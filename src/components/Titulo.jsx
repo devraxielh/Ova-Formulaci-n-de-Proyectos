@@ -2,9 +2,15 @@ import React, { useState } from 'react';
 import { CheckCircle, AlertCircle, Bookmark, Calendar, MapPin, Users, HelpCircle, PenTool, BookOpen } from 'lucide-react';
 
 
+import verbsData from '../data/verbs.json';
+
 const Titulo = () => {
 
+    const verbs = verbsData;
 
+
+    const [formData, setFormData] = useState({
+        accion: '',
         objeto: '',
         donde: '',
         quien: '',
@@ -13,9 +19,25 @@ const Titulo = () => {
         includeParaque: true,
         includeQuien: true,
         includeDonde: true,
-        includeCuando: true,
         includeCuando: true
     });
+
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [aiTitle, setAiTitle] = useState('');
+
+    const handleGenerateTitle = async () => {
+        setIsGenerating(true);
+        try {
+            // Aquí iría la lógica de generación con IA
+            console.log('Generating title with AI...');
+            // Por ahora solo simulamos un delay
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (error) {
+            console.error('Error generating title:', error);
+        } finally {
+            setIsGenerating(false);
+        }
+    };
 
 
 
@@ -207,29 +229,77 @@ const Titulo = () => {
 
                     <div className="input-group">
                         <label>1. ¿Qué se hace? (Acción / Verbo sustantivado)</label>
-                        <input
-                            type="text"
-                            className="input-field"
-                            placeholder="Ej: Análisis, Diseño, Implementación, Evaluación..."
-                            value={formData.accion}
-                            onChange={(e) => setFormData({ ...formData, accion: e.target.value })}
-                        />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', alignItems: 'start' }}>
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type="text"
+                                    className="input-field"
+                                    placeholder="Buscar verbo..."
+                                    value={formData.accion}
+                                    onChange={(e) => setFormData({ ...formData, accion: e.target.value })}
+                                    list="verbs-list"
+                                />
+                                <datalist id="verbs-list">
+                                    {verbs.map(v => <option key={v.label} value={v.label} />)}
+                                </datalist>
+                            </div>
+
+                            {(() => {
+                                const selectedVerb = verbs.find(v => v.label.toLowerCase() === formData.accion.toLowerCase());
+                                return selectedVerb ? (
+                                    <div style={{
+                                        background: '#f0f9ff',
+                                        border: '1px solid #bae6fd',
+                                        padding: '0.75rem',
+                                        borderRadius: '0.5rem',
+                                        fontSize: '0.85rem'
+                                    }}>
+                                        <div style={{ fontWeight: '600', color: '#0369a1', marginBottom: '0.25rem' }}>{selectedVerb.label}</div>
+                                        <div style={{ color: '#0c4a6e' }}>{selectedVerb.desc}</div>
+                                    </div>
+                                ) : (
+                                    <div style={{
+                                        background: '#f8fafc',
+                                        border: '1px solid #e2e8f0',
+                                        padding: '0.75rem',
+                                        borderRadius: '0.5rem',
+                                        fontSize: '0.85rem',
+                                        color: '#64748b',
+                                        fontStyle: 'italic'
+                                    }}>
+                                        Selecciona un verbo para ver su definición.
+                                    </div>
+                                );
+                            })()}
+                        </div>
                     </div>
 
                     <div className="input-group">
                         <label>2. ¿Sobre qué? (Objeto de Estudio / Variable)</label>
-                        <input
-                            type="text"
-                            className="input-field"
-                            placeholder="Ej: del clima organizacional, de un software contable..."
-                            value={formData.objeto}
-                            onChange={(e) => setFormData({ ...formData, objeto: e.target.value })}
-                        />
+                        {(() => {
+                            const selectedVerb = verbs.find(v => v.label.toLowerCase() === formData.accion.toLowerCase());
+                            return (
+                                <div>
+                                    {selectedVerb && (
+                                        <div style={{ marginBottom: '0.5rem', fontSize: '0.85rem', color: '#0369a1', fontWeight: '500' }}>
+                                            💡 {selectedVerb.objectHint}
+                                        </div>
+                                    )}
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        placeholder={selectedVerb ? `Ej: ${selectedVerb.example}...` : "Ej: del clima organizacional, de un software contable..."}
+                                        value={formData.objeto}
+                                        onChange={(e) => setFormData({ ...formData, objeto: e.target.value })}
+                                    />
+                                </div>
+                            );
+                        })()}
                     </div>
 
                     <div className="input-group">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <label>3. ¿Para qué? (Propósito) <span style={{ color: '#94a3b8', fontWeight: 'normal' }}>(Opcional)</span></label>
+                            <label>3. ¿Para qué? (Propósito) <span style={{ color: '#94a3b8', fontWeight: 'normal' }}></span></label>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#64748b', cursor: 'pointer' }}>
                                 <input
                                     type="checkbox"
@@ -239,14 +309,26 @@ const Titulo = () => {
                                 Incluir
                             </label>
                         </div>
-                        <input
-                            type="text"
-                            className="input-field"
-                            placeholder="Ej: mejorar la productividad, reducir riesgos..."
-                            value={formData.paraque}
-                            onChange={(e) => setFormData({ ...formData, paraque: e.target.value })}
-                            style={{ opacity: formData.includeParaque ? 1 : 0.6 }}
-                        />
+                        {(() => {
+                            const selectedVerb = verbs.find(v => v.label.toLowerCase() === formData.accion.toLowerCase());
+                            return (
+                                <div>
+                                    {selectedVerb && (
+                                        <div style={{ marginBottom: '0.5rem', fontSize: '0.85rem', color: '#059669', fontWeight: '500' }}>
+                                            💡 {selectedVerb.purposeHint}
+                                        </div>
+                                    )}
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        placeholder={selectedVerb ? `Ej: ${selectedVerb.purposeExample}...` : "Ej: mejorar la productividad, reducir riesgos..."}
+                                        value={formData.paraque}
+                                        onChange={(e) => setFormData({ ...formData, paraque: e.target.value })}
+                                        style={{ opacity: formData.includeParaque ? 1 : 0.6 }}
+                                    />
+                                </div>
+                            );
+                        })()}
                     </div>
 
                     <div className="input-group">
@@ -261,17 +343,29 @@ const Titulo = () => {
                                 Incluir
                             </label>
                         </div>
-                        <input
-                            type="text"
-                            className="input-field"
-                            placeholder="Ej: los empleados, los estudiantes de grado 10..."
-                            value={formData.quien}
-                            onChange={(e) => setFormData({ ...formData, quien: e.target.value })}
-                            style={{ opacity: formData.includeQuien ? 1 : 0.6 }}
-                        />
+                        {(() => {
+                            const selectedVerb = verbs.find(v => v.label.toLowerCase() === formData.accion.toLowerCase());
+                            return (
+                                <div>
+                                    {selectedVerb && (
+                                        <div style={{ marginBottom: '0.5rem', fontSize: '0.85rem', color: '#7c3aed', fontWeight: '500' }}>
+                                            💡 {selectedVerb.populationHint}
+                                        </div>
+                                    )}
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        placeholder={selectedVerb ? `Ej: ${selectedVerb.populationExample}...` : "Ej: en estudiantes, en las pymes..."}
+                                        value={formData.quien}
+                                        onChange={(e) => setFormData({ ...formData, quien: e.target.value })}
+                                        style={{ opacity: formData.includeQuien ? 1 : 0.6 }}
+                                    />
+                                </div>
+                            );
+                        })()}
                     </div>
 
-                    <div className="grid-cols-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                         <div className="input-group">
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <label>5. ¿Dónde? (Lugar)</label>
@@ -284,14 +378,26 @@ const Titulo = () => {
                                     Incluir
                                 </label>
                             </div>
-                            <input
-                                type="text"
-                                className="input-field"
-                                placeholder="Ej: empresa XYZ, Hospital Central..."
-                                value={formData.donde}
-                                onChange={(e) => setFormData({ ...formData, donde: e.target.value })}
-                                style={{ opacity: formData.includeDonde ? 1 : 0.6 }}
-                            />
+                            {(() => {
+                                const selectedVerb = verbs.find(v => v.label.toLowerCase() === formData.accion.toLowerCase());
+                                return (
+                                    <div>
+                                        {selectedVerb && (
+                                            <div style={{ marginBottom: '0.5rem', fontSize: '0.85rem', color: '#db2777', fontWeight: '500' }}>
+                                                💡 {selectedVerb.placeHint}
+                                            </div>
+                                        )}
+                                        <input
+                                            type="text"
+                                            className="input-field"
+                                            placeholder={selectedVerb ? `Ej: ${selectedVerb.placeExample}...` : "Ej: en la ciudad de Bogotá, en el laboratorio..."}
+                                            value={formData.donde}
+                                            onChange={(e) => setFormData({ ...formData, donde: e.target.value })}
+                                            style={{ opacity: formData.includeDonde ? 1 : 0.6 }}
+                                        />
+                                    </div>
+                                );
+                            })()}
                         </div>
 
                         <div className="input-group">
@@ -306,17 +412,30 @@ const Titulo = () => {
                                     Incluir
                                 </label>
                             </div>
-                            <input
-                                type="text"
-                                className="input-field"
-                                placeholder="Ej: 2024, primer semestre..."
-                                value={formData.cuando}
-                                onChange={(e) => setFormData({ ...formData, cuando: e.target.value })}
-                                style={{ opacity: formData.includeCuando ? 1 : 0.6 }}
-                            />
+                            {(() => {
+                                const selectedVerb = verbs.find(v => v.label.toLowerCase() === formData.accion.toLowerCase());
+                                return (
+                                    <div>
+                                        {selectedVerb && (
+                                            <div style={{ marginBottom: '0.5rem', fontSize: '0.85rem', color: '#ea580c', fontWeight: '500' }}>
+                                                💡 {selectedVerb.timeHint}
+                                            </div>
+                                        )}
+                                        <input
+                                            type="text"
+                                            className="input-field"
+                                            placeholder={selectedVerb ? `Ej: ${selectedVerb.timeExample}...` : "Ej: 2024, primer semestre..."}
+                                            value={formData.cuando}
+                                            onChange={(e) => setFormData({ ...formData, cuando: e.target.value })}
+                                            style={{ opacity: formData.includeCuando ? 1 : 0.6 }}
+                                        />
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>
+
 
                 {/* Live Preview Section */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -347,23 +466,75 @@ const Titulo = () => {
                                     {generatedTitle}
                                 </span>
                             ) : (
-                                <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Completa los campos para construir tu título...</span>
+
+                                <div style={{ marginTop: '1.5rem', borderTop: '1px solid #f1f5f9', paddingTop: '1rem' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem', color: '#64748b' }}>
+                                        <span>Conteo de palabras:</span>
+                                        <span style={{
+                                            fontWeight: 'bold',
+                                            color: wordCount > 20 ? '#ef4444' : (wordCount > 0 ? '#10b981' : '#94a3b8')
+                                        }}>
+                                            {wordCount} palabras
+                                        </span>
+                                    </div>
+                                    {wordCount > 20 && (
+                                        <p style={{ fontSize: '0.8rem', color: '#ef4444', marginTop: '0.5rem' }}>
+                                            * Intenta simplificar. Un título académico idealmente no supera las 20 palabras.
+                                        </p>
+                                    )}
+                                </div>
                             )}
                         </div>
 
-                        <div style={{ marginTop: '1.5rem', borderTop: '1px solid #f1f5f9', paddingTop: '1rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem', color: '#64748b' }}>
-                                <span>Conteo de palabras:</span>
-                                <span style={{
-                                    fontWeight: 'bold',
-                                    color: wordCount > 20 ? '#ef4444' : (wordCount > 0 ? '#10b981' : '#94a3b8')
+                        {/* AI Generation Section */}
+                        <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px dashed #cbd5e1' }}>
+                            <button
+                                onClick={handleGenerateTitle}
+                                disabled={isGenerating || !formData.accion || !formData.objeto}
+                                style={{
+                                    width: '100%',
+                                    padding: '0.75rem',
+                                    background: isGenerating ? '#94a3b8' : 'linear-gradient(to right, #7c3aed, #db2777)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '0.5rem',
+                                    fontWeight: '600',
+                                    cursor: isGenerating || !formData.accion || !formData.objeto ? 'not-allowed' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.5rem',
+                                    boxShadow: '0 4px 6px -1px rgba(124, 58, 237, 0.3)',
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                {isGenerating ? (
+                                    <>
+                                        <span className="spinner" style={{ animation: 'spin 1s linear infinite' }}>⌛</span> Generando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <span style={{ fontSize: '1.2rem' }}>✨</span> Generar con IA
+                                    </>
+                                )}
+                            </button>
+
+                            {aiTitle && (
+                                <div style={{
+                                    marginTop: '1rem',
+                                    padding: '1rem',
+                                    background: '#f0fdf4',
+                                    border: '1px solid #bbf7d0',
+                                    borderRadius: '0.5rem',
+                                    position: 'relative'
                                 }}>
-                                    {wordCount} palabras
-                                </span>
-                            </div>
-                            {wordCount > 20 && (
-                                <p style={{ fontSize: '0.8rem', color: '#ef4444', marginTop: '0.5rem' }}>
-                                    * Intenta simplificar. Un título académico idealmente no supera las 20 palabras.
+                                    <h5 style={{ margin: '0 0 0.5rem 0', color: '#166534', fontSize: '0.85rem', textTransform: 'uppercase' }}>Sugerencia IA:</h5>
+                                    <p style={{ margin: 0, color: '#14532d', fontWeight: '600', fontSize: '1.1rem' }}>{aiTitle}</p>
+                                </div>
+                            )}
+                            {!formData.accion && !formData.objeto && (
+                                <p style={{ fontSize: '0.8rem', color: '#94a3b8', textAlign: 'center', marginTop: '0.5rem' }}>
+                                    * Completa al menos la Acción y el Objeto para usar la IA.
                                 </p>
                             )}
                         </div>
@@ -388,9 +559,9 @@ const Titulo = () => {
                     </div>
                 </div>
 
-            </div>
+            </div >
 
-        </div>
+        </div >
     );
 };
 
