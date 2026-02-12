@@ -65,7 +65,7 @@ const PreguntaInvestigacion = () => {
         <div style={{ maxWidth: '100%', paddingBottom: '3rem' }}>
 
             {/* Theory Card */}
-            <div style={{
+            <div className="responsive-banner" style={{
                 background: 'linear-gradient(to right, #f0f9ff, #e0f2fe)',
                 border: '1px solid #bae6fd',
                 borderRadius: '1rem',
@@ -92,7 +92,8 @@ const PreguntaInvestigacion = () => {
                     padding: '1.5rem',
                     borderRadius: '0.75rem',
                     boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
-                    maxWidth: '320px'
+                    maxWidth: '320px',
+                    width: '100%'
                 }}>
                     <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0284c7', marginBottom: '0.75rem', fontSize: '1rem' }}>
                         <HelpCircle size={20} /> Características Clave
@@ -107,7 +108,7 @@ const PreguntaInvestigacion = () => {
             </div>
 
             {/* Additional Theory Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
+            <div className="responsive-flex-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
 
                 {/* Card: Cómo Formular */}
                 <div style={{
@@ -166,7 +167,7 @@ const PreguntaInvestigacion = () => {
             </div>
 
             {/* More Theory Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
+            <div className="responsive-flex-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
 
                 {/* Card: Errores Comunes */}
                 <div style={{
@@ -220,7 +221,7 @@ const PreguntaInvestigacion = () => {
 
             </div>
 
-            <div style={{ maxWidth: '1200px', display: 'grid', gridTemplateColumns: 'minmax(300px, 1.5fr) 1fr', gap: '2rem' }}>
+            <div className="responsive-flex-grid" style={{ maxWidth: '1200px', display: 'grid', gridTemplateColumns: 'minmax(300px, 1.5fr) 1fr', gap: '2rem' }}>
 
                 {/* Main Builder */}
                 <div>

@@ -33,7 +33,7 @@ const Introduccion = () => {
         <div style={{ maxWidth: '100%', paddingBottom: '3rem' }}>
 
             {/* Main Theory Card */}
-            <div style={{
+            <div className="responsive-banner" style={{
                 background: 'linear-gradient(to right, #fef3c7, #fef9e7)',
                 border: '1px solid #fde68a',
                 borderRadius: '1rem',
@@ -60,7 +60,8 @@ const Introduccion = () => {
                     padding: '1.5rem',
                     borderRadius: '0.75rem',
                     boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
-                    maxWidth: '320px'
+                    maxWidth: '320px',
+                    width: '100%'
                 }}>
                     <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#d97706', marginBottom: '0.75rem', fontSize: '1rem' }}>
                         <Lightbulb size={20} /> Elementos Clave
@@ -76,7 +77,7 @@ const Introduccion = () => {
             </div>
 
             {/* Additional Theory Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
+            <div className="responsive-flex-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
 
                 {/* Card: Estructura */}
                 <div style={{
@@ -138,7 +139,7 @@ const Introduccion = () => {
             </div>
 
             {/* More Theory Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
+            <div className="responsive-flex-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
 
                 {/* Card: Errores Comunes */}
                 <div style={{
@@ -216,7 +217,7 @@ const Introduccion = () => {
                         <strong>Conectores útiles:</strong> Enriquecen la estructura y redacción del texto, uniendo elementos de forma coherente.
                     </p>
                 </div>
-                <div style={{
+                <div className="responsive-flex-grid" style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
                     gap: '0.5rem',

@@ -32,7 +32,7 @@ const PlanteamientoProblema = () => {
         <div style={{ maxWidth: '100%', paddingBottom: '3rem' }}>
 
             {/* Main Theory Card */}
-            <div style={{
+            <div className="responsive-banner" style={{
                 background: 'linear-gradient(to right, #fef3c7, #fef9e7)',
                 border: '1px solid #fde68a',
                 borderRadius: '1rem',
@@ -48,7 +48,7 @@ const PlanteamientoProblema = () => {
                         ¿Qué es el Planteamiento del Problema?
                     </h2>
                     <p style={{ color: '#78350f', lineHeight: '1.7', fontSize: '1.05rem', marginBottom: '1rem' }}>
-                        El planteamiento del problema es la <strong>descripción clara y precisa de la situación problemática</strong> que motiva tu investigación. Debe explicar qué está sucediendo, por qué es importante estudiarlo y qué consecuencias tiene.
+                        El planteamiento del problema es la <strong>descripción clara y precisa de la situation problemática</strong> que motiva tu investigación. Debe explicar qué está sucediendo, por qué es importante estudiarlo y qué consecuencias tiene.
                     </p>
                     <p style={{ color: '#78350f', lineHeight: '1.7', fontSize: '1.05rem' }}>
                         Un buen planteamiento contextualiza el problema, identifica sus causas y efectos, y justifica la necesidad de investigarlo. Es la base que sustenta todo tu proyecto de investigación.
@@ -59,7 +59,8 @@ const PlanteamientoProblema = () => {
                     padding: '1.5rem',
                     borderRadius: '0.75rem',
                     boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
-                    maxWidth: '320px'
+                    maxWidth: '320px',
+                    width: '100%'
                 }}>
                     <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#d97706', marginBottom: '0.75rem', fontSize: '1rem' }}>
                         <Lightbulb size={20} /> Elementos Clave
@@ -75,7 +76,7 @@ const PlanteamientoProblema = () => {
             </div>
 
             {/* Additional Theory Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
+            <div className="responsive-flex-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
 
                 {/* Card: Estructura */}
                 <div style={{
@@ -134,7 +135,7 @@ const PlanteamientoProblema = () => {
             </div>
 
             {/* More Theory Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
+            <div className="responsive-flex-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
 
                 {/* Card: Errores Comunes */}
                 <div style={{

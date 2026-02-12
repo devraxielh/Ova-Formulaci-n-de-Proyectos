@@ -58,7 +58,7 @@ const Objetivos = () => {
         <div style={{ maxWidth: '100%', paddingBottom: '3rem' }}>
 
             {/* Main Theory Card */}
-            <div style={{
+            <div className="responsive-banner" style={{
                 background: 'linear-gradient(to right, #dbeafe, #bfdbfe)',
                 border: '1px solid #93c5fd',
                 borderRadius: '1rem',
@@ -85,7 +85,8 @@ const Objetivos = () => {
                     padding: '1.5rem',
                     borderRadius: '0.75rem',
                     boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
-                    maxWidth: '320px'
+                    maxWidth: '320px',
+                    width: '100%'
                 }}>
                     <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#2563eb', marginBottom: '0.75rem', fontSize: '1rem' }}>
                         <Lightbulb size={20} /> Características
@@ -100,7 +101,7 @@ const Objetivos = () => {
             </div>
 
             {/* Additional Theory Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
+            <div className="responsive-flex-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
 
                 {/* Card: Objetivo General */}
                 <div style={{
@@ -153,7 +154,7 @@ const Objetivos = () => {
             </div>
 
             {/* More Theory Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
+            <div className="responsive-flex-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
 
                 {/* Card: Verbos Comunes */}
                 <div style={{
@@ -166,7 +167,7 @@ const Objetivos = () => {
                         <HelpCircle size={24} color="#f59e0b" />
                         Verbos Comunes (Taxonomía de Bloom)
                     </h3>
-                    <div style={{ color: '#78350f', fontSize: '0.9rem', lineHeight: '1.5', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
+                    <div className="responsive-flex-grid" style={{ color: '#78350f', fontSize: '0.9rem', lineHeight: '1.5', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
                         {verbs.map((verb, index) => (
                             <div key={index} style={{ padding: '0.25rem 0' }}>• {verb}</div>
                         ))}

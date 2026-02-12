@@ -62,7 +62,7 @@ function App() {
                 </button>
                 <div className="sidebar-brand" style={{ marginLeft: '1rem', fontSize: '1.1rem', borderBottom: 'none', marginBottom: 0 }}>
                     <Layers size={20} color="#4f46e5" />
-                    <span>Proyectos + IA</span>
+                    <span>PROJECTSIA</span>
                 </div>
             </header>
 
