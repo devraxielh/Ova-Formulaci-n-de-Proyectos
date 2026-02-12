@@ -103,7 +103,7 @@ function App() {
                 </nav>
 
                 <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid #e2e8f0' }}>
-                    <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>© 2024 OVA Educación</p>
+                    <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>© Rodrigo García,PhD</p>
                 </div>
             </aside>
 
