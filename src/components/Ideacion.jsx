@@ -84,7 +84,7 @@ const Ideacion = () => {
     return (
         <div style={{ maxWidth: '100%', paddingBottom: '3rem' }}>
             {/* Introduction Banner */}
-            <div style={{
+            <div className="responsive-banner" style={{
                 background: 'linear-gradient(to right, #eff6ff, #f0fdf4)',
                 border: '1px solid #dbeafe',
                 borderRadius: '1rem',
@@ -108,7 +108,8 @@ const Ideacion = () => {
                     padding: '1.5rem',
                     borderRadius: '0.75rem',
                     boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
-                    maxWidth: '300px'
+                    maxWidth: '300px',
+                    width: '100%'
                 }}>
                     <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#059669', marginBottom: '0.5rem' }}>
                         <BookOpen size={18} /> Concepto Clave
@@ -121,7 +122,7 @@ const Ideacion = () => {
 
             {/* Primary Educational Cards */}
             <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', color: '#334155' }}>Fundamentos del Problema</h3>
-            <div className="grid-cols-3" style={{ marginBottom: '3rem', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
+            <div className="grid-cols-3 responsive-flex-grid" style={{ marginBottom: '3rem' }}>
                 {/* Card 1: Problems vs Symptoms */}
                 <div className="card" style={{ borderTop: '4px solid #ef4444' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
@@ -205,7 +206,7 @@ const Ideacion = () => {
 
             {/* Secondary Educational Cards */}
             <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', color: '#334155' }}>Contexto y Justificación</h3>
-            <div className="grid-cols-3" style={{ marginBottom: '3rem', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
+            <div className="grid-cols-3 responsive-flex-grid" style={{ marginBottom: '3rem' }}>
 
                 {/* Card 4: Environmental Context */}
                 <div className="card" style={{ borderTop: '4px solid #f59e0b' }}>

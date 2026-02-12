@@ -82,7 +82,7 @@ const Titulo = () => {
         <div style={{ maxWidth: '100%', paddingBottom: '3rem' }}>
 
             {/* Introduction Banner */}
-            <div style={{
+            <div className="responsive-banner" style={{
                 background: 'linear-gradient(to right, #f3e8ff, #fdf4ff)',
                 border: '1px solid #e9d5ff',
                 borderRadius: '1rem',
@@ -106,7 +106,8 @@ const Titulo = () => {
                     padding: '1.5rem',
                     borderRadius: '0.75rem',
                     boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
-                    maxWidth: '300px'
+                    maxWidth: '300px',
+                    width: '100%'
                 }}>
                     <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#9333ea', marginBottom: '0.5rem' }}>
                         <BookOpen size={18} /> Regla de Oro
@@ -119,7 +120,7 @@ const Titulo = () => {
 
             {/* Educational Theory Cards */}
             <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', color: '#334155' }}>Anatomía del Título</h3>
-            <div className="grid-cols-3" style={{ marginBottom: '3rem', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+            <div className="grid-cols-3 responsive-flex-grid" style={{ marginBottom: '3rem' }}>
 
                 <div className="card" style={{ borderTop: '4px solid #3b82f6' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
@@ -179,7 +180,7 @@ const Titulo = () => {
 
             {/* Examples & Common Mistakes Section */}
             <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', color: '#334155' }}>Ejemplos y Buenas Prácticas</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '2rem', marginBottom: '3rem' }}>
+            <div className="responsive-flex-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '2rem', marginBottom: '3rem' }}>
 
                 {/* Deconstructed Examples */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -242,7 +243,7 @@ const Titulo = () => {
                 <PenTool size={20} /> Constructor Estructurado
             </h3>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1.5fr) 1fr', gap: '2rem' }}>
+            <div className="responsive-flex-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1.5fr) 1fr', gap: '2rem' }}>
 
                 {/* Form Section */}
                 <div className="card">

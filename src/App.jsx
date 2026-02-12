@@ -9,6 +9,15 @@ import Introduccion from './components/Introduccion';
 
 function App() {
     const [activeTab, setActiveTab] = useState('ideacion');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+    const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+    const closeSidebar = () => setIsSidebarOpen(false);
+
+    const handleTabChange = (tabId) => {
+        setActiveTab(tabId);
+        closeSidebar(); // Close sidebar on selection (mobile)
+    };
 
     const renderContent = () => {
         switch (activeTab) {
@@ -43,19 +52,36 @@ function App() {
 
     return (
         <div className="app-container">
+            {/* Mobile Header */}
+            <header className="mobile-header">
+                <button
+                    onClick={toggleSidebar}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.5rem', color: '#1e293b' }}
+                >
+                    <Menu size={24} />
+                </button>
+                <div className="sidebar-brand" style={{ marginLeft: '1rem', fontSize: '1.1rem', borderBottom: 'none', marginBottom: 0 }}>
+                    <Layers size={20} color="#4f46e5" />
+                    <span>Proyectos + IA</span>
+                </div>
+            </header>
+
+            {/* Sidebar Overlay (Mobile) */}
+            {isSidebarOpen && <div className="sidebar-overlay" onClick={closeSidebar}></div>}
+
             {/* Sidebar Navigation */}
-            <aside className="sidebar">
+            <aside className={`sidebar ${isSidebarOpen ? 'sidebar-open' : ''}`}>
                 <div className="sidebar-header">
                     <div className="sidebar-brand">
                         <Layers size={24} color="#4f46e5" />
-                        <span>Proyectos + IA</span>
+                        <span>PROJECTSIA</span>
                     </div>
                 </div>
 
                 <nav style={{ flex: 1 }}>
                     <button
                         className={`nav-button ${activeTab === 'ideacion' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('ideacion')}
+                        onClick={() => handleTabChange('ideacion')}
                     >
                         <Lightbulb size={20} />
                         <span>Ideación</span>
@@ -63,7 +89,7 @@ function App() {
 
                     <button
                         className={`nav-button ${activeTab === 'titulo' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('titulo')}
+                        onClick={() => handleTabChange('titulo')}
                     >
                         <Type size={20} />
                         <span>Título</span>
@@ -71,7 +97,7 @@ function App() {
 
                     <button
                         className={`nav-button ${activeTab === 'pregunta' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('pregunta')}
+                        onClick={() => handleTabChange('pregunta')}
                     >
                         <HelpCircle size={20} />
                         <span>Pregunta Investigación</span>
@@ -79,7 +105,7 @@ function App() {
 
                     <button
                         className={`nav-button ${activeTab === 'planteamiento' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('planteamiento')}
+                        onClick={() => handleTabChange('planteamiento')}
                     >
                         <FileText size={20} />
                         <span>Planteamiento Problema</span>
@@ -87,7 +113,7 @@ function App() {
 
                     <button
                         className={`nav-button ${activeTab === 'objetivos' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('objetivos')}
+                        onClick={() => handleTabChange('objetivos')}
                     >
                         <Target size={20} />
                         <span>Objetivos</span>
@@ -95,7 +121,7 @@ function App() {
 
                     <button
                         className={`nav-button ${activeTab === 'introduccion' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('introduccion')}
+                        onClick={() => handleTabChange('introduccion')}
                     >
                         <BookOpen size={20} />
                         <span>Introducción</span>
