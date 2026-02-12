@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CheckCircle, AlertCircle, Bookmark, Calendar, MapPin, Users, HelpCircle, PenTool, BookOpen } from 'lucide-react';
+import { generateTitle, evaluateTitle } from '../services/groqService';
 
 
 import verbsData from '../data/verbs.json';
@@ -24,18 +25,41 @@ const Titulo = () => {
 
     const [isGenerating, setIsGenerating] = useState(false);
     const [aiTitle, setAiTitle] = useState('');
+    const [error, setError] = useState('');
+    const [isEvaluating, setIsEvaluating] = useState(false);
+    const [evaluation, setEvaluation] = useState('');
 
     const handleGenerateTitle = async () => {
         setIsGenerating(true);
+        setError('');
         try {
-            // Aquí iría la lógica de generación con IA
-            console.log('Generating title with AI...');
-            // Por ahora solo simulamos un delay
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            const generatedTitle = await generateTitle(formData);
+            setAiTitle(generatedTitle);
         } catch (error) {
             console.error('Error generating title:', error);
+            setError(error.message || 'Error al generar el título');
         } finally {
             setIsGenerating(false);
+        }
+    };
+
+    const handleEvaluateTitle = async () => {
+        const titleToEvaluate = aiTitle || generatedTitle;
+        if (!titleToEvaluate) {
+            setError('No hay título para evaluar');
+            return;
+        }
+
+        setIsEvaluating(true);
+        setError('');
+        try {
+            const evaluationResult = await evaluateTitle(titleToEvaluate, formData);
+            setEvaluation(evaluationResult);
+        } catch (error) {
+            console.error('Error evaluating title:', error);
+            setError(error.message || 'Error al evaluar el título');
+        } finally {
+            setIsEvaluating(false);
         }
     };
 
@@ -272,6 +296,26 @@ const Titulo = () => {
                                 );
                             })()}
                         </div>
+                        <div style={{
+                            marginTop: '0.75rem',
+                            padding: '0.875rem',
+                            background: 'linear-gradient(to right, #fef3c7, #fef9e7)',
+                            border: '1px solid #fde68a',
+                            borderRadius: '0.5rem',
+                            fontSize: '0.875rem',
+                            lineHeight: '1.6'
+                        }}>
+                            <div style={{ fontWeight: '600', color: '#92400e', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ fontSize: '1.1rem' }}>💡</span> ¿Qué se hace?
+                            </div>
+                            <div style={{ color: '#78350f' }}>
+                                <strong>Define la acción principal</strong> de tu investigación usando un verbo sustantivado (análisis, evaluación, diseño, etc.).
+                                Este verbo representa <strong>qué tipo de trabajo investigativo</strong> realizarás.
+                            </div>
+                            <div style={{ marginTop: '0.5rem', color: '#78350f', fontSize: '0.8rem', fontStyle: 'italic' }}>
+                                Ejemplo: "Análisis" si vas a examinar datos, "Diseño" si vas a crear algo nuevo, "Evaluación" si vas a medir resultados.
+                            </div>
+                        </div>
                     </div>
 
                     <div className="input-group">
@@ -295,6 +339,42 @@ const Titulo = () => {
                                 </div>
                             );
                         })()}
+                        <div style={{
+                            marginTop: '0.75rem',
+                            padding: '0.875rem',
+                            background: 'linear-gradient(to right, #fef3c7, #fef9e7)',
+                            border: '1px solid #fde68a',
+                            borderRadius: '0.5rem',
+                            fontSize: '0.875rem',
+                            lineHeight: '1.6'
+                        }}>
+                            <div style={{ fontWeight: '600', color: '#92400e', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ fontSize: '1.1rem' }}>💡</span> ¿Sobre qué?
+                            </div>
+                            <div style={{ color: '#78350f' }}>
+                                <strong>Define el objeto de estudio o las variables</strong> que investigarás. Es el "qué" específico que analizarás, medirás o estudiarás.
+                            </div>
+                            <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #fde68a' }}>
+                                <div style={{ color: '#78350f', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+                                    <strong>Ejemplos de objetos de estudio:</strong>
+                                </div>
+                                <ul style={{ margin: '0.25rem 0 0 1.25rem', padding: 0, color: '#78350f', fontSize: '0.8rem' }}>
+                                    <li>El clima organizacional en empresas tecnológicas</li>
+                                    <li>La satisfacción del cliente en servicios bancarios</li>
+                                    <li>El proceso de toma de decisiones gerenciales</li>
+                                </ul>
+                            </div>
+                            <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #fde68a' }}>
+                                <div style={{ color: '#78350f', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+                                    <strong>Ejemplos de variables:</strong>
+                                </div>
+                                <ul style={{ margin: '0.25rem 0 0 1.25rem', padding: 0, color: '#78350f', fontSize: '0.8rem' }}>
+                                    <li>La productividad laboral</li>
+                                    <li>El rendimiento académico</li>
+                                    <li>La eficiencia operativa</li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="input-group">
@@ -329,6 +409,34 @@ const Titulo = () => {
                                 </div>
                             );
                         })()}
+                        <div style={{
+                            marginTop: '0.75rem',
+                            padding: '0.875rem',
+                            background: 'linear-gradient(to right, #fef3c7, #fef9e7)',
+                            border: '1px solid #fde68a',
+                            borderRadius: '0.5rem',
+                            fontSize: '0.875rem',
+                            lineHeight: '1.6'
+                        }}>
+                            <div style={{ fontWeight: '600', color: '#92400e', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ fontSize: '1.1rem' }}>💡</span> ¿Para qué?
+                            </div>
+                            <div style={{ color: '#78350f' }}>
+                                <strong>Define el propósito u objetivo</strong> de tu investigación. Responde a la pregunta: ¿qué quieres lograr o conseguir con este estudio?
+                            </div>
+                            <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #fde68a' }}>
+                                <div style={{ color: '#78350f', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+                                    <strong>Ejemplos de propósitos:</strong>
+                                </div>
+                                <ul style={{ margin: '0.25rem 0 0 1.25rem', padding: 0, color: '#78350f', fontSize: '0.8rem' }}>
+                                    <li>Para mejorar la productividad laboral</li>
+                                    <li>Para identificar oportunidades de mejora</li>
+                                    <li>Para reducir costos operativos</li>
+                                    <li>Para optimizar procesos de negocio</li>
+                                    <li>Para aumentar la satisfacción del cliente</li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="input-group">
@@ -363,6 +471,34 @@ const Titulo = () => {
                                 </div>
                             );
                         })()}
+                        <div style={{
+                            marginTop: '0.75rem',
+                            padding: '0.875rem',
+                            background: 'linear-gradient(to right, #fef3c7, #fef9e7)',
+                            border: '1px solid #fde68a',
+                            borderRadius: '0.5rem',
+                            fontSize: '0.875rem',
+                            lineHeight: '1.6'
+                        }}>
+                            <div style={{ fontWeight: '600', color: '#92400e', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ fontSize: '1.1rem' }}>💡</span> ¿En quiénes?
+                            </div>
+                            <div style={{ color: '#78350f' }}>
+                                <strong>Define la población o unidad de análisis</strong> de tu investigación. ¿Sobre quiénes o qué entidades recopilarás información?
+                            </div>
+                            <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #fde68a' }}>
+                                <div style={{ color: '#78350f', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+                                    <strong>Ejemplos de poblaciones:</strong>
+                                </div>
+                                <ul style={{ margin: '0.25rem 0 0 1.25rem', padding: 0, color: '#78350f', fontSize: '0.8rem' }}>
+                                    <li>En estudiantes universitarios de Colombia</li>
+                                    <li>En docentes de educación básica</li>
+                                    <li>En pequeñas y medianas empresas (PYMES)</li>
+                                    <li>En trabajadores del sector salud</li>
+                                    <li>En clientes de servicios financieros</li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
@@ -398,6 +534,33 @@ const Titulo = () => {
                                     </div>
                                 );
                             })()}
+                            <div style={{
+                                marginTop: '0.75rem',
+                                padding: '0.875rem',
+                                background: 'linear-gradient(to right, #fef3c7, #fef9e7)',
+                                border: '1px solid #fde68a',
+                                borderRadius: '0.5rem',
+                                fontSize: '0.875rem',
+                                lineHeight: '1.6'
+                            }}>
+                                <div style={{ fontWeight: '600', color: '#92400e', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <span style={{ fontSize: '1.1rem' }}>💡</span> ¿Dónde?
+                                </div>
+                                <div style={{ color: '#78350f' }}>
+                                    <strong>Define el contexto geográfico o espacial</strong> donde se realizará la investigación.
+                                </div>
+                                <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #fde68a' }}>
+                                    <div style={{ color: '#78350f', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+                                        <strong>Ejemplos de lugares:</strong>
+                                    </div>
+                                    <ul style={{ margin: '0.25rem 0 0 1.25rem', padding: 0, color: '#78350f', fontSize: '0.8rem' }}>
+                                        <li>En la ciudad de Bogotá</li>
+                                        <li>En la Universidad Nacional de Colombia</li>
+                                        <li>En empresas del sector tecnológico de Medellín</li>
+                                        <li>En hospitales públicos de Cali</li>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="input-group">
@@ -432,6 +595,33 @@ const Titulo = () => {
                                     </div>
                                 );
                             })()}
+                            <div style={{
+                                marginTop: '0.75rem',
+                                padding: '0.875rem',
+                                background: 'linear-gradient(to right, #fef3c7, #fef9e7)',
+                                border: '1px solid #fde68a',
+                                borderRadius: '0.5rem',
+                                fontSize: '0.875rem',
+                                lineHeight: '1.6'
+                            }}>
+                                <div style={{ fontWeight: '600', color: '#92400e', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <span style={{ fontSize: '1.1rem' }}>💡</span> ¿Cuándo?
+                                </div>
+                                <div style={{ color: '#78350f' }}>
+                                    <strong>Define el marco temporal</strong> de tu investigación. ¿En qué período se realizará o se enfoca el estudio?
+                                </div>
+                                <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #fde68a' }}>
+                                    <div style={{ color: '#78350f', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+                                        <strong>Ejemplos de períodos temporales:</strong>
+                                    </div>
+                                    <ul style={{ margin: '0.25rem 0 0 1.25rem', padding: 0, color: '#78350f', fontSize: '0.8rem' }}>
+                                        <li>Durante el año 2024</li>
+                                        <li>En el primer semestre de 2025</li>
+                                        <li>Entre enero y junio de 2024</li>
+                                        <li>Durante el período 2023-2024</li>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -530,6 +720,79 @@ const Titulo = () => {
                                 }}>
                                     <h5 style={{ margin: '0 0 0.5rem 0', color: '#166534', fontSize: '0.85rem', textTransform: 'uppercase' }}>Sugerencia IA:</h5>
                                     <p style={{ margin: 0, color: '#14532d', fontWeight: '600', fontSize: '1.1rem' }}>{aiTitle}</p>
+
+                                    <button
+                                        onClick={handleEvaluateTitle}
+                                        disabled={isEvaluating}
+                                        style={{
+                                            marginTop: '0.75rem',
+                                            width: '100%',
+                                            padding: '0.75rem',
+                                            background: isEvaluating ? '#94a3b8' : 'linear-gradient(to right, #059669, #047857)',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '0.5rem',
+                                            fontWeight: '600',
+                                            cursor: isEvaluating ? 'not-allowed' : 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '0.5rem',
+                                            fontSize: '0.9rem',
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        {isEvaluating ? (
+                                            <>
+                                                <span className="spinner" style={{ animation: 'spin 1s linear infinite' }}>⌛</span> Evaluando...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span style={{ fontSize: '1.1rem' }}>🎯</span> Evaluar Título
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            )}
+                            {evaluation && (
+                                <div style={{
+                                    marginTop: '1rem',
+                                    padding: '1.25rem',
+                                    background: 'linear-gradient(to bottom right, #fefce8, #fef9c3)',
+                                    border: '2px solid #fde047',
+                                    borderRadius: '0.75rem',
+                                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                                }}>
+                                    <h5 style={{
+                                        margin: '0 0 1rem 0',
+                                        color: '#854d0e',
+                                        fontSize: '1rem',
+                                        fontWeight: '700',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem'
+                                    }}>
+                                        <span style={{ fontSize: '1.3rem' }}>📊</span> Evaluación del Título
+                                    </h5>
+                                    <div style={{
+                                        color: '#713f12',
+                                        fontSize: '0.95rem',
+                                        lineHeight: '1.7',
+                                        whiteSpace: 'pre-wrap'
+                                    }}>
+                                        {evaluation}
+                                    </div>
+                                </div>
+                            )}
+                            {error && (
+                                <div style={{
+                                    marginTop: '1rem',
+                                    padding: '1rem',
+                                    background: '#fef2f2',
+                                    border: '1px solid #fecaca',
+                                    borderRadius: '0.5rem'
+                                }}>
+                                    <p style={{ margin: 0, color: '#991b1b', fontSize: '0.9rem' }}>⚠️ {error}</p>
                                 </div>
                             )}
                             {!formData.accion && !formData.objeto && (
@@ -538,24 +801,6 @@ const Titulo = () => {
                                 </p>
                             )}
                         </div>
-                    </div>
-
-                    <div className="card" style={{ background: '#f5f3ff', border: '1px solid #ddd6fe' }}>
-                        <h4 style={{ color: '#7c3aed', marginBottom: '0.75rem', fontSize: '1rem' }}>Lista de Verificación</h4>
-                        <ul style={{ listStyle: 'none', padding: 0 }}>
-                            <li style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem', fontSize: '0.9rem', color: formData.accion && formData.objeto ? '#059669' : '#64748b' }}>
-                                {formData.accion && formData.objeto ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-                                Claridad en el objeto de estudio.
-                            </li>
-                            <li style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem', fontSize: '0.9rem', color: formData.donde ? '#059669' : '#64748b' }}>
-                                {formData.donde ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-                                Ubicación específica definida.
-                            </li>
-                            <li style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.9rem', color: formData.quien ? '#059669' : '#64748b' }}>
-                                {formData.quien ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-                                Población identificada.
-                            </li>
-                        </ul>
                     </div>
                 </div>
 

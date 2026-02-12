@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
-import { Lightbulb, Type, HelpCircle, Layers, Menu } from 'lucide-react';
+import { Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen } from 'lucide-react';
 import Ideacion from './components/Ideacion';
 import Titulo from './components/Titulo';
 import PreguntaInvestigacion from './components/PreguntaInvestigacion';
+import PlanteamientoProblema from './components/PlanteamientoProblema';
+import Objetivos from './components/Objetivos';
+import Introduccion from './components/Introduccion';
 
 function App() {
     const [activeTab, setActiveTab] = useState('ideacion');
@@ -15,6 +18,12 @@ function App() {
                 return <Titulo />;
             case 'pregunta':
                 return <PreguntaInvestigacion />;
+            case 'planteamiento':
+                return <PlanteamientoProblema />;
+            case 'objetivos':
+                return <Objetivos />;
+            case 'introduccion':
+                return <Introduccion />;
             default:
                 return <Ideacion />;
         }
@@ -25,6 +34,9 @@ function App() {
             case 'ideacion': return 'Fase de Ideación';
             case 'titulo': return 'Construcción del Título';
             case 'pregunta': return 'Pregunta de Investigación';
+            case 'planteamiento': return 'Planteamiento del Problema';
+            case 'objetivos': return 'Objetivos de Investigación';
+            case 'introduccion': return 'Introducción';
             default: return '';
         }
     };
@@ -36,7 +48,7 @@ function App() {
                 <div className="sidebar-header">
                     <div className="sidebar-brand">
                         <Layers size={24} color="#4f46e5" />
-                        <span>Proyectos</span>
+                        <span>Proyectos + IA</span>
                     </div>
                 </div>
 
@@ -63,6 +75,30 @@ function App() {
                     >
                         <HelpCircle size={20} />
                         <span>Pregunta Investigación</span>
+                    </button>
+
+                    <button
+                        className={`nav-button ${activeTab === 'planteamiento' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('planteamiento')}
+                    >
+                        <FileText size={20} />
+                        <span>Planteamiento Problema</span>
+                    </button>
+
+                    <button
+                        className={`nav-button ${activeTab === 'objetivos' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('objetivos')}
+                    >
+                        <Target size={20} />
+                        <span>Objetivos</span>
+                    </button>
+
+                    <button
+                        className={`nav-button ${activeTab === 'introduccion' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('introduccion')}
+                    >
+                        <BookOpen size={20} />
+                        <span>Introducción</span>
                     </button>
                 </nav>
 
