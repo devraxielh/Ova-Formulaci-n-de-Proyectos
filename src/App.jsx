@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
-import { Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen } from 'lucide-react';
+import { Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, Scale, LayoutGrid, Link } from 'lucide-react';
+import Herramientas from './components/Herramientas';
 import Ideacion from './components/Ideacion';
 import Titulo from './components/Titulo';
 import PreguntaInvestigacion from './components/PreguntaInvestigacion';
 import PlanteamientoProblema from './components/PlanteamientoProblema';
+import Justificacion from './components/Justificacion';
 import Objetivos from './components/Objetivos';
 import Introduccion from './components/Introduccion';
+import DoiCite from './components/DoiCite';
 
 function App() {
-    const [activeTab, setActiveTab] = useState('ideacion');
+    const [activeTab, setActiveTab] = useState('herramientas');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
@@ -21,6 +24,8 @@ function App() {
 
     const renderContent = () => {
         switch (activeTab) {
+            case 'herramientas':
+                return <Herramientas onNavigate={handleTabChange} />;
             case 'ideacion':
                 return <Ideacion />;
             case 'titulo':
@@ -29,10 +34,14 @@ function App() {
                 return <PreguntaInvestigacion />;
             case 'planteamiento':
                 return <PlanteamientoProblema />;
+            case 'justificacion':
+                return <Justificacion />;
             case 'objetivos':
                 return <Objetivos />;
             case 'introduccion':
                 return <Introduccion />;
+            case 'doi':
+                return <DoiCite />;
             default:
                 return <Ideacion />;
         }
@@ -40,12 +49,15 @@ function App() {
 
     const getTitle = () => {
         switch (activeTab) {
+            case 'herramientas': return 'Herramientas';
             case 'ideacion': return 'Fase de Ideación';
             case 'titulo': return 'Construcción del Título';
             case 'pregunta': return 'Pregunta de Investigación';
             case 'planteamiento': return 'Planteamiento del Problema';
+            case 'justificacion': return 'Justificación';
             case 'objetivos': return 'Objetivos de Investigación';
             case 'introduccion': return 'Introducción';
+            case 'doi': return 'DOI to Cite';
             default: return '';
         }
     };
@@ -80,6 +92,14 @@ function App() {
 
                 <nav style={{ flex: 1 }}>
                     <button
+                        className={`nav-button ${activeTab === 'herramientas' ? 'active' : ''}`}
+                        onClick={() => handleTabChange('herramientas')}
+                    >
+                        <LayoutGrid size={20} />
+                        <span>Herramientas</span>
+                    </button>
+
+                    <button
                         className={`nav-button ${activeTab === 'ideacion' ? 'active' : ''}`}
                         onClick={() => handleTabChange('ideacion')}
                     >
@@ -112,6 +132,14 @@ function App() {
                     </button>
 
                     <button
+                        className={`nav-button ${activeTab === 'justificacion' ? 'active' : ''}`}
+                        onClick={() => handleTabChange('justificacion')}
+                    >
+                        <Scale size={20} />
+                        <span>Justificación</span>
+                    </button>
+
+                    <button
                         className={`nav-button ${activeTab === 'objetivos' ? 'active' : ''}`}
                         onClick={() => handleTabChange('objetivos')}
                     >
@@ -125,6 +153,14 @@ function App() {
                     >
                         <BookOpen size={20} />
                         <span>Introducción</span>
+                    </button>
+
+                    <button
+                        className={`nav-button ${activeTab === 'doi' ? 'active' : ''}`}
+                        onClick={() => handleTabChange('doi')}
+                    >
+                        <Link size={20} />
+                        <span>DOI to Cite</span>
                     </button>
                 </nav>
 

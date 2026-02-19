@@ -234,7 +234,7 @@ Sé específico y práctico. Ayuda al investigador a saber exactamente qué escr
             ],
             model: import.meta.env.VITE_GROQ_MODEL,
             temperature: 0.7,
-            max_tokens: 600,
+            max_tokens: 1800,
         });
 
         return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al generar estructura';
@@ -302,7 +302,7 @@ Sé específico, claro y profesional. Los objetivos deben ser coherentes entre s
             ],
             model: import.meta.env.VITE_GROQ_MODEL,
             temperature: 0.7,
-            max_tokens: 400,
+            max_tokens: 600,
         });
 
         return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al generar objetivos';
@@ -374,7 +374,83 @@ Sé específico, práctico y CONCISO. Cada descripción debe ser breve (1-2 orac
             ],
             model: import.meta.env.VITE_GROQ_MODEL,
             temperature: 0.7,
-            max_tokens: 700,
+            max_tokens: 1700,
+        });
+
+        return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al generar estructura';
+    } catch (error) {
+        console.error('Error calling Groq API:', error);
+        throw new Error('No se pudo generar la estructura. Verifica tu conexión y la API key.');
+    }
+}
+
+export async function generateJustificationStructure(title, researchQuestion) {
+    const prompt = `Eres un experto en redacción de justificaciones para investigaciones académicas.
+
+TÍTULO DE LA INVESTIGACIÓN:
+"${title}"
+
+PREGUNTA DE INVESTIGACIÓN:
+"${researchQuestion}"
+
+INSTRUCCIONES:
+Genera una ESTRUCTURA DETALLADA de párrafos para la justificación de la investigación. Para cada párrafo, indica:
+1. El tema/enfoque del párrafo
+2. Qué información específica debe incluir (MÁXIMO 1-2 oraciones, sé CONCISO)
+3. Conectores lógicos recomendados para ese párrafo (elige los más apropiados según su función)
+
+La estructura debe tener 6 párrafos que cubran:
+- Relevancia e importancia del tema seleccionado
+- Beneficiarios directos e indirectos del estudio
+- Justificación teórica (aporte conceptual y brechas del conocimiento)
+- Justificación metodológica (pertinencia del enfoque y diseño)
+- Justificación práctica (aplicaciones concretas y aporte social/científico)
+- Urgencia y pertinencia actual (por qué es importante trabajar en esto ahora: contexto, coyuntura, vacíos sin resolver o consecuencias de no actuar)
+
+CONECTORES ÚTILES (clasifícalos según su función):
+Causa/Razón: Dado que, Puesto que, Ya que, Debido a que, En razón de que
+Consecuencia/Propósito: Por consiguiente, En consecuencia, De ahí que, Por ende, Con el fin de
+Adición/Refuerzo: Además, Asimismo, Del mismo modo, De igual manera, Sumado a lo anterior
+Contraste/Limitación: Sin embargo, No obstante, Aunque, A pesar de que, Ahora bien
+Ejemplo/Especificación: Por ejemplo, En particular, Específicamente, Tal es el caso de
+Síntesis/Cierre: En síntesis, En conclusión, En definitiva, Para concluir, Finalmente
+
+ESTILO DE REDACCIÓN:
+- USE mayúsculas solo para nombres propios y comienzos de oración
+- NO abuse de negritas, cursivas ni subrayado (normas APA)
+- Prefiera las comillas "inglesas" y 'sencillas' por sobre las «latinas»
+- Lenguaje formal y académico
+- Texto plano, sin markdown
+
+Formato de respuesta (NO uses markdown):
+
+PÁRRAFO 1: [Título del párrafo]
+[Descripción BREVE de qué debe incluir, 1-2 oraciones máximo]
+Conectores sugeridos: [lista de 3-4 conectores apropiados para este párrafo]
+
+PÁRRAFO 2: [Título del párrafo]
+[Descripción BREVE de qué debe incluir, 1-2 oraciones máximo]
+Conectores sugeridos: [lista de 3-4 conectores apropiados para este párrafo]
+
+[Y así sucesivamente...]
+
+Sé específico, práctico y CONCISO. Ayuda al investigador a saber exactamente qué escribir en cada párrafo y qué conectores usar.`;
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Eres un experto en metodología de investigación. Ayudas a estructurar justificaciones de proyectos de forma clara, académica y siguiendo las normas APA.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            model: import.meta.env.VITE_GROQ_MODEL,
+            temperature: 0.7,
+            max_tokens: 1850,
         });
 
         return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al generar estructura';
