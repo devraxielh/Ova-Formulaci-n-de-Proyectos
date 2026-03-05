@@ -506,3 +506,127 @@ NO uses markdown. Usa texto plano simple. Sé conciso y educativo.`;
         throw new Error('No se pudo evaluar los objetivos. Verifica tu conexión y la API key.');
     }
 }
+
+export async function generateAlcancesLimitacionesStructure(title, researchQuestion) {
+    const prompt = `Eres un experto en redacción de alcances y limitaciones para investigaciones académicas.
+
+TÍTULO DE LA INVESTIGACIÓN:
+"${title}"
+
+PREGUNTA DE INVESTIGACIÓN:
+"${researchQuestion}"
+
+INSTRUCCIONES:
+Genera una ESTRUCTURA DETALLADA de párrafos para los Alcances y Limitaciones de la investigación. Para cada párrafo, indica:
+1. El tema/enfoque del párrafo
+2. Qué información específica debe incluir (MÁXIMO 1-2 oraciones, sé CONCISO)
+3. Conectores lógicos recomendados para ese párrafo
+
+La estructura debe tener 4 párrafos que cubran:
+- Alcance temático y teórico (qué temas abordará exactamente y hasta dónde llegará la investigación)
+- Alcance espacial y temporal (dónde y cuándo se desarrollará, población específica)
+- Limitaciones metodológicas o prácticas (obstáculos anticipados y su impacto)
+- Mitigación de limitaciones (cómo abordará esas limitaciones para no afectar la validez del estudio)
+
+Recuerda que se debe exponer si el proyecto tiene alguna limitación y en qué forma influiría en el alcance del proyecto y/o en el desarrollo de las actividades, teniendo presente que el alcance del proyecto explora las fronteras y el máximo desarrollo que tendrá el proyecto, es decir, hasta qué punto el estudiante se compromete a llegar y cuál sería el impacto que realmente tendría.
+
+CONECTORES ÚTILES:
+Delimitación: Hasta el punto de, Enmarcándose en, Cuyo límite es, Circunscrito a
+Contraste/Limitación: Sin embargo, No obstante, A pesar de, Si bien es cierto, Esto implica que
+Explicación: Es decir, O sea, Esto significa que, En otras palabras
+Precisión: Específicamente, Particularmente, En este sentido, En particular
+
+Formato de respuesta (NO uses markdown):
+
+PÁRRAFO 1: [Título del párrafo]
+[Descripción BREVE de qué debe incluir, 1-2 oraciones máximo]
+Conectores sugeridos: [lista de 3-4 conectores apropiados para este párrafo]
+
+PÁRRAFO 2: [Título del párrafo]
+[Descripción BREVE de qué debe incluir, 1-2 oraciones máximo]
+Conectores sugeridos: [lista de 3-4 conectores apropiados para este párrafo]
+
+[Y así sucesivamente...]
+
+Sé específico, práctico y CONCISO. Ayuda al investigador a saber exactamente qué escribir.`;
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Eres un experto en metodología de investigación. Ayudas a estructurar alcances y limitaciones de proyectos de forma clara, académica y delimitada.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            model: import.meta.env.VITE_GROQ_MODEL,
+            temperature: 0.7,
+            max_tokens: 1500,
+        });
+
+        return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al generar estructura';
+    } catch (error) {
+        console.error('Error calling Groq API:', error);
+        throw new Error('No se pudo generar la estructura. Verifica tu conexión y la API key.');
+    }
+}
+
+export async function generateProjectLimitations(title, researchQuestion) {
+    const prompt = `Eres un experto investigador y metodólogo académico.
+
+TÍTULO DE LA INVESTIGACIÓN:
+"${title}"
+
+PREGUNTA DE INVESTIGACIÓN:
+"${researchQuestion}"
+
+INSTRUCCIONES:
+Analiza el título y la pregunta proporcionados e identifica 3 posibles LIMITACIONES REALISTAS a las que se podría enfrentar este proyecto en específico, y explica cómo influirían en el alcance del proyecto.
+
+Clasifica cada limitación en uno de estos tipos: Metodológica, De Información, Práctica/De Acceso, o Temporal.
+
+Formato de respuesta (NO uses markdown):
+
+LIMITACIÓN 1: [Nombre corto de la limitación]
+Tipo: [Metodológica / De Información / Práctica / Temporal]
+Descripción: [Explica la barrera específica que enfrentaría este proyecto. MÁXIMO 2 oraciones]
+Impacto en el alcance: [Explica exactamente cómo esta limitación reduce el alcance, la profundidad, o la generalización de este estudio en particular. MÁXIMO 2 oraciones]
+
+LIMITACIÓN 2: [Nombre corto de la limitación]
+Tipo: [Metodológica / De Información / Práctica / Temporal]
+Descripción: [Explica la barrera específica que enfrentaría este proyecto. MÁXIMO 2 oraciones]
+Impacto en el alcance: [Explica exactamente cómo esta limitación reduce el alcance o el diseño del estudio. MÁXIMO 2 oraciones]
+
+LIMITACIÓN 3: [Nombre corto de la limitación]
+Tipo: [Metodológica / De Información / Práctica / Temporal]
+Descripción: [Explica la barrera específica que enfrentaría este proyecto. MÁXIMO 2 oraciones]
+Impacto en el alcance: [Explica exactamente cómo esta limitación restringe los resultados o la aplicación del estudio. MÁXIMO 2 oraciones]
+
+Sé muy analítico, realista y ESPECÍFICO al proyecto mencionado. No des ejemplos genéricos, aplícalo al tema del estudiante.`;
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Eres un experto en metodología de investigación que ayuda a estudiantes a anticipar obstáculos reales en sus proyectos y entender cómo estos limitan el alcance de su trabajo.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            model: import.meta.env.VITE_GROQ_MODEL,
+            temperature: 0.8,
+            max_tokens: 1200,
+        });
+
+        return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al generar limitaciones';
+    } catch (error) {
+        console.error('Error calling Groq API:', error);
+        throw new Error('No se pudo generar las limitaciones. Verifica tu conexión y la API key.');
+    }
+}

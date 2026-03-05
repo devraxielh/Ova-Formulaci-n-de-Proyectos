@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, Scale, LayoutGrid, Link } from 'lucide-react';
+import { Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, Scale, LayoutGrid, Link, Compass } from 'lucide-react';
 import Herramientas from './components/Herramientas';
 import Ideacion from './components/Ideacion';
 import Titulo from './components/Titulo';
 import PreguntaInvestigacion from './components/PreguntaInvestigacion';
 import PlanteamientoProblema from './components/PlanteamientoProblema';
 import Justificacion from './components/Justificacion';
+import AlcancesLimitaciones from './components/AlcancesLimitaciones';
 import Objetivos from './components/Objetivos';
 import Introduccion from './components/Introduccion';
 import DoiCite from './components/DoiCite';
@@ -36,6 +37,8 @@ function App() {
                 return <PlanteamientoProblema />;
             case 'justificacion':
                 return <Justificacion />;
+            case 'alcances':
+                return <AlcancesLimitaciones />;
             case 'objetivos':
                 return <Objetivos />;
             case 'introduccion':
@@ -55,6 +58,7 @@ function App() {
             case 'pregunta': return 'Pregunta de Investigación';
             case 'planteamiento': return 'Planteamiento del Problema';
             case 'justificacion': return 'Justificación';
+            case 'alcances': return 'Alcances y Limitaciones';
             case 'objetivos': return 'Objetivos de Investigación';
             case 'introduccion': return 'Introducción';
             case 'doi': return 'DOI to Cite';
@@ -137,6 +141,14 @@ function App() {
                     >
                         <Scale size={20} />
                         <span>Justificación</span>
+                    </button>
+
+                    <button
+                        className={`nav-button ${activeTab === 'alcances' ? 'active' : ''}`}
+                        onClick={() => handleTabChange('alcances')}
+                    >
+                        <Compass size={20} />
+                        <span>Alcances y Limites</span>
                     </button>
 
                     <button

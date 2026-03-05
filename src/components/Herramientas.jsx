@@ -1,7 +1,7 @@
 import React from 'react';
 import {
     Lightbulb, Type, HelpCircle, FileText, Scale,
-    Target, BookOpen, ArrowRight, Sparkles, Layers, Link
+    Target, BookOpen, ArrowRight, Sparkles, Layers, Link, Compass
 } from 'lucide-react';
 
 const tools = [
@@ -53,6 +53,16 @@ const tools = [
         border: '#6ee7b7',
         title: 'Justificación',
         description: 'Argumenta por qué tu investigación es pertinente. Incluye razones teóricas, metodológicas y prácticas con conectores lógicos.',
+        badge: 'IA'
+    },
+    {
+        id: 'alcances',
+        icon: Compass,
+        color: '#4f46e5',
+        bg: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)',
+        border: '#a5b4fc',
+        title: 'Alcances y Limitaciones',
+        description: 'Define las fronteras de tu proyecto, su impacto real y anticipa las dificultades metodológicas o prácticas.',
         badge: 'IA'
     },
     {
