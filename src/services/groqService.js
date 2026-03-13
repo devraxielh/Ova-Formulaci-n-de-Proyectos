@@ -630,3 +630,219 @@ Sé muy analítico, realista y ESPECÍFICO al proyecto mencionado. No des ejempl
         throw new Error('No se pudo generar las limitaciones. Verifica tu conexión y la API key.');
     }
 }
+
+export async function generateMarcoReferencialStructure(title, researchQuestion) {
+    const prompt = `Eres un experto en redacción de marcos referenciales (marcos teóricos) para investigaciones académicas.
+
+TÍTULO DE LA INVESTIGACIÓN:
+"${title}"
+
+PREGUNTA DE INVESTIGACIÓN:
+"${researchQuestion}"
+
+INSTRUCCIONES:
+Genera una ESTRUCTURA DETALLADA de títulos y subtítulos para el Marco Referencial de esta investigación. Para cada sección, indica:
+1. El título/subtítulo de la sección
+2. Qué información específica debe incluir (MÁXIMO 2-3 oraciones, sé CONCISO)
+3. Qué tipo de fuentes buscar y qué autores/teorías podrían ser relevantes
+
+La estructura debe cubrir:
+- Antecedentes teóricos y estado del arte del tema
+- Teorías representativas que fundamentan la investigación
+- Identificación y definición de variables y/o categorías
+- Contribuciones e inconsistencias teóricas encontradas
+- Soporte empírico y evidencia científica reciente
+- Síntesis del marco referencial y su relación con el diseño metodológico
+
+REGLAS IMPORTANTES:
+- Máximo 5 páginas de extensión (orienta al estudiante sobre la profundidad)
+- Las fuentes deben ser recientes y de calidad (artículos científicos, libros académicos)
+- NO referenciar blogs, Wikipedia, Rincón del Vago ni portales web no académicos
+- Seguir Normas APA Séptima Edición
+- El marco debe demostrar lectura, análisis y redacción propios (preferir paráfrasis sobre citas textuales)
+- Debe contener análisis crítico, no solo descripción de fuentes
+
+Formato de respuesta (NO uses markdown):
+
+TÍTULO 1: [Título de la sección]
+[Descripción BREVE de qué debe incluir, 2-3 oraciones máximo]
+Fuentes sugeridas: [Tipo de fuentes a buscar y bases de datos recomendadas]
+
+SUBTÍTULO 1.1: [Subtítulo]
+[Descripción BREVE de qué debe incluir, 2-3 oraciones máximo]
+Fuentes sugeridas: [Tipo de fuentes a buscar]
+
+TÍTULO 2: [Título de la sección]
+[Descripción BREVE de qué debe incluir, 2-3 oraciones máximo]
+Fuentes sugeridas: [Tipo de fuentes a buscar y bases de datos recomendadas]
+
+[Y así sucesivamente...]
+
+Sé específico al tema de la investigación. Ayuda al investigador a saber exactamente qué escribir y dónde buscar información.`;
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Eres un experto en metodología de investigación y redacción académica. Ayudas a estructurar marcos referenciales de forma clara, siguiendo las normas APA 7, con énfasis en fuentes de calidad y análisis crítico.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            model: import.meta.env.VITE_GROQ_MODEL,
+            temperature: 0.7,
+            max_tokens: 2000,
+        });
+
+        return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al generar estructura';
+    } catch (error) {
+        console.error('Error calling Groq API:', error);
+        throw new Error('No se pudo generar la estructura del marco referencial. Verifica tu conexión y la API key.');
+    }
+}
+
+export async function generateAntecedentesStructure(title) {
+    const prompt = `Eres un experto en metodología de investigación académica.
+
+TÍTULO DE LA INVESTIGACIÓN:
+"${title}"
+
+INSTRUCCIONES:
+Genera una GUÍA ESTRUCTURADA para redactar los antecedentes de esta investigación. Incluye:
+
+1. PALABRAS CLAVE SUGERIDAS para buscar antecedentes en bases de datos académicas (mínimo 6 términos de búsqueda en español e inglés).
+
+2. CADENAS DE BÚSQUEDA recomendadas para Google Scholar y bases de datos (combinaciones con operadores AND, OR, con comillas).
+
+3. ESTRUCTURA DE REDACCIÓN: Para cada antecedente que el estudiante encuentre, debe redactarlo siguiendo este orden:
+   - Autor(es) y año
+   - Objetivo del estudio
+   - Metodología empleada
+   - Principales resultados
+   - Conclusiones relevantes
+   - Relación con la investigación actual
+
+4. EJEMPLO REDACTADO: Escribe un ejemplo ficticio pero realista de cómo se redacta UN antecedente completo relacionado con el título proporcionado, usando el formato APA 7 (paráfrasis). El ejemplo debe tener entre 80 y 120 palabras y ser un modelo de referencia.
+
+5. ORGANIZACIÓN RECOMENDADA: Indica cómo organizar los antecedentes (internacional → nacional → local, o cronológico, o temático) y cuántos antecedentes se recomienda incluir.
+
+Formato de respuesta (NO uses markdown):
+
+PALABRAS CLAVE DE BÚSQUEDA:
+[Lista de términos en español e inglés separados por comas]
+
+CADENAS DE BÚSQUEDA SUGERIDAS:
+1. [cadena para Google Scholar]
+2. [cadena para Google Scholar]
+3. [cadena para base de datos]
+
+ESTRUCTURA DE CADA ANTECEDENTE:
+[Explica el orden y qué incluir en cada parte, 2-3 oraciones por sección]
+
+EJEMPLO DE ANTECEDENTE REDACTADO:
+[Ejemplo completo con cita APA 7 en paráfrasis]
+
+ORGANIZACIÓN Y CANTIDAD:
+[Recomendaciones de organización y número de antecedentes]
+
+Sé específico al tema de la investigación. Ayuda al estudiante a saber exactamente qué buscar y cómo escribir cada antecedente.`;
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Eres un experto en metodología de investigación y redacción académica. Ayudas a estudiantes a buscar y redactar antecedentes de investigación de forma clara, siguiendo las normas APA 7.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            model: import.meta.env.VITE_GROQ_MODEL,
+            temperature: 0.7,
+            max_tokens: 2000,
+        });
+
+        return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al generar estructura';
+    } catch (error) {
+        console.error('Error calling Groq API:', error);
+        throw new Error('No se pudo generar la guía de antecedentes. Verifica tu conexión y la API key.');
+    }
+}
+
+export async function generateMarcoTeoricoStructure(title) {
+    const prompt = `Eres un experto en metodología de investigación académica.
+
+TÍTULO DE LA INVESTIGACIÓN:
+"${title}"
+
+INSTRUCCIONES:
+Genera una GUÍA ESTRUCTURADA para redactar el marco teórico de esta investigación. Incluye:
+
+1. TEORÍAS Y MODELOS SUGERIDOS: Identifica las principales teorías, modelos teóricos y enfoques conceptuales que podrían sustentar esta investigación (mínimo 3 teorías con sus autores principales).
+
+2. PALABRAS CLAVE para buscar teorías en bases de datos (en español e inglés, mínimo 6 términos).
+
+3. CADENAS DE BÚSQUEDA recomendadas para encontrar artículos teóricos y revisiones de literatura.
+
+4. ESTRUCTURA DE REDACCIÓN del marco teórico:
+   - Cómo introducir cada teoría
+   - Cómo vincular la teoría con las variables del estudio
+   - Cómo hacer análisis crítico comparando posturas
+   - Cómo cerrar con una síntesis teórica
+
+5. EJEMPLO REDACTADO: Escribe un ejemplo ficticio pero realista de cómo se redacta un párrafo del marco teórico relacionado con el título, usando citas APA 7 en paráfrasis. El ejemplo debe tener entre 100 y 150 palabras.
+
+6. AUTORES REPRESENTATIVOS: Lista los autores más citados en las teorías sugeridas que el estudiante debería buscar.
+
+Formato de respuesta (NO uses markdown):
+
+TEORÍAS Y MODELOS SUGERIDOS:
+[Lista de teorías con breve descripción y autores principales]
+
+PALABRAS CLAVE DE BÚSQUEDA:
+[Términos en español e inglés]
+
+CADENAS DE BÚSQUEDA SUGERIDAS:
+1. [cadena]
+2. [cadena]
+3. [cadena]
+
+ESTRUCTURA DE REDACCIÓN:
+[Guía paso a paso de cómo organizar y redactar el marco teórico]
+
+EJEMPLO DE PÁRRAFO REDACTADO:
+[Ejemplo con citas APA 7]
+
+AUTORES REPRESENTATIVOS:
+[Lista de autores clave por teoría]
+
+Sé específico al tema de la investigación.`;
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Eres un experto en metodología de investigación y fundamentación teórica. Ayudas a estudiantes a identificar teorías, buscar fuentes teóricas y redactar marcos teóricos sólidos siguiendo las normas APA 7.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            model: import.meta.env.VITE_GROQ_MODEL,
+            temperature: 0.7,
+            max_tokens: 2000,
+        });
+
+        return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al generar estructura';
+    } catch (error) {
+        console.error('Error calling Groq API:', error);
+        throw new Error('No se pudo generar la guía del marco teórico. Verifica tu conexión y la API key.');
+    }
+}

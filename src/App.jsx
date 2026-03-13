@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, Scale, LayoutGrid, Link, Compass } from 'lucide-react';
+import { Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, Scale, LayoutGrid, Link, Compass, Library } from 'lucide-react';
 import Herramientas from './components/Herramientas';
 import Ideacion from './components/Ideacion';
 import Titulo from './components/Titulo';
@@ -9,6 +9,7 @@ import Justificacion from './components/Justificacion';
 import AlcancesLimitaciones from './components/AlcancesLimitaciones';
 import Objetivos from './components/Objetivos';
 import Introduccion from './components/Introduccion';
+import MarcoReferencial from './components/MarcoReferencial';
 import DoiCite from './components/DoiCite';
 
 function App() {
@@ -43,6 +44,8 @@ function App() {
                 return <Objetivos />;
             case 'introduccion':
                 return <Introduccion />;
+            case 'marco':
+                return <MarcoReferencial />;
             case 'doi':
                 return <DoiCite />;
             default:
@@ -61,6 +64,7 @@ function App() {
             case 'alcances': return 'Alcances y Limitaciones';
             case 'objetivos': return 'Objetivos de Investigación';
             case 'introduccion': return 'Introducción';
+            case 'marco': return 'Marco Referencial';
             case 'doi': return 'DOI to Cite';
             default: return '';
         }
@@ -165,6 +169,14 @@ function App() {
                     >
                         <BookOpen size={20} />
                         <span>Introducción</span>
+                    </button>
+
+                    <button
+                        className={`nav-button ${activeTab === 'marco' ? 'active' : ''}`}
+                        onClick={() => handleTabChange('marco')}
+                    >
+                        <Library size={20} />
+                        <span>Marco Referencial</span>
                     </button>
 
                     <button

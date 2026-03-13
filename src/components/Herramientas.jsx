@@ -1,7 +1,7 @@
 import React from 'react';
 import {
     Lightbulb, Type, HelpCircle, FileText, Scale,
-    Target, BookOpen, ArrowRight, Sparkles, Layers, Link, Compass
+    Target, BookOpen, ArrowRight, Sparkles, Layers, Link, Compass, Library
 } from 'lucide-react';
 
 const tools = [
@@ -83,6 +83,16 @@ const tools = [
         border: '#fbcfe8',
         title: 'Introducción',
         description: 'Redacta la presentación general de tu proyecto. La IA sugiere la estructura de párrafos y conectores recomendados.',
+        badge: 'IA'
+    },
+    {
+        id: 'marco',
+        icon: Library,
+        color: '#b45309',
+        bg: 'linear-gradient(135deg, #fffbeb, #fef3c7)',
+        border: '#fde68a',
+        title: 'Marco Referencial',
+        description: 'Construye el marco teórico con guía de citación APA 7, fuentes académicas recomendadas y generador de estructura con IA.',
         badge: 'IA'
     },
     {
