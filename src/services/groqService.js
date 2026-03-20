@@ -846,3 +846,321 @@ Sé específico al tema de la investigación.`;
         throw new Error('No se pudo generar la guía del marco teórico. Verifica tu conexión y la API key.');
     }
 }
+
+export async function generateMarcoConceptualStructure(title) {
+    const prompt = `Eres un experto en metodología de investigación académica.
+
+TÍTULO DE LA INVESTIGACIÓN:
+"${title}"
+
+INSTRUCCIONES:
+Genera una GUÍA ESTRUCTURADA para redactar el marco conceptual de esta investigación. Incluye:
+
+1. CONCEPTOS CLAVE A DEFINIR: Extrae los principales conceptos (variables y categorías) del título que necesitan definición teórica y operacional (mínimo 4 conceptos).
+
+2. PALABRAS CLAVE para buscar estos conceptos en bases de datos (en español e inglés).
+
+3. CADENAS DE BÚSQUEDA recomendadas para encontrar artículos de revisión conceptual o definiciones operacionales.
+
+4. DIMENSIONES O INDICADORES: Para los conceptos principales, sugiere posibles dimensiones empíricas (cómo se podrían medir u observar).
+
+5. EJEMPLO REDACTADO: Escribe un ejemplo ficticio pero realista de cómo se redacta la definición de uno de esos conceptos, incluyendo su definición teórica (con cita APA) y su definición operacional para el estudio. El ejemplo debe tener entre 80 y 120 palabras.
+
+Formato de respuesta (NO uses markdown):
+
+CONCEPTOS CLAVE A DEFINIR:
+[Lista de conceptos]
+
+PALABRAS CLAVE DE BÚSQUEDA:
+[Términos en español e inglés]
+
+CADENAS DE BÚSQUEDA SUGERIDAS:
+1. [cadena]
+2. [cadena]
+3. [cadena]
+
+DIMENSIONES SUGERIDAS:
+[Concepto 1: Dimensión A, Dimensión B...]
+[Concepto 2: Dimensión C, Dimensión D...]
+
+EJEMPLO DE PÁRRAFO REDACTADO:
+[Ejemplo con definición teórica y operacional]
+
+Sé específico al tema de la investigación.`;
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Eres un experto en metodología de investigación. Ayudas a estudiantes a estructurar sus marcos conceptuales identificando y definiendo variables clave.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            model: import.meta.env.VITE_GROQ_MODEL,
+            temperature: 0.7,
+            max_tokens: 2000,
+        });
+
+        return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al generar estructura';
+    } catch (error) {
+        console.error('Error calling Groq API:', error);
+        throw new Error('No se pudo generar la guía del marco conceptual. Verifica tu conexión y la API key.');
+    }
+}
+
+export async function generateMarcoContextualStructure(title) {
+    const prompt = `Eres un experto en metodología de investigación académica.
+
+TÍTULO DE LA INVESTIGACIÓN:
+"${title}"
+
+INSTRUCCIONES:
+Genera una GUÍA ESTRUCTURADA para redactar el marco contextual de esta investigación. Incluye:
+
+1. DIMENSIONES A DESCRIBIR: Identifica los aspectos clave del contexto que deben abordarse (geográfico, demográfico, institucional, económico, etc.) específicos para este proyecto.
+
+2. FUENTES DE DATOS RECOMENDADAS: Sugiere dónde buscar datos estadísticos, históricos o informes oficiales que soporten la descripción del contexto.
+
+3. ESTRUCTURA DE REDACCIÓN: Pasos para organizar el marco contextual de lo macro a lo micro (por ejemplo, contexto internacional, nacional, regional, e institucional/local).
+
+4. EJEMPLO REDACTADO: Escribe un breve ejemplo ficticio de cómo se redacta un párrafo caracterizando el contexto específico del problema planteado en el título. El ejemplo debe tener entre 80 y 120 palabras.
+
+Formato de respuesta (NO uses markdown):
+
+DIMENSIONES A DESCRIBIR:
+[Lista de las dimensiones del contexto necesarias para el proyecto]
+
+FUENTES DE DATOS SUGERIDAS:
+[Tipos de fuentes o nombres de entidades recomendadas]
+
+ESTRUCTURA DE REDACCIÓN:
+[Guía paso a paso para organizar la información de lo macro a lo micro]
+
+EJEMPLO DE PÁRRAFO REDACTADO:
+[Ejemplo de caracterización contextual]
+
+Sé específico al tema de la investigación.`;
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Eres un experto en metodología de investigación. Ayudas a estructurar las características y el entorno donde se desarrolla el problema de estudio.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            model: import.meta.env.VITE_GROQ_MODEL,
+            temperature: 0.7,
+            max_tokens: 2000,
+        });
+
+        return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al generar estructura';
+    } catch (error) {
+        console.error('Error calling Groq API:', error);
+        throw new Error('No se pudo generar la guía del marco contextual. Verifica tu conexión y la API key.');
+    }
+}
+
+export async function suggestTheoriesForTitle(title) {
+    const prompt = `Eres un experto en investigación académica.
+
+TÍTULO DE LA INVESTIGACIÓN:
+"${title}"
+
+INSTRUCCIONES:
+El estudiante necesita ayuda para saber qué teorías o modelos académicos puede incorporar en su Marco Teórico según su título.
+Sugiere al menos 5 teorías o modelos consolidados que apliquen directamente a su tema. Para cada una, proporciona:
+1. El nombre de la teoría o modelo.
+2. Breve justificación de por qué encaja perfectamente con el título (1-2 oraciones).
+
+Formato de respuesta (NO uses markdown):
+
+TEORÍA 1: [Nombre de la teoría]
+JUSTIFICACIÓN: [Breve justificación]
+
+TEORÍA 2: [Nombre de la teoría]
+JUSTIFICACIÓN: [Breve justificación]
+...
+`;
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Eres un experto en metodología de investigación. Formateas tu respuesta sin markdown, solo texto plano.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            model: import.meta.env.VITE_GROQ_MODEL,
+            temperature: 0.7,
+            max_tokens: 1000,
+        });
+
+        return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al sugerir teorías';
+    } catch (error) {
+        console.error('Error calling Groq API:', error);
+        throw new Error('No se pudo sugerir las teorías. Verifica tu conexión y la API key.');
+    }
+}
+
+export async function suggestConceptsForTitle(title) {
+    const prompt = `Eres un experto en investigación académica.
+
+TÍTULO DE LA INVESTIGACIÓN:
+"${title}"
+
+INSTRUCCIONES:
+El estudiante necesita ayuda para saber qué conceptos o variables debe definir en su Marco Conceptual según su título.
+Sugiere al menos 5 conceptos o variables clave que apliquen directamente a su tema y que deban ser medidos o definidos operacionalmente. Para cada uno, proporciona:
+1. El nombre del concepto o variable.
+2. Breve justificación de por qué es esencial definirlo para este proyecto (1-2 oraciones).
+
+Formato de respuesta (NO uses markdown):
+
+CONCEPTO 1: [Nombre del concepto]
+JUSTIFICACIÓN: [Breve justificación]
+
+CONCEPTO 2: [Nombre del concepto]
+JUSTIFICACIÓN: [Breve justificación]
+...
+`;
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Eres un experto en metodología de investigación. Formateas tu respuesta sin markdown, solo texto plano.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            model: import.meta.env.VITE_GROQ_MODEL,
+            temperature: 0.7,
+            max_tokens: 1000,
+        });
+
+        return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al sugerir conceptos';
+    } catch (error) {
+        console.error('Error calling Groq API:', error);
+        throw new Error('No se pudo sugerir los conceptos. Verifica tu conexión y la API key.');
+    }
+}
+
+export async function generateMarcoLegalStructure(title) {
+    const prompt = `Eres un experto en metodología de investigación académica y redacción de marcos normativos/legales.
+
+TÍTULO DE LA INVESTIGACIÓN:
+"${title}"
+
+INSTRUCCIONES:
+Genera una GUÍA ESTRUCTURADA para redactar el marco legal o normativo de esta investigación. Incluye:
+
+1. JERARQUÍA NORMATIVA (PIRÁMIDE DE KELSEN): Sugiere qué tipo de normas deben investigarse, organizadas desde normas constitucionales/internacionales, leyes nacionales, hasta resoluciones/decretos locales o sectoriales aplicables al tema.
+
+2. PALABRAS CLAVE PARA BUSCADORES LEGALES: Sugiere 4-5 conceptos jurídicos para buscar en bases de datos normativas.
+
+3. ESTRUCTURA DE REDACCIÓN: Pasos lógicos para presentar el marco legal (ej: citar norma, explicar objetivo de la norma, y aterrizar la relación directa con el proyecto).
+
+4. EJEMPLO REDACTADO: Escribe un breve ejemplo ficticio de cómo se analizaría una ley inventada aplicándola a este proyecto, resaltando su cumplimiento o regulación. El ejemplo debe tener entre 80 y 120 palabras.
+
+Formato de respuesta (NO uses markdown):
+
+JERARQUÍA NORMATIVA A INVESTIGAR:
+[Estructura sugerida]
+
+PALABRAS CLAVE BÚSQUEDA LEGAL:
+[Lista de palabras clave]
+
+ESTRUCTURA DE REDACCIÓN:
+[Paso a paso]
+
+EJEMPLO DE PÁRRAFO REDACTADO:
+[Ejemplo de redacción]
+
+Sé preciso y coherente con el área de estudio del título.`;
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Eres un experto en metodología de investigación y marcos legales. Formateas tu respuesta sin markdown, solo texto plano.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            model: import.meta.env.VITE_GROQ_MODEL,
+            temperature: 0.7,
+            max_tokens: 2000,
+        });
+
+        return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al generar estructura legal';
+    } catch (error) {
+        console.error('Error calling Groq API:', error);
+        throw new Error('No se pudo generar la guía del marco legal. Verifica tu conexión y la API key.');
+    }
+}
+
+export async function suggestNormsForTitle(title) {
+    const prompt = `Eres un experto investigador en derecho y normatividad.
+
+TÍTULO DE LA INVESTIGACIÓN:
+"${title}"
+
+INSTRUCCIONES:
+El estudiante necesita ayuda para identificar categorías de leyes, normativas o regulaciones (nacionales o internacionales) aplicables a su proyecto.
+Sugiere al menos 5 normativas generales o tipos de regulación (ej. "Ley Marco de Educación", "Normativa de Protección de Datos Personales", "Derecho Ambiental Internacional", etc.) que deba investigar obligatoriamente para su Marco Legal.
+No incluyas autores. Para cada sugerencia, proporciona:
+1. El nombre o tipo general de la norma/ley.
+2. Breve justificación de por qué es esencial incluirla como base legal en su proyecto (1-2 oraciones).
+
+Formato de respuesta (NO uses markdown):
+
+NORMATIVA 1: [Nombre o tipo de norma]
+JUSTIFICACIÓN: [Breve justificación]
+
+NORMATIVA 2: [Nombre o tipo de norma]
+JUSTIFICACIÓN: [Breve justificación]
+...
+`;
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Eres un experto en investigación legal. Formateas tu respuesta sin markdown, solo texto plano.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            model: import.meta.env.VITE_GROQ_MODEL,
+            temperature: 0.7,
+            max_tokens: 1000,
+        });
+
+        return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al sugerir normativas';
+    } catch (error) {
+        console.error('Error calling Groq API:', error);
+        throw new Error('No se pudo sugerir normativas. Verifica tu conexión y la API key.');
+    }
+}

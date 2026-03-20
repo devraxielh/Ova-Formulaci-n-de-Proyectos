@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BookOpen, AlertCircle, ArrowRight, HelpCircle, Lightbulb, Search, Database, Quote, Shield, Layers, ExternalLink, Clock, FileText, Landmark, MapPin, Scale } from 'lucide-react';
-import { generateAntecedentesStructure, generateMarcoTeoricoStructure } from '../services/groqService';
+import { generateAntecedentesStructure, generateMarcoTeoricoStructure, generateMarcoConceptualStructure, generateMarcoContextualStructure, suggestTheoriesForTitle, suggestConceptsForTitle, generateMarcoLegalStructure, suggestNormsForTitle } from '../services/groqService';
 
 const MarcoReferencial = () => {
     const [activeCitationType, setActiveCitationType] = useState('parafrasis');
@@ -13,6 +13,30 @@ const MarcoReferencial = () => {
     const [teoricoResult, setTeoricoResult] = useState('');
     const [isGeneratingTeorico, setIsGeneratingTeorico] = useState(false);
     const [teoricoError, setTeoricoError] = useState('');
+    const [conceptualTitle, setConceptualTitle] = useState('');
+    const [conceptualResult, setConceptualResult] = useState('');
+    const [isGeneratingConceptual, setIsGeneratingConceptual] = useState(false);
+    const [conceptualError, setConceptualError] = useState('');
+    const [suggestedConceptsTitle, setSuggestedConceptsTitle] = useState('');
+    const [suggestedConceptsResult, setSuggestedConceptsResult] = useState('');
+    const [isGeneratingConcepts, setIsGeneratingConcepts] = useState(false);
+    const [conceptsError, setConceptsError] = useState('');
+    const [suggestedTheoriesTitle, setSuggestedTheoriesTitle] = useState('');
+    const [suggestedTheoriesResult, setSuggestedTheoriesResult] = useState('');
+    const [isGeneratingTheories, setIsGeneratingTheories] = useState(false);
+    const [theoriesError, setTheoriesError] = useState('');
+    const [contextualTitle, setContextualTitle] = useState('');
+    const [contextualResult, setContextualResult] = useState('');
+    const [isGeneratingContextual, setIsGeneratingContextual] = useState(false);
+    const [contextualError, setContextualError] = useState('');
+    const [legalTitle, setLegalTitle] = useState('');
+    const [legalResult, setLegalResult] = useState('');
+    const [isGeneratingLegal, setIsGeneratingLegal] = useState(false);
+    const [legalError, setLegalError] = useState('');
+    const [suggestedNormsTitle, setSuggestedNormsTitle] = useState('');
+    const [suggestedNormsResult, setSuggestedNormsResult] = useState('');
+    const [isGeneratingNorms, setIsGeneratingNorms] = useState(false);
+    const [normsError, setNormsError] = useState('');
 
     const handleGenerateAntecedentes = async () => {
         if (!antecedentesTitle.trim()) {
@@ -47,6 +71,114 @@ const MarcoReferencial = () => {
             setTeoricoError(err.message || 'Error al generar la guía');
         } finally {
             setIsGeneratingTeorico(false);
+        }
+    };
+
+    const handleGenerateConceptual = async () => {
+        if (!conceptualTitle.trim()) {
+            setConceptualError('Por favor ingresa el título de tu investigación');
+            return;
+        }
+        setIsGeneratingConceptual(true);
+        setConceptualError('');
+        try {
+            const result = await generateMarcoConceptualStructure(conceptualTitle);
+            setConceptualResult(result);
+        } catch (err) {
+            console.error('Error generating marco conceptual:', err);
+            setConceptualError(err.message || 'Error al generar la guía');
+        } finally {
+            setIsGeneratingConceptual(false);
+        }
+    };
+
+    const handleGenerateContextual = async () => {
+        if (!contextualTitle.trim()) {
+            setContextualError('Por favor ingresa el título de tu investigación');
+            return;
+        }
+        setIsGeneratingContextual(true);
+        setContextualError('');
+        try {
+            const result = await generateMarcoContextualStructure(contextualTitle);
+            setContextualResult(result);
+        } catch (err) {
+            console.error('Error generating marco contextual:', err);
+            setContextualError(err.message || 'Error al generar la guía');
+        } finally {
+            setIsGeneratingContextual(false);
+        }
+    };
+
+    const handleSuggestConcepts = async () => {
+        if (!suggestedConceptsTitle.trim()) {
+            setConceptsError('Por favor ingresa un título para sugerir conceptos');
+            return;
+        }
+        setIsGeneratingConcepts(true);
+        setConceptsError('');
+        try {
+            const result = await suggestConceptsForTitle(suggestedConceptsTitle);
+            setSuggestedConceptsResult(result);
+        } catch (err) {
+            console.error('Error suggesting concepts:', err);
+            setConceptsError(err.message || 'Error al sugerir conceptos');
+        } finally {
+            setIsGeneratingConcepts(false);
+        }
+    };
+
+    const handleGenerateLegal = async () => {
+        if (!legalTitle.trim()) {
+            setLegalError('Por favor ingresa el título de tu investigación');
+            return;
+        }
+        setIsGeneratingLegal(true);
+        setLegalError('');
+        try {
+            const result = await generateMarcoLegalStructure(legalTitle);
+            setLegalResult(result);
+        } catch (err) {
+            console.error('Error generating marco legal:', err);
+            setLegalError(err.message || 'Error al generar la guía');
+        } finally {
+            setIsGeneratingLegal(false);
+        }
+    };
+
+    const handleSuggestNorms = async () => {
+        if (!suggestedNormsTitle.trim()) {
+            setNormsError('Por favor ingresa un título para sugerir normativas');
+            return;
+        }
+        setIsGeneratingNorms(true);
+        setNormsError('');
+        try {
+            const result = await suggestNormsForTitle(suggestedNormsTitle);
+            setSuggestedNormsResult(result);
+        } catch (err) {
+            console.error('Error suggesting norms:', err);
+            setNormsError(err.message || 'Error al sugerir normativas');
+        } finally {
+            setIsGeneratingNorms(false);
+        }
+    };
+
+    const handleSuggestTheories = async () => {
+        if (!suggestedTheoriesTitle.trim()) {
+            setTheoriesError('Por favor ingresa un título para sugerir teorías');
+            return;
+        }
+        setIsGeneratingTheories(true);
+        setTheoriesError('');
+        try {
+            const result = await suggestTheoriesForTitle(suggestedTheoriesTitle);
+            setSuggestedTheoriesResult(result);
+        } catch (err) {
+            console.error('Error suggesting theories:', err);
+            setTheoriesError(err.message || 'Error al sugerir teorías');
+        } finally {
+            setIsGeneratingTheories(false);
         }
     };
 
@@ -136,7 +268,24 @@ const MarcoReferencial = () => {
                 'Indicadores y dimensiones de cada variable',
                 'Diagrama o esquema de relaciones conceptuales'
             ],
-            tips: 'Cada concepto clave debe tener al menos dos fuentes que lo respalden. Use definiciones de autores reconocidos en el área y, cuando sea pertinente, presente su propia definición operacional. Puede incluir un mapa conceptual o diagrama que muestre las relaciones entre variables.'
+            tips: 'Cada concepto clave debe tener al menos dos fuentes que lo respalden. Use definiciones de autores reconocidos en el área y, cuando sea pertinente, presente su propia definición operacional. Puede incluir un mapa conceptual o diagrama que muestre las relaciones entre variables.',
+            searchGuide: {
+                title: '¿Dónde y cómo buscar conceptos para el marco conceptual?',
+                steps: [
+                    { step: '1. Extraiga conceptos clave', detail: 'Identifique los términos principales de su pregunta de investigación y objetivos. Estos formarán la base de su marco.' },
+                    { step: '2. Busque definiciones formales', detail: 'Utilice diccionarios especializados, enciclopedias temáticas y libros de texto reconocidos en su área de estudio.' },
+                    { step: '3. Revise artículos de revisión conceptual', detail: 'Busque artículos que se dediquen a definir y debatir conceptos específicos (términos como "concept analysis", "definición", "revisión").' },
+                    { step: '4. Compare definiciones', detail: 'No se quede con la primera definición. Compare cómo distintos autores entienden el mismo concepto.' },
+                    { step: '5. Construya su propia definición', detail: 'A partir de las fuentes consultadas, construya una definición de trabajo (operacional) que se ajuste a su investigación específica.' },
+                ],
+                databases: [
+                    { name: 'Google Scholar', url: 'https://scholar.google.com', tip: 'Busque "concept of" o "definición de" + su término.' },
+                    { name: 'Scielo', url: 'https://scielo.org', tip: 'Artículos de revisión conceptual en español y portugués.' },
+                    { name: 'Redalyc', url: 'https://www.redalyc.org', tip: 'Revistas de ciencias sociales con fuertes bases conceptuales.' },
+                    { name: 'Dialnet', url: 'https://dialnet.unirioja.es', tip: 'Artículos y tesis conceptuales en español.' },
+                    { name: 'JSTOR', url: 'https://www.jstor.org', tip: 'Útil para rastrear la evolución histórica de un concepto.' },
+                ]
+            }
         },
         {
             id: 'contextual',
@@ -153,7 +302,24 @@ const MarcoReferencial = () => {
                 'Población y sus características principales',
                 'Condiciones actuales que rodean el problema'
             ],
-            tips: 'Sea específico y use datos verificables (estadísticas oficiales, informes institucionales, censos). Describa solo los aspectos del contexto que son relevantes para su investigación. Incluya datos recientes que permitan al lector comprender la realidad donde se sitúa el estudio.'
+            tips: 'Sea específico y use datos verificables (estadísticas oficiales, informes institucionales, censos). Describa solo los aspectos del contexto que son relevantes para su investigación. Incluya datos recientes que permitan al lector comprender la realidad donde se sitúa el estudio.',
+            searchGuide: {
+                title: '¿Dónde y cómo buscar información para el marco contextual?',
+                steps: [
+                    { step: '1. Identifique el alcance espacial', detail: 'Defina qué nivel de contexto necesita: internacional, nacional, regional, municipal o institucional.' },
+                    { step: '2. Busque datos oficiales y estadísticos', detail: 'Utilice las páginas de los ministerios, secretarías locales o institutos nacionales de estadística (ej: DANE en Colombia).' },
+                    { step: '3. Revise informes institucionales', detail: 'Si aplica a una empresa o colegio, revise sus PEI, estatutos, planes de desarrollo o balances de gestión.' },
+                    { step: '4. Agrupe por dimensiones', detail: 'Organice la información en dimensiones claras: demográfica, económica, social, cultural y tecnológica.' },
+                    { step: '5. Conecte el contexto con el problema', detail: 'No solo describa el lugar; explique cómo las características de ese lugar propician o afectan el problema investigado.' },
+                ],
+                databases: [
+                    { name: 'Institutos de Estadística', url: 'https://www.dane.gov.co', tip: 'Entidades gubernamentales para obtener datos demográficos y económicos.' },
+                    { name: 'Ministerios e Instituciones', url: '#', tip: 'Portales oficiales para políticas, diagnósticos sectoriales y reportes de alcance nacional.' },
+                    { name: 'ECLAC / CEPAL', url: 'https://www.cepal.org/es', tip: 'Excelente para estadísticas socioeconómicas de América Latina.' },
+                    { name: 'Bancos Multilaterales', url: 'https://data.worldbank.org/indicator', tip: 'Datos del Banco Mundial, BID, que proporcionan estudios de la región.' },
+                    { name: 'Observatorios Locales', url: '#', tip: 'Portales municipales o departamentales para indicadores específicos de su localidad.' },
+                ]
+            }
         },
         {
             id: 'legal',
@@ -161,16 +327,33 @@ const MarcoReferencial = () => {
             icon: Scale,
             color: '#dc2626',
             bgGradient: 'linear-gradient(to bottom right, #fef2f2, #fee2e2)',
-            border: '#fecaca',
-            description: 'El marco legal recopila y analiza las normas, leyes, decretos, resoluciones y políticas que regulan o se relacionan con el tema de investigación. Establece el sustento jurídico y normativo que enmarca el estudio, desde el nivel constitucional hasta las normas específicas del sector.',
+            border: '#fca5a5',
+            description: 'El marco legal recopila y analiza las normas jurídicas, leyes, decretos y resoluciones que regulan, enmarcan o afectan directa e indirectamente el objeto de investigación.',
             elements: [
-                'Constitución Política (artículos pertinentes)',
-                'Leyes y decretos relacionados con el tema',
-                'Resoluciones y normativas institucionales',
-                'Políticas públicas aplicables',
-                'Normas técnicas o estándares del sector'
+                'Constitución Nacional y tratados internacionales',
+                'Leyes orgánicas y estatutarias',
+                'Decretos y acuerdos resolutivos',
+                'Jurisprudencia relevante',
+                'Normativas institucionales locales'
             ],
-            tips: 'Organice las normas jerárquicamente: Constitución → Leyes → Decretos → Resoluciones → Normas institucionales. Cite el número completo de la norma, el año de expedición y los artículos específicos relevantes. No solo liste las normas; explique cómo se relacionan con su investigación.'
+            tips: 'Siga la pirámide de Kelsen: comience con las normas de mayor jerarquía (Constitución) y baje hacia las más específicas (resoluciones locales). No basta con citar la norma; debe explicar cómo aplica específicamente a su proyecto y por qué restringe o posibilita lo que está investigando.',
+            searchGuide: {
+                title: '¿Dónde y cómo buscar información para el marco legal?',
+                steps: [
+                    { step: '1. Aplique la Pirámide de Kelsen', detail: 'Defina y busque desde lo macro (Constitución) hasta lo micro (Acuerdos Locales).' },
+                    { step: '2. Bases gubernamentales oficiales', detail: 'Consulte portales oficiales como el Diario Oficial o gacetas del Congreso.' },
+                    { step: '3. Buscadores y repositorios jurídicos', detail: 'Utilice herramientas gratuitas o suscritas como vLex, LexBase o la página de la Corte Constitucional.' },
+                    { step: '4. Vigencia de la norma', detail: 'Revise siempre que la norma esté vigente, no drogada, y busque la última actualización o jurisprudencia.' },
+                    { step: '5. Cite y analice', detail: 'Aparte de citarla correctamente, relate expresamente cómo dicho artículo afecta o regula su objeto de estudio.' },
+                ],
+                databases: [
+                    { name: 'vLex', url: 'https://vlex.com', tip: 'Plataforma con legislación, jurisprudencia y doctrina a nivel global (varias universidades tienen acceso).' },
+                    { name: 'Corte Constitucional / Supremas', url: 'https://www.corteconstitucional.gov.co/', tip: 'Ideal para buscar sentencias de unificación y revisión constitucional.' },
+                    { name: 'Diario Oficial / SUIN', url: 'https://www.suin-juriscol.gov.co/', tip: 'Sistema Único de Información Normativa (ej. Colombia) para consultar la vigencia de las leyes.' },
+                    { name: 'LexBase', url: 'https://www.lexbase.com/', tip: 'Herramienta de búsqueda para normativas y jurisprudencia clasificada.' },
+                    { name: 'Páginas web ministeriales', url: '#', tip: 'Para decretos y resoluciones muy aplicables a un sector (Ej: MinEducación, MinAmbiente).' },
+                ]
+            }
         },
     ];
 
@@ -1048,6 +1231,503 @@ const MarcoReferencial = () => {
                                             </div>
                                         ))}
                                     </div>
+                                </div>
+
+                                {/* Theory Suggestion Card */}
+                                <div style={{ background: 'linear-gradient(to right, #faf5ff, #f3e8ff)', borderRadius: '0.75rem', padding: '1.5rem', border: '1px solid #d8b4fe', marginTop: '1.5rem' }}>
+                                    <h4 style={{ fontSize: '1.05rem', color: '#6b21a8', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <span style={{ fontSize: '1.2rem' }}>💡</span> Explorador Rápido de Teorías
+                                    </h4>
+                                    <p style={{ color: '#4c1d95', fontSize: '0.85rem', marginBottom: '1rem', lineHeight: '1.5' }}>¿No sabes qué teorías sustentan tu proyecto? Ingresa tu título y la IA te sugerirá los modelos y autores más relevantes para tu marco teórico.</p>
+                                    <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+                                        <label style={{ fontSize: '0.85rem', color: '#5b21b6' }}>Título de tu Investigación</label>
+                                        <input type="text" className="input-field" placeholder="Ej: Influencia de la gamificación en la motivación escolar..." value={suggestedTheoriesTitle} onChange={(e) => setSuggestedTheoriesTitle(e.target.value)} style={{ padding: '0.65rem', borderColor: '#d8b4fe' }} />
+                                    </div>
+                                    <button onClick={handleSuggestTheories} disabled={isGeneratingTheories || !suggestedTheoriesTitle.trim()}
+                                        style={{ width: '100%', padding: '0.75rem', background: isGeneratingTheories || !suggestedTheoriesTitle.trim() ? '#c4b5fd' : 'linear-gradient(to right, #7e22ce, #6b21a8)', color: 'white', border: 'none', borderRadius: '0.5rem', fontWeight: '600', cursor: isGeneratingTheories || !suggestedTheoriesTitle.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontSize: '0.95rem', transition: 'all 0.2s' }}>
+                                        {isGeneratingTheories ? (<><span style={{ animation: 'spin 1s linear infinite' }}>⌛</span> Buscando teorías...</>) : (<><span style={{ fontSize: '1.1rem' }}>🧠</span> Sugerir Teorías</>)}
+                                    </button>
+                                    {suggestedTheoriesResult && (
+                                        <div style={{ marginTop: '1rem', padding: '1.25rem', background: 'white', border: '2px solid #d8b4fe', borderRadius: '0.75rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.08)' }}>
+                                            <h5 style={{ margin: '0 0 0.75rem 0', color: '#7e22ce', fontSize: '1rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><span style={{ fontSize: '1.2rem' }}>📌</span> Teorías Sugeridas</h5>
+                                            <div style={{ color: '#1e293b', fontSize: '0.92rem', lineHeight: '1.75', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{suggestedTheoriesResult}</div>
+                                        </div>
+                                    )}
+                                    {theoriesError && (
+                                        <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '0.5rem' }}>
+                                            <p style={{ margin: '0', color: '#991b1b', fontSize: '0.85rem' }}>⚠️ {theoriesError}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Extra content for Marco Conceptual tab */}
+                        {activeMarcoTab === 'conceptual' && activeMarcoData.searchGuide && (
+                            <div style={{ marginTop: '1.5rem' }}>
+                                {/* Comparison Card: Teórico vs Conceptual */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+                                    <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '0.75rem', padding: '1.25rem' }}>
+                                        <h4 style={{ fontSize: '1rem', color: '#7c3aed', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                            <BookOpen size={18} /> Marco Teórico
+                                        </h4>
+                                        <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.88rem', color: '#5b21b6', lineHeight: '1.6' }}>
+                                            <li style={{ marginBottom: '0.3rem' }}><strong>Enfoque:</strong> Paradigmas y modelos amplios.</li>
+                                            <li style={{ marginBottom: '0.3rem' }}><strong>Propósito:</strong> Explicar el fundamento y <em>por qué</em> ocurre el fenómeno.</li>
+                                            <li><strong>Ejemplo:</strong> Teoría del Aprendizaje Social (Bandura, 1977).</li>
+                                        </ul>
+                                    </div>
+                                    <div style={{ background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: '0.75rem', padding: '1.25rem' }}>
+                                        <h4 style={{ fontSize: '1rem', color: '#059669', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                            <Layers size={18} /> Marco Conceptual
+                                        </h4>
+                                        <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.88rem', color: '#065f46', lineHeight: '1.6' }}>
+                                            <li style={{ marginBottom: '0.3rem' }}><strong>Enfoque:</strong> Variables, categorías y dimensiones.</li>
+                                            <li style={{ marginBottom: '0.3rem' }}><strong>Propósito:</strong> Aterrizar, definir <em>qué es</em> y delimitar <em>cómo se medirá</em>.</li>
+                                            <li><strong>Ejemplo:</strong> Autoeficacia: concepto y sus 3 dimensiones de medición.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                {/* Search Guide */}
+                                <div style={{ background: 'rgba(255,255,255,0.85)', borderRadius: '0.75rem', padding: '1.5rem', border: '1px solid #6ee7b7', marginBottom: '1.25rem' }}>
+                                    <h4 style={{ fontSize: '1.05rem', color: '#059669', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <Search size={20} /> {activeMarcoData.searchGuide.title}
+                                    </h4>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                        {activeMarcoData.searchGuide.steps.map((s, i) => (
+                                            <div key={i} style={{ display: 'flex', gap: '0.75rem', alignItems: 'start' }}>
+                                                <div style={{ background: '#059669', color: 'white', borderRadius: '0.375rem', padding: '0.2rem 0.55rem', fontSize: '0.75rem', fontWeight: '700', flexShrink: 0, marginTop: '0.15rem' }}>{i + 1}</div>
+                                                <div>
+                                                    <strong style={{ color: '#047857', fontSize: '0.9rem' }}>{s.step.replace(/^\d+\.\s*/, '')}</strong>
+                                                    <p style={{ margin: '0.2rem 0 0', color: '#334155', fontSize: '0.85rem', lineHeight: '1.55' }}>{s.detail}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* Databases */}
+                                <div style={{ background: 'rgba(255,255,255,0.85)', borderRadius: '0.75rem', padding: '1.5rem', border: '1px solid #6ee7b7', marginBottom: '1.25rem' }}>
+                                    <h4 style={{ fontSize: '1.05rem', color: '#059669', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <Database size={20} /> Bases de datos recomendadas para conceptos
+                                    </h4>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.75rem' }}>
+                                        {activeMarcoData.searchGuide.databases.map((db, i) => (
+                                            <a key={i} href={db.url} target="_blank" rel="noopener noreferrer"
+                                                style={{ background: 'white', borderRadius: '0.5rem', padding: '0.85rem', border: '1px solid #6ee7b7', textDecoration: 'none', transition: 'transform 0.15s, box-shadow 0.15s', display: 'block' }}
+                                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.08)'; }}
+                                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+                                            >
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
+                                                    <span style={{ fontWeight: '600', color: '#059669', fontSize: '0.9rem' }}>{db.name}</span>
+                                                    <ExternalLink size={13} color="#94a3b8" style={{ marginLeft: 'auto' }} />
+                                                </div>
+                                                <p style={{ margin: '0', fontSize: '0.8rem', color: '#475569', lineHeight: '1.4' }}>{db.tip}</p>
+                                            </a>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* AI Generator for Marco Conceptual */}
+                                <div style={{ background: 'linear-gradient(to right, #ecfdf5, #d1fae5)', borderRadius: '0.75rem', padding: '1.5rem', border: '1px solid #34d399' }}>
+                                    <h4 style={{ fontSize: '1.05rem', color: '#059669', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <span style={{ fontSize: '1.2rem' }}>✨</span> Generador de Guía del Marco Conceptual con IA
+                                    </h4>
+                                    <p style={{ color: '#334155', fontSize: '0.85rem', marginBottom: '1rem', lineHeight: '1.5' }}>Ingresa tu título y la IA generará: conceptos clave a definir, dimensiones, esquema sugerido, y ejemplo de operacionalización de variables.</p>
+                                    <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+                                        <label style={{ fontSize: '0.85rem' }}>Título de tu Investigación</label>
+                                        <input type="text" className="input-field" placeholder="Ej: Influencia del clima organizacional en la productividad..." value={conceptualTitle} onChange={(e) => setConceptualTitle(e.target.value)} style={{ padding: '0.65rem' }} />
+                                    </div>
+                                    <button onClick={handleGenerateConceptual} disabled={isGeneratingConceptual || !conceptualTitle.trim()}
+                                        style={{ width: '100%', padding: '0.75rem', background: isGeneratingConceptual || !conceptualTitle.trim() ? '#94a3b8' : 'linear-gradient(to right, #059669, #047857)', color: 'white', border: 'none', borderRadius: '0.5rem', fontWeight: '600', cursor: isGeneratingConceptual || !conceptualTitle.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontSize: '0.95rem', transition: 'all 0.2s' }}>
+                                        {isGeneratingConceptual ? (<><span style={{ animation: 'spin 1s linear infinite' }}>⌛</span> Generando...</>) : (<><span style={{ fontSize: '1.1rem' }}>🧩</span> Generar Guía de Conceptos</>)}
+                                    </button>
+                                    {conceptualResult && (
+                                        <div style={{ marginTop: '1rem', padding: '1.25rem', background: 'white', border: '2px solid #34d399', borderRadius: '0.75rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.08)' }}>
+                                            <h5 style={{ margin: '0 0 0.75rem 0', color: '#059669', fontSize: '1rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><span style={{ fontSize: '1.2rem' }}>📋</span> Guía Generada</h5>
+                                            <div style={{ color: '#1e293b', fontSize: '0.92rem', lineHeight: '1.75', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{conceptualResult}</div>
+                                        </div>
+                                    )}
+                                    {conceptualError && (
+                                        <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '0.5rem' }}>
+                                            <p style={{ margin: '0', color: '#991b1b', fontSize: '0.85rem' }}>⚠️ {conceptualError}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Writing Example */}
+                                <div style={{
+                                    background: 'rgba(255,255,255,0.9)',
+                                    borderRadius: '0.75rem',
+                                    padding: '1.5rem',
+                                    border: '1px solid #6ee7b7',
+                                    marginTop: '1.25rem'
+                                }}>
+                                    <h4 style={{ fontSize: '1.05rem', color: '#059669', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <FileText size={20} /> Ejemplo de Definición Conceptual
+                                    </h4>
+                                    <p style={{ color: '#475569', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: '1.5' }}>
+                                        A continuación se presenta un ejemplo de cómo redactar la definición conceptual y operacional de una variable. Observe la estructura clara y fundamentada.
+                                    </p>
+
+                                    {/* Example paragraph */}
+                                    <div style={{
+                                        background: '#f0fdf4',
+                                        borderLeft: '4px solid #059669',
+                                        borderRadius: '0 0.5rem 0.5rem 0',
+                                        padding: '1.25rem 1.5rem',
+                                        marginBottom: '1rem',
+                                        fontSize: '0.92rem',
+                                        color: '#1e293b',
+                                        lineHeight: '1.85',
+                                        fontStyle: 'italic'
+                                    }}>
+                                        <p style={{ margin: '0 0 1rem 0' }}>
+                                            <span style={{ background: '#d1fae5', padding: '0.1rem 0.35rem', borderRadius: '0.2rem', fontStyle: 'normal', fontSize: '0.7rem', fontWeight: '700', color: '#059669', verticalAlign: 'super' }}>CONCEPTO CLAVE</span>{' '}
+                                            <strong>Clima Organizacional.</strong>
+                                            {' '}<span style={{ background: '#d1fae5', padding: '0.1rem 0.35rem', borderRadius: '0.2rem', fontStyle: 'normal', fontSize: '0.7rem', fontWeight: '700', color: '#059669', verticalAlign: 'super' }}>DEFINICIÓN TEÓRICA</span>{' '}
+                                            El clima organizacional se define como las percepciones compartidas por los empleados respecto a las políticas, prácticas y procedimientos que se recompensan, apoyan y esperan en el entorno laboral (Schneider et al., 2013).
+                                            {' '}<span style={{ background: '#d1fae5', padding: '0.1rem 0.35rem', borderRadius: '0.2rem', fontStyle: 'normal', fontSize: '0.7rem', fontWeight: '700', color: '#059669', verticalAlign: 'super' }}>CONTRASTE</span>{' '}
+                                            A diferencia de la cultura organizacional, que representa los valores profundos de la empresa, el clima es un fenómeno "más superficial" y directamente vinculado a la experiencia cotidiana del trabajador (Ostroff et al., 2012).
+                                        </p>
+                                        <p style={{ margin: '0' }}>
+                                            <span style={{ background: '#d1fae5', padding: '0.1rem 0.35rem', borderRadius: '0.2rem', fontStyle: 'normal', fontSize: '0.7rem', fontWeight: '700', color: '#059669', verticalAlign: 'super' }}>DEFINICIÓN OPERACIONAL</span>{' '}
+                                            Para efectos de esta investigación, el clima organizacional será operacionalizado y medido a través del instrumento ECO (Escala de Clima Organizacional) adaptado por Silva (2019), el cual evalúa tres dimensiones fundamentales: (a) liderazgo y apoyo directivo, (b) cohesión de equipo, y (c) condiciones físicas del entorno.
+                                        </p>
+                                    </div>
+
+                                    {/* Structure labels */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                                        {[
+                                            { label: 'Concepto clave', desc: 'Identifique claramente el concepto o variable.' },
+                                            { label: 'Definición teórica', desc: 'Aporte la definición de un autor representativo.' },
+                                            { label: 'Contraste (opcional)', desc: 'Diferéncielo de conceptos similares para evitar confusión.' },
+                                            { label: 'Definición operacional', desc: 'Explique cómo se medirá o aplicará en su estudio.' },
+                                            { label: 'Dimensiones', desc: 'Desglose el concepto en sus partes medibles.' },
+                                        ].map((item, i) => (
+                                            <div key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'start' }}>
+                                                <div style={{ background: '#059669', color: 'white', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: '700', flexShrink: 0, marginTop: '0.1rem' }}>✓</div>
+                                                <div>
+                                                    <strong style={{ color: '#047857', fontSize: '0.82rem' }}>{item.label}</strong>
+                                                    <p style={{ margin: '0', color: '#475569', fontSize: '0.78rem', lineHeight: '1.4' }}>{item.desc}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Concepts Suggestion Card */}
+                                <div style={{ background: 'linear-gradient(to right, #ecfdf5, #d1fae5)', borderRadius: '0.75rem', padding: '1.5rem', border: '1px solid #6ee7b7', marginTop: '1.5rem' }}>
+                                    <h4 style={{ fontSize: '1.05rem', color: '#065f46', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <span style={{ fontSize: '1.2rem' }}>💡</span> Explorador Rápido de Conceptos
+                                    </h4>
+                                    <p style={{ color: '#064e3b', fontSize: '0.85rem', marginBottom: '1rem', lineHeight: '1.5' }}>¿No estás seguro de cuáles términos definen tu investigación? Ingresa tu título y la IA te sugerirá las variables y conceptos clave esenciales para tu marco conceptual.</p>
+                                    <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+                                        <label style={{ fontSize: '0.85rem', color: '#065f46' }}>Título de tu Investigación</label>
+                                        <input type="text" className="input-field" placeholder="Ej: Brecha digital en escuelas rurales del municipio X..." value={suggestedConceptsTitle} onChange={(e) => setSuggestedConceptsTitle(e.target.value)} style={{ padding: '0.65rem', borderColor: '#6ee7b7' }} />
+                                    </div>
+                                    <button onClick={handleSuggestConcepts} disabled={isGeneratingConcepts || !suggestedConceptsTitle.trim()}
+                                        style={{ width: '100%', padding: '0.75rem', background: isGeneratingConcepts || !suggestedConceptsTitle.trim() ? '#a7f3d0' : 'linear-gradient(to right, #10b981, #059669)', color: 'white', border: 'none', borderRadius: '0.5rem', fontWeight: '600', cursor: isGeneratingConcepts || !suggestedConceptsTitle.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontSize: '0.95rem', transition: 'all 0.2s' }}>
+                                        {isGeneratingConcepts ? (<><span style={{ animation: 'spin 1s linear infinite' }}>⌛</span> Buscando conceptos...</>) : (<><span style={{ fontSize: '1.1rem' }}>🧠</span> Sugerir Conceptos</>)}
+                                    </button>
+                                    {suggestedConceptsResult && (
+                                        <div style={{ marginTop: '1rem', padding: '1.25rem', background: 'white', border: '2px solid #6ee7b7', borderRadius: '0.75rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.08)' }}>
+                                            <h5 style={{ margin: '0 0 0.75rem 0', color: '#059669', fontSize: '1rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><span style={{ fontSize: '1.2rem' }}>📌</span> Conceptos Sugeridos</h5>
+                                            <div style={{ color: '#1e293b', fontSize: '0.92rem', lineHeight: '1.75', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{suggestedConceptsResult}</div>
+                                        </div>
+                                    )}
+                                    {conceptsError && (
+                                        <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '0.5rem' }}>
+                                            <p style={{ margin: '0', color: '#991b1b', fontSize: '0.85rem' }}>⚠️ {conceptsError}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Extra content for Marco Contextual tab */}
+                        {activeMarcoTab === 'contextual' && activeMarcoData.searchGuide && (
+                            <div style={{ marginTop: '1.5rem' }}>
+                                {/* Search Guide */}
+                                <div style={{ background: 'rgba(255,255,255,0.85)', borderRadius: '0.75rem', padding: '1.5rem', border: '1px solid #fde68a', marginBottom: '1.25rem' }}>
+                                    <h4 style={{ fontSize: '1.05rem', color: '#d97706', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <Search size={20} /> {activeMarcoData.searchGuide.title}
+                                    </h4>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                        {activeMarcoData.searchGuide.steps.map((s, i) => (
+                                            <div key={i} style={{ display: 'flex', gap: '0.75rem', alignItems: 'start' }}>
+                                                <div style={{ background: '#d97706', color: 'white', borderRadius: '0.375rem', padding: '0.2rem 0.55rem', fontSize: '0.75rem', fontWeight: '700', flexShrink: 0, marginTop: '0.15rem' }}>{i + 1}</div>
+                                                <div>
+                                                    <strong style={{ color: '#b45309', fontSize: '0.9rem' }}>{s.step.replace(/^\d+\.\s*/, '')}</strong>
+                                                    <p style={{ margin: '0.2rem 0 0', color: '#334155', fontSize: '0.85rem', lineHeight: '1.55' }}>{s.detail}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* Databases */}
+                                <div style={{ background: 'rgba(255,255,255,0.85)', borderRadius: '0.75rem', padding: '1.5rem', border: '1px solid #fde68a', marginBottom: '1.25rem' }}>
+                                    <h4 style={{ fontSize: '1.05rem', color: '#d97706', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <Database size={20} /> Bases de datos y fuentes recomendadas
+                                    </h4>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.75rem' }}>
+                                        {activeMarcoData.searchGuide.databases.map((db, i) => (
+                                            <a key={i} href={db.url} target="_blank" rel="noopener noreferrer"
+                                                style={{ background: 'white', borderRadius: '0.5rem', padding: '0.85rem', border: '1px solid #fde68a', textDecoration: 'none', transition: 'transform 0.15s, box-shadow 0.15s', display: 'block' }}
+                                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.08)'; }}
+                                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+                                            >
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
+                                                    <span style={{ fontWeight: '600', color: '#d97706', fontSize: '0.9rem' }}>{db.name}</span>
+                                                    <ExternalLink size={13} color="#94a3b8" style={{ marginLeft: 'auto' }} />
+                                                </div>
+                                                <p style={{ margin: '0', fontSize: '0.8rem', color: '#475569', lineHeight: '1.4' }}>{db.tip}</p>
+                                            </a>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* AI Generator for Marco Contextual */}
+                                <div style={{ background: 'linear-gradient(to right, #fffbeb, #fef3c7)', borderRadius: '0.75rem', padding: '1.5rem', border: '1px solid #fcd34d' }}>
+                                    <h4 style={{ fontSize: '1.05rem', color: '#d97706', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <span style={{ fontSize: '1.2rem' }}>✨</span> Generador de Guía del Marco Contextual con IA
+                                    </h4>
+                                    <p style={{ color: '#334155', fontSize: '0.85rem', marginBottom: '1rem', lineHeight: '1.5' }}>Ingresa tu título y la IA generará: dimensiones a explorar, sugerencias de fuentes y un ejemplo descriptivo del entorno del problema.</p>
+                                    <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+                                        <label style={{ fontSize: '0.85rem' }}>Título de tu Investigación</label>
+                                        <input type="text" className="input-field" placeholder="Ej: Brecha digital en escuelas rurales del municipio X..." value={contextualTitle} onChange={(e) => setContextualTitle(e.target.value)} style={{ padding: '0.65rem' }} />
+                                    </div>
+                                    <button onClick={handleGenerateContextual} disabled={isGeneratingContextual || !contextualTitle.trim()}
+                                        style={{ width: '100%', padding: '0.75rem', background: isGeneratingContextual || !contextualTitle.trim() ? '#94a3b8' : 'linear-gradient(to right, #d97706, #b45309)', color: 'white', border: 'none', borderRadius: '0.5rem', fontWeight: '600', cursor: isGeneratingContextual || !contextualTitle.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontSize: '0.95rem', transition: 'all 0.2s' }}>
+                                        {isGeneratingContextual ? (<><span style={{ animation: 'spin 1s linear infinite' }}>⌛</span> Generando...</>) : (<><span style={{ fontSize: '1.1rem' }}>🌍</span> Generar Dimensiones del Contexto</>)}
+                                    </button>
+                                    {contextualResult && (
+                                        <div style={{ marginTop: '1rem', padding: '1.25rem', background: 'white', border: '2px solid #fcd34d', borderRadius: '0.75rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.08)' }}>
+                                            <h5 style={{ margin: '0 0 0.75rem 0', color: '#d97706', fontSize: '1rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><span style={{ fontSize: '1.2rem' }}>📋</span> Guía Generada</h5>
+                                            <div style={{ color: '#1e293b', fontSize: '0.92rem', lineHeight: '1.75', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{contextualResult}</div>
+                                        </div>
+                                    )}
+                                    {contextualError && (
+                                        <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '0.5rem' }}>
+                                            <p style={{ margin: '0', color: '#991b1b', fontSize: '0.85rem' }}>⚠️ {contextualError}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Writing Example */}
+                                <div style={{
+                                    background: 'rgba(255,255,255,0.9)',
+                                    borderRadius: '0.75rem',
+                                    padding: '1.5rem',
+                                    border: '1px solid #fde68a',
+                                    marginTop: '1.25rem'
+                                }}>
+                                    <h4 style={{ fontSize: '1.05rem', color: '#d97706', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <FileText size={20} /> Ejemplo de Descripción Contextual
+                                    </h4>
+                                    <p style={{ color: '#475569', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: '1.5' }}>
+                                        A continuación se presenta un ejemplo de cómo redactar la descripción del contexto poblacional y geográfico integrando datos oficiales. Observe el uso de estadísticas para fundamentar la exposición.
+                                    </p>
+
+                                    {/* Example paragraph */}
+                                    <div style={{
+                                        background: '#fffbeb',
+                                        borderLeft: '4px solid #d97706',
+                                        borderRadius: '0 0.5rem 0.5rem 0',
+                                        padding: '1.25rem 1.5rem',
+                                        marginBottom: '1rem',
+                                        fontSize: '0.92rem',
+                                        color: '#1e293b',
+                                        lineHeight: '1.85',
+                                        fontStyle: 'italic'
+                                    }}>
+                                        <p style={{ margin: '0 0 1rem 0' }}>
+                                            <span style={{ background: '#fef3c7', padding: '0.1rem 0.35rem', borderRadius: '0.2rem', fontStyle: 'normal', fontSize: '0.7rem', fontWeight: '700', color: '#d97706', verticalAlign: 'super' }}>CONTEXTO GEOGRÁFICO</span>{' '}
+                                            La presente investigación se enmarca en la ciudad de Bogotá D.C., Colombia, de manera específica en la Localidad de Ciudad Bolívar.
+                                            {' '}<span style={{ background: '#fef3c7', padding: '0.1rem 0.35rem', borderRadius: '0.2rem', fontStyle: 'normal', fontSize: '0.7rem', fontWeight: '700', color: '#d97706', verticalAlign: 'super' }}>DATOS DEMOGRÁFICOS</span>{' '}
+                                            De acuerdo con el Departamento Administrativo Nacional de Estadística (DANE, 2022), esta localidad cuenta con una población que supera los 600.000 habitantes, caracterizándose por ser una de las zonas receptoras de población más representativas de la ciudad, con un alto predominio de estratos socioeconómicos 1 y 2.
+                                        </p>
+                                        <p style={{ margin: '0' }}>
+                                            <span style={{ background: '#fef3c7', padding: '0.1rem 0.35rem', borderRadius: '0.2rem', fontStyle: 'normal', fontSize: '0.7rem', fontWeight: '700', color: '#d97706', verticalAlign: 'super' }}>VÍNCULO CON EL PROBLEMA</span>{' '}
+                                            Las dinámicas socioeconómicas del sector han propiciado retos estructurales en el acceso a la conectividad digital (Secretaría Distrital de Planeación, 2021). 
+                                            {' '}<span style={{ background: '#fef3c7', padding: '0.1rem 0.35rem', borderRadius: '0.2rem', fontStyle: 'normal', fontSize: '0.7rem', fontWeight: '700', color: '#d97706', verticalAlign: 'super' }}>CONTEXTO INSTITUCIONAL</span>{' '}
+                                            En este escenario se inscribe la Institución Educativa Distrital San Francisco, entidad de carácter público que atiende a una población de 1.200 estudiantes en jornada mañana y tarde, la cual presenta un déficit en infraestructura tecnológica de acuerdo con su Proyecto Educativo Institucional (IED San Francisco, 2022).
+                                        </p>
+                                    </div>
+
+                                    {/* Structure labels */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                                        {[
+                                            { label: 'Contexto espacial macro', desc: 'Inicie ubicando geográficamente al lector (país, ciudad).' },
+                                            { label: 'Datos oficiales estadísticos', desc: 'Respalde los datos demográficos y económicos con citas.' },
+                                            { label: 'Vínculo con el problema', desc: 'Muestre que las condiciones afectan la problemática tratada.' },
+                                            { label: 'Contexto micro / institucional', desc: 'Describa el lugar concreto donde se interviene.' },
+                                            { label: 'Uso y análisis de informes', desc: 'Mencione documentación local (PEI, planes de gobierno).' },
+                                        ].map((item, i) => (
+                                            <div key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'start' }}>
+                                                <div style={{ background: '#d97706', color: 'white', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: '700', flexShrink: 0, marginTop: '0.1rem' }}>✓</div>
+                                                <div>
+                                                    <strong style={{ color: '#b45309', fontSize: '0.82rem' }}>{item.label}</strong>
+                                                    <p style={{ margin: '0', color: '#475569', fontSize: '0.78rem', lineHeight: '1.4' }}>{item.desc}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Extra content for Marco Legal tab */}
+                        {activeMarcoTab === 'legal' && activeMarcoData.searchGuide && (
+                            <div style={{ marginTop: '1.5rem' }}>
+                                {/* Search Guide */}
+                                <div style={{ background: 'rgba(255,255,255,0.85)', borderRadius: '0.75rem', padding: '1.5rem', border: '1px solid #fca5a5', marginBottom: '1.25rem' }}>
+                                    <h4 style={{ fontSize: '1.05rem', color: '#dc2626', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <Search size={20} /> {activeMarcoData.searchGuide.title}
+                                    </h4>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                        {activeMarcoData.searchGuide.steps.map((s, i) => (
+                                            <div key={i} style={{ display: 'flex', gap: '0.75rem', alignItems: 'start' }}>
+                                                <div style={{ background: '#dc2626', color: 'white', borderRadius: '0.375rem', padding: '0.2rem 0.55rem', fontSize: '0.75rem', fontWeight: '700', flexShrink: 0, marginTop: '0.15rem' }}>{i + 1}</div>
+                                                <div>
+                                                    <strong style={{ color: '#991b1b', fontSize: '0.9rem' }}>{s.step.replace(/^\d+\.\s*/, '')}</strong>
+                                                    <p style={{ margin: '0.2rem 0 0', color: '#334155', fontSize: '0.85rem', lineHeight: '1.55' }}>{s.detail}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* Databases */}
+                                <div style={{ background: 'rgba(255,255,255,0.85)', borderRadius: '0.75rem', padding: '1.5rem', border: '1px solid #fca5a5', marginBottom: '1.25rem' }}>
+                                    <h4 style={{ fontSize: '1.05rem', color: '#dc2626', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <Database size={20} /> Bases de datos y fuentes recomendadas
+                                    </h4>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.75rem' }}>
+                                        {activeMarcoData.searchGuide.databases.map((db, i) => (
+                                            <a key={i} href={db.url} target="_blank" rel="noopener noreferrer"
+                                                style={{ background: 'white', borderRadius: '0.5rem', padding: '0.85rem', border: '1px solid #fca5a5', textDecoration: 'none', transition: 'transform 0.15s, box-shadow 0.15s', display: 'block' }}
+                                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.08)'; }}
+                                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+                                            >
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
+                                                    <span style={{ fontWeight: '600', color: '#dc2626', fontSize: '0.9rem' }}>{db.name}</span>
+                                                    <ExternalLink size={13} color="#94a3b8" style={{ marginLeft: 'auto' }} />
+                                                </div>
+                                                <p style={{ margin: '0', fontSize: '0.8rem', color: '#475569', lineHeight: '1.4' }}>{db.tip}</p>
+                                            </a>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* AI Generator for Marco Legal */}
+                                <div style={{ background: 'linear-gradient(to right, #fef2f2, #fee2e2)', borderRadius: '0.75rem', padding: '1.5rem', border: '1px solid #f87171' }}>
+                                    <h4 style={{ fontSize: '1.05rem', color: '#dc2626', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <span style={{ fontSize: '1.2rem' }}>✨</span> Generador de Guía del Marco Legal con IA
+                                    </h4>
+                                    <p style={{ color: '#334155', fontSize: '0.85rem', marginBottom: '1rem', lineHeight: '1.5' }}>Ingresa tu título y la IA generará: pirámide normativa aplicable, entidades reguladoras, palabras clave de búsqueda y un ejemplo redactado.</p>
+                                    <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+                                        <label style={{ fontSize: '0.85rem' }}>Título de tu Investigación</label>
+                                        <input type="text" className="input-field" placeholder="Ej: Cumplimiento de derechos laborales en plataformas digitales..." value={legalTitle} onChange={(e) => setLegalTitle(e.target.value)} style={{ padding: '0.65rem' }} />
+                                    </div>
+                                    <button onClick={handleGenerateLegal} disabled={isGeneratingLegal || !legalTitle.trim()}
+                                        style={{ width: '100%', padding: '0.75rem', background: isGeneratingLegal || !legalTitle.trim() ? '#94a3b8' : 'linear-gradient(to right, #dc2626, #b91c1c)', color: 'white', border: 'none', borderRadius: '0.5rem', fontWeight: '600', cursor: isGeneratingLegal || !legalTitle.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontSize: '0.95rem', transition: 'all 0.2s' }}>
+                                        {isGeneratingLegal ? (<><span style={{ animation: 'spin 1s linear infinite' }}>⌛</span> Generando...</>) : (<><span style={{ fontSize: '1.1rem' }}>⚖️</span> Generar Estructura Legal</>)}
+                                    </button>
+                                    {legalResult && (
+                                        <div style={{ marginTop: '1rem', padding: '1.25rem', background: 'white', border: '2px solid #f87171', borderRadius: '0.75rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.08)' }}>
+                                            <h5 style={{ margin: '0 0 0.75rem 0', color: '#dc2626', fontSize: '1rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><span style={{ fontSize: '1.2rem' }}>📋</span> Guía Generada</h5>
+                                            <div style={{ color: '#1e293b', fontSize: '0.92rem', lineHeight: '1.75', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{legalResult}</div>
+                                        </div>
+                                    )}
+                                    {legalError && (
+                                        <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '0.5rem' }}>
+                                            <p style={{ margin: '0', color: '#991b1b', fontSize: '0.85rem' }}>⚠️ {legalError}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Writing Example */}
+                                <div style={{
+                                    background: 'rgba(255,255,255,0.9)',
+                                    borderRadius: '0.75rem',
+                                    padding: '1.5rem',
+                                    border: '1px solid #fca5a5',
+                                    marginTop: '1.25rem'
+                                }}>
+                                    <h4 style={{ fontSize: '1.05rem', color: '#dc2626', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <FileText size={20} /> Ejemplo de Análisis Normativo
+                                    </h4>
+                                    <p style={{ color: '#475569', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: '1.5' }}>
+                                        A continuación se presenta un ejemplo de cómo redactar la descripción de una norma. Note cómo no solo se cita, sino que se analiza su impacto directo en el proyecto.
+                                    </p>
+
+                                    {/* Example paragraph */}
+                                    <div style={{
+                                        background: '#fef2f2',
+                                        borderLeft: '4px solid #dc2626',
+                                        borderRadius: '0 0.5rem 0.5rem 0',
+                                        padding: '1.25rem 1.5rem',
+                                        marginBottom: '1rem',
+                                        fontSize: '0.92rem',
+                                        color: '#1e293b',
+                                        lineHeight: '1.85',
+                                        fontStyle: 'italic'
+                                    }}>
+                                        <p style={{ margin: '0 0 1rem 0' }}>
+                                            <span style={{ background: '#fee2e2', padding: '0.1rem 0.35rem', borderRadius: '0.2rem', fontStyle: 'normal', fontSize: '0.7rem', fontWeight: '700', color: '#dc2626', verticalAlign: 'super' }}>CITA DE LA NORMA</span>{' '}
+                                            En el ámbito nacional, la Ley 1581 de 2012, dictada por el Congreso de la República de Colombia, constituye el marco general para la protección de datos personales.
+                                            {' '}<span style={{ background: '#fee2e2', padding: '0.1rem 0.35rem', borderRadius: '0.2rem', fontStyle: 'normal', fontSize: '0.7rem', fontWeight: '700', color: '#dc2626', verticalAlign: 'super' }}>PROPÓSITO DE LEY</span>{' '}
+                                            Esta disposición estatutaria tiene por objeto desarrollar el derecho constitucional que tienen todas las personas a conocer, actualizar y rectificar las informaciones que se hayan recogido sobre ellas en bases de datos o archivos.
+                                        </p>
+                                        <p style={{ margin: '0' }}>
+                                            <span style={{ background: '#fee2e2', padding: '0.1rem 0.35rem', borderRadius: '0.2rem', fontStyle: 'normal', fontSize: '0.7rem', fontWeight: '700', color: '#dc2626', verticalAlign: 'super' }}>ANÁLISIS DE APLICACIÓN</span>{' '}
+                                            Para los propósitos de esta investigación, el cumplimiento de los Artículos 9 y 12 resulta de carácter vinculante e imperativo. 
+                                            {' '}<span style={{ background: '#fee2e2', padding: '0.1rem 0.35rem', borderRadius: '0.2rem', fontStyle: 'normal', fontSize: '0.7rem', fontWeight: '700', color: '#dc2626', verticalAlign: 'super' }}>DESENLACE PRÁCTICO</span>{' '}
+                                            Dado que la plataforma de telemedicina propuesta en el Capítulo 4 almacenará información clínica (datos sensibles), la aplicación de esta ley obliga al diseño de protocolos extra de encriptación y al desarrollo de un formulario explícito de consentimiento informado previo.
+                                        </p>
+                                    </div>
+
+                                    {/* Structure labels */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                                        {[
+                                            { label: 'Cita de la Norma', desc: 'Identifica claramente el tipo de norma, número y año.' },
+                                            { label: 'Propósito General', desc: 'Sintetiza de qué trata la norma (sin copiarla toda).' },
+                                            { label: 'Análisis de Aplicación', desc: 'Enfócate en los artículos específicos que te afectan.' },
+                                            { label: 'Desenlace Práctico', desc: 'Concluye qué debes hacer en tu investigación para cumplirla.' },
+                                        ].map((item, i) => (
+                                            <div key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'start' }}>
+                                                <div style={{ background: '#dc2626', color: 'white', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: '700', flexShrink: 0, marginTop: '0.1rem' }}>✓</div>
+                                                <div>
+                                                    <strong style={{ color: '#991b1b', fontSize: '0.82rem' }}>{item.label}</strong>
+                                                    <p style={{ margin: '0', color: '#475569', fontSize: '0.78rem', lineHeight: '1.4' }}>{item.desc}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Norms Suggestion Card */}
+                                <div style={{ background: 'linear-gradient(to right, #fef2f2, #fee2e2)', borderRadius: '0.75rem', padding: '1.5rem', border: '1px solid #fca5a5', marginTop: '1.5rem' }}>
+                                    <h4 style={{ fontSize: '1.05rem', color: '#b91c1c', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <span style={{ fontSize: '1.2rem' }}>💡</span> Explorador Rápido de Normativas
+                                    </h4>
+                                    <p style={{ color: '#991b1b', fontSize: '0.85rem', marginBottom: '1rem', lineHeight: '1.5' }}>¿No estás seguro de qué leyes aplican a tu estudio? Ingresa tu título y la IA te sugerirá las ramas del derecho, leyes o regulaciones que debes explorar.</p>
+                                    <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+                                        <label style={{ fontSize: '0.85rem', color: '#991b1b' }}>Título de tu Investigación</label>
+                                        <input type="text" className="input-field" placeholder="Ej: Implementación de comercio electrónico en..." value={suggestedNormsTitle} onChange={(e) => setSuggestedNormsTitle(e.target.value)} style={{ padding: '0.65rem', borderColor: '#fca5a5' }} />
+                                    </div>
+                                    <button onClick={handleSuggestNorms} disabled={isGeneratingNorms || !suggestedNormsTitle.trim()}
+                                        style={{ width: '100%', padding: '0.75rem', background: isGeneratingNorms || !suggestedNormsTitle.trim() ? '#fca5a5' : 'linear-gradient(to right, #ef4444, #dc2626)', color: 'white', border: 'none', borderRadius: '0.5rem', fontWeight: '600', cursor: isGeneratingNorms || !suggestedNormsTitle.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontSize: '0.95rem', transition: 'all 0.2s' }}>
+                                        {isGeneratingNorms ? (<><span style={{ animation: 'spin 1s linear infinite' }}>⌛</span> Buscando normas...</>) : (<><span style={{ fontSize: '1.1rem' }}>🧠</span> Sugerir Normativas</>)}
+                                    </button>
+                                    {suggestedNormsResult && (
+                                        <div style={{ marginTop: '1rem', padding: '1.25rem', background: 'white', border: '2px solid #fca5a5', borderRadius: '0.75rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.08)' }}>
+                                            <h5 style={{ margin: '0 0 0.75rem 0', color: '#dc2626', fontSize: '1rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><span style={{ fontSize: '1.2rem' }}>📌</span> Normativas Sugeridas</h5>
+                                            <div style={{ color: '#1e293b', fontSize: '0.92rem', lineHeight: '1.75', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{suggestedNormsResult}</div>
+                                        </div>
+                                    )}
+                                    {normsError && (
+                                        <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '0.5rem' }}>
+                                            <p style={{ margin: '0', color: '#991b1b', fontSize: '0.85rem' }}>⚠️ {normsError}</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
