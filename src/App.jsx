@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, Scale, LayoutGrid, Link, Compass, Library } from 'lucide-react';
+import { Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, Scale, LayoutGrid, Link, Compass, Library, Users } from 'lucide-react';
 import Herramientas from './components/Herramientas';
 import Ideacion from './components/Ideacion';
 import Titulo from './components/Titulo';
@@ -11,6 +11,9 @@ import Objetivos from './components/Objetivos';
 import Introduccion from './components/Introduccion';
 import MarcoReferencial from './components/MarcoReferencial';
 import DoiCite from './components/DoiCite';
+import Metodologia from './components/Metodologia';
+import Poblacion from './components/Poblacion';
+import PlanAnalisis from './components/PlanAnalisis';
 
 function App() {
     const [activeTab, setActiveTab] = useState('herramientas');
@@ -48,6 +51,12 @@ function App() {
                 return <MarcoReferencial />;
             case 'doi':
                 return <DoiCite />;
+            case 'metodologia':
+                return <Metodologia />;
+            case 'poblacion':
+                return <Poblacion />;
+            case 'plan-analisis':
+                return <PlanAnalisis />;
             default:
                 return <Ideacion />;
         }
@@ -65,6 +74,9 @@ function App() {
             case 'objetivos': return 'Objetivos de Investigación';
             case 'introduccion': return 'Introducción';
             case 'marco': return 'Marco Referencial';
+            case 'metodologia': return 'Metodología';
+            case 'poblacion': return 'Población y Muestra';
+            case 'plan-analisis': return 'Plan de Análisis e Instrumentos';
             case 'doi': return 'DOI to Cite';
             default: return '';
         }
@@ -177,6 +189,30 @@ function App() {
                     >
                         <Library size={20} />
                         <span>Marco Referencial</span>
+                    </button>
+
+                    <button
+                        className={`nav-button ${activeTab === 'metodologia' ? 'active' : ''}`}
+                        onClick={() => handleTabChange('metodologia')}
+                    >
+                        <FileText size={20} />
+                        <span>Metodología</span>
+                    </button>
+
+                    <button
+                        className={`nav-button ${activeTab === 'poblacion' ? 'active' : ''}`}
+                        onClick={() => handleTabChange('poblacion')}
+                    >
+                        <Users size={20} />
+                        <span>Población y Muestra</span>
+                    </button>
+
+                    <button
+                        className={`nav-button ${activeTab === 'plan-analisis' ? 'active' : ''}`}
+                        onClick={() => handleTabChange('plan-analisis')}
+                    >
+                        <Library size={20} />
+                        <span>Plan de Análisis e Inst.</span>
                     </button>
 
                     <button

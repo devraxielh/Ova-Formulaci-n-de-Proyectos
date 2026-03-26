@@ -1164,3 +1164,273 @@ JUSTIFICACIÓN: [Breve justificación]
         throw new Error('No se pudo sugerir normativas. Verifica tu conexión y la API key.');
     }
 }
+
+export async function suggestMethodology(title) {
+    const prompt = `Eres un experto en metodología de la investigación.
+TÍTULO DE LA INVESTIGACIÓN:
+"${title}"
+
+INSTRUCCIONES:
+Analiza el título propuesto y determina cuál es la metodología más adecuada para llevar a cabo esta investigación. 
+Debes proponer el Enfoque, el Tipo de investigación y el Diseño, eligiendo ESTRICTAMENTE una de las opciones permitidas para cada categoría.
+
+Opciones permitidas:
+- ENFOQUE: Cuantitativo, Cualitativo, Mixto
+- TIPO: Exploratoria, Descriptiva, Explicativa
+- DISEÑO: Experimental, Cuasi-experimental, No experimental
+
+Responde ÚNICAMENTE con este formato exacto (asegúrate de incluir las etiquetas):
+
+ENFOQUE: [tu elección]
+TIPO: [tu elección]
+DISEÑO: [tu elección]
+EXPLICACION: [Redacta 2-3 párrafos académicos explicando POR QUÉ esta combinación metodológica es la ideal para el título propuesto, cómo articularán entre sí estas decisiones para lograr los objetivos, y qué ventaja le da al investigador proceder de esta forma. Usa un tono formal educativo.]`;
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Eres un experto metodólogo. Sugieres enfoques, tipos y diseños de investigación de forma estructurada según el formato exacto requerido.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            model: import.meta.env.VITE_GROQ_MODEL,
+            temperature: 0.7,
+            max_tokens: 1000,
+        });
+
+        return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al sugerir metodología';
+    } catch (error) {
+        console.error('Error calling Groq API:', error);
+        throw new Error('No se pudo sugerir la metodología. Verifica tu conexión.');
+    }
+}
+
+export async function justifyMethodology(title, enfoque, tipo, diseno) {
+    const prompt = `Eres un experto en redacción de metodología académica.
+TÍTULO: "${title}"
+ENFOQUE: ${enfoque}
+TIPO: ${tipo}
+DISEÑO: ${diseno}
+
+INSTRUCCIONES:
+El investigador ha seleccionado manualmente esta configuración metodológica para su proyecto.
+Redacta una justificación de 2-3 párrafos explicando rigurosamente cómo se justifica esta elección metodológica para el título indicado.
+Explica cómo el enfoque ${enfoque.toLowerCase()}, el tipo ${tipo.toLowerCase()} y el diseño ${diseno.toLowerCase()} se complementan para responder a la necesidad de la investigación.`;
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Eres un experto académico que justifica decisiones metodológicas con lenguaje formal.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            model: import.meta.env.VITE_GROQ_MODEL,
+            temperature: 0.7,
+            max_tokens: 900,
+        });
+
+        return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al justificar metodología';
+    } catch (error) {
+        console.error('Error calling Groq API:', error);
+        throw new Error('No se pudo justificar la metodología. Verifica tu conexión.');
+    }
+}
+
+export async function generateMethodologyStructure(title, enfoque, tipo, diseno) {
+    const prompt = `Eres un experto en investigación académica.
+TÍTULO: "${title}"
+ENFOQUE: ${enfoque}
+TIPO: ${tipo}
+DISEÑO: ${diseno}
+
+INSTRUCCIONES:
+El investigador necesita escribir su capítulo de Metodología.
+Genera una GUÍA ESTRUCTURADA sobre cómo se debería redactar. Toma en cuenta que "cada una es una subsección" en el documento final.
+
+Formato esperado (NO uses markdown):
+
+SUBSECCIÓN 1: Enfoque de Investigación (${enfoque})
+[Explica aquí qué debe redactar exactamente el estudiante en este primer subtítulo de su trabajo, justificando por qué aplica a su proyecto. Limítate a 2-3 oraciones claras.]
+Conectores recomendados: [lista de 3-4 conectores]
+
+SUBSECCIÓN 2: Tipo de Investigación (${tipo})
+[Explica qué debe redactar en este segundo subtítulo y cómo conectarlo con su investigación en particular. 2-3 oraciones]
+Conectores recomendados: [lista de 3-4 conectores]
+
+SUBSECCIÓN 3: Diseño de la Investigación (${diseno})
+[Qué debe redactar aquí. Ej: detalles de cómo obtendrá datos, aplicada a su contexto. 2-3 oraciones]
+Conectores recomendados: [lista de 3-4 conectores]
+
+Sé muy práctico y educativo. Ayuda al investigador a saber exactamente qué redactar debajo de cada subtítulo.`;
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Eres un experto académico que ayuda a estudiantes a estructurar sus documentos de investigación.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            model: import.meta.env.VITE_GROQ_MODEL,
+            temperature: 0.7,
+            max_tokens: 1200,
+        });
+
+        return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al generar la guía metodológica';
+    } catch (error) {
+        console.error('Error calling Groq API:', error);
+        throw new Error('No se pudo generar la guía. Verifica tu conexión.');
+    }
+}
+
+export async function suggestPopulations(title) {
+    const prompt = `Eres un experto en metodología de la investigación.
+TÍTULO DE LA INVESTIGACIÓN:
+"${title}"
+
+INSTRUCCIONES:
+El estudiante necesita definir la población de estudio para su proyecto.
+Analiza el título propuesto y sugiere 3 posibles poblaciones específicas y viables para llevar a cabo esta investigación.
+
+Para cada opción de población, brinda la siguiente estructura obligatoria (No uses markdown, sólo texto claro):
+
+OPCIÓN 1: [Nombre de la población, ej. Estudiantes de bachillerato del grado décimo]
+CRITERIO DE INCLUSIÓN: [Una característica obligatoria que deben cumplir para ser parte del estudio]
+JUSTIFICACIÓN: [Por qué estudiar a este grupo en particular ayudará a responder el problema de investigación. 1-2 oraciones]
+
+OPCIÓN 2: [Segunda alternativa posible, ej. Docentes de matemáticas...]
+CRITERIO DE INCLUSIÓN: ...
+JUSTIFICACIÓN: ...
+
+OPCIÓN 3: [Tercera alternativa posible]
+CRITERIO DE INCLUSIÓN: ...
+JUSTIFICACIÓN: ...
+
+Redacta de forma académica, concisa y totalmente enfocada al título de investigación proporcionado.`;
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Eres un experto académico que ayuda a estudiantes a delimitar la población de estudio.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            model: import.meta.env.VITE_GROQ_MODEL,
+            temperature: 0.7,
+            max_tokens: 1200,
+        });
+
+        return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al sugerir poblaciones';
+    } catch (error) {
+        console.error('Error calling Groq API:', error);
+        throw new Error('No se pudo sugerir las poblaciones. Verifica tu conexión.');
+    }
+}
+
+export async function generateMethodologyPhases(title, objetivos, enfoque, tipo, diseno) {
+    const prompt = `Eres un experto académico en metodología de investigación empírica.
+
+TÍTULO: "${title}"
+OBJETIVOS ESPECÍFICOS:
+${objetivos || 'No se proporcionaron objetivos específicos. Deduce lógicamente las fases necesarias según el título.'}
+
+ENFOQUE: ${enfoque}
+TIPO DE INVESTIGACIÓN: ${tipo}
+DISEÑO: ${diseno}
+
+INSTRUCCIONES:
+El estudiante necesita definir las Fases de su Investigación (el paso a paso cronológico). Es fundamental que las fases estén estrechamente vinculadas y sirvan para dar cumplimiento a los Objetivos Específicos.
+Genera las fases secuenciales lógicas (generalmente correspondientes 1 a 1 con los objetivos específicos).
+
+Para cada fase, proporciona estrictamente esta estructura (usa texto claro, no uses markdown complejo):
+
+FASE [X]: [Nombre conciso de la Fase, ej. Diagnóstico de la situación actual...]
+OBJETIVO VINCULADO: [A qué objetivo específico responde esta fase]
+ACTIVIDADES CLAVE: [Menciona 2 a 3 acciones prácticas alineadas al diseño]
+ENTREGABLE/RESULTADO: [Qué se obtiene concretamente en esa fase, ej. Informe diagnóstico...]
+
+Asegúrate de que todo tenga total congruencia estructural con el enfoque (${enfoque}) y diseño (${diseno}) indicados.`;
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Eres un investigador experto ayudando a estructurar las fases cronológicas de un proyecto.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            model: import.meta.env.VITE_GROQ_MODEL,
+            temperature: 0.7,
+            max_tokens: 1200,
+        });
+
+        return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al generar las fases de la metodología';
+    } catch (error) {
+        console.error('Error calling Groq API:', error);
+        throw new Error('No se pudo generar las fases. Verifica tu conexión.');
+    }
+}
+
+export async function suggestInstruments(title) {
+    const prompt = `Eres un experto académico en metodología de investigación empírica.
+
+TÍTULO DE INVESTIGACIÓN: "${title}"
+
+INSTRUCCIONES:
+El estudiante necesita seleccionar los instrumentos de recolección de información más idóneos para su investigación.
+Analiza el título propuesto y sugiere 1 o 2 instrumentos específicos y altamente viables (Ej: Encuesta de escala Likert, Entrevista semiestructurada, Rúbrica de observación, Análisis de historial...).
+
+Para cada instrumento sugerido, debes proveer este formato estricto (no uses markdown complejo, solo texto claro):
+
+INSTRUMENTO: [Nombre exacto del instrumento sugerido]
+JUSTIFICACIÓN: [Por qué este instrumento es el más adecuado para medir o capturar los datos que exige este título]
+VIABILIDAD: [Análisis rápido de qué tan viable es, qué sesgos evitar y la facilidad para aplicarlo en la vida real]
+
+Sé muy conciso, directo, empírico y académico.`;
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Eres un investigador experto ayudando a definir la idoneidad y viabilidad de los instrumentos de recolección de datos.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            model: import.meta.env.VITE_GROQ_MODEL,
+            temperature: 0.7,
+            max_tokens: 1200,
+        });
+
+        return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al sugerir instrumentos';
+    } catch (error) {
+        console.error('Error calling Groq API:', error);
+        throw new Error('No se pudo sugerir los instrumentos. Verifica tu conexión.');
+    }
+}

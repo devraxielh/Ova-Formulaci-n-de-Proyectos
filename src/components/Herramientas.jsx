@@ -1,7 +1,7 @@
 import React from 'react';
 import {
     Lightbulb, Type, HelpCircle, FileText, Scale,
-    Target, BookOpen, ArrowRight, Sparkles, Layers, Link, Compass, Library
+    Target, BookOpen, ArrowRight, Sparkles, Layers, Link, Compass, Library, Microscope, Users, AreaChart
 } from 'lucide-react';
 
 const tools = [
@@ -96,11 +96,41 @@ const tools = [
         badge: 'IA'
     },
     {
-        id: 'doi',
-        icon: Link,
+        id: 'metodologia',
+        icon: Microscope,
         color: '#0891b2',
         bg: 'linear-gradient(135deg, #ecfeff, #cffafe)',
         border: '#a5f3fc',
+        title: 'Metodología',
+        description: 'Conoce los enfoques (cuantitativo, cualitativo, mixto), tipos y diseños de investigación para alcanzar tus objetivos.',
+        badge: 'Teoría'
+    },
+    {
+        id: 'poblacion',
+        icon: Users,
+        color: '#6d28d9',
+        bg: 'linear-gradient(135deg, #f5f3ff, #ede9fe)',
+        border: '#c4b5fd',
+        title: 'Población y Muestra',
+        description: 'Define claramente el universo de tu estudio y aprende a extraer una muestra representativa con su justificación.',
+        badge: 'Teoría'
+    },
+    {
+        id: 'plan-analisis',
+        icon: AreaChart,
+        color: '#86198f',
+        bg: 'linear-gradient(135deg, #fdf4ff, #fae8ff)',
+        border: '#f5d0fe',
+        title: 'Plan de Análisis e Instrumentos',
+        description: 'Mapas de ruta para procesar y validar los datos obtenidos a través de tus instrumentos de recolección de información.',
+        badge: 'Teoría'
+    },
+    {
+        id: 'doi',
+        icon: Link,
+        color: '#be123c',
+        bg: 'linear-gradient(135deg, #ffe4e6, #fecdd3)',
+        border: '#fda4af',
         title: 'DOI to Cite',
         description: 'Convierte cualquier DOI en una referencia APA 7 lista para usar. Consulta CrossRef automáticamente y copia la cita al portapapeles.',
         badge: 'API'
