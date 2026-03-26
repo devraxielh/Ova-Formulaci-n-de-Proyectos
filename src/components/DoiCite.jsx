@@ -304,7 +304,7 @@ const DoiCite = () => {
         setInTextCitation('');
         setMetadata(null);
         try {
-            const res = await fetch(`/api/crossref/works/${encodeURIComponent(cleaned)}?mailto=info@projectsia.edu`);
+            const res = await fetch(`https://api.crossref.org/works/${encodeURIComponent(cleaned)}?mailto=info@projectsia.edu`);
             if (!res.ok) throw new Error(`DOI no encontrado (${res.status})`);
             const json = await res.json();
             const data = json.message;
