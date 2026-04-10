@@ -51,6 +51,7 @@ body {
   flex-direction: column;
   padding: 1.5rem;
   flex-shrink: 0;
+  overflow-y: auto;
 }
 
 .sidebar-header {

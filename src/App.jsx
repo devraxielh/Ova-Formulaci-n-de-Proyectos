@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, Scale, LayoutGrid, Link, Compass, Library, Users } from 'lucide-react';
+import { Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, Scale, LayoutGrid, Link, Compass, Library, Users, Calendar, DollarSign } from 'lucide-react';
 import Herramientas from './components/Herramientas';
 import Ideacion from './components/Ideacion';
 import Titulo from './components/Titulo';
@@ -14,6 +14,8 @@ import DoiCite from './components/DoiCite';
 import Metodologia from './components/Metodologia';
 import Poblacion from './components/Poblacion';
 import PlanAnalisis from './components/PlanAnalisis';
+import Cronograma from './components/Cronograma';
+import Presupuesto from './components/Presupuesto';
 
 function App() {
     const [activeTab, setActiveTab] = useState('herramientas');
@@ -57,6 +59,10 @@ function App() {
                 return <Poblacion />;
             case 'plan-analisis':
                 return <PlanAnalisis />;
+            case 'cronograma':
+                return <Cronograma />;
+            case 'presupuesto':
+                return <Presupuesto />;
             default:
                 return <Ideacion />;
         }
@@ -77,6 +83,8 @@ function App() {
             case 'metodologia': return 'Metodología';
             case 'poblacion': return 'Población y Muestra';
             case 'plan-analisis': return 'Plan de Análisis e Instrumentos';
+            case 'cronograma': return 'Cronograma';
+            case 'presupuesto': return 'Presupuesto Financiero';
             case 'doi': return 'DOI to Cite';
             default: return '';
         }
@@ -110,7 +118,7 @@ function App() {
                     </div>
                 </div>
 
-                <nav style={{ flex: 1 }}>
+                <nav style={{ flex: 1, overflowY: 'auto', margin: '1rem -0.5rem', padding: '0 0.5rem' }}>
                     <button
                         className={`nav-button ${activeTab === 'herramientas' ? 'active' : ''}`}
                         onClick={() => handleTabChange('herramientas')}
@@ -213,6 +221,22 @@ function App() {
                     >
                         <Library size={20} />
                         <span>Plan de Análisis e Inst.</span>
+                    </button>
+
+                    <button
+                        className={`nav-button ${activeTab === 'cronograma' ? 'active' : ''}`}
+                        onClick={() => handleTabChange('cronograma')}
+                    >
+                        <Calendar size={20} />
+                        <span>Cronograma</span>
+                    </button>
+
+                    <button
+                        className={`nav-button ${activeTab === 'presupuesto' ? 'active' : ''}`}
+                        onClick={() => handleTabChange('presupuesto')}
+                    >
+                        <DollarSign size={20} />
+                        <span>Presupuesto</span>
                     </button>
 
                     <button

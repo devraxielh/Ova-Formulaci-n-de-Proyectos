@@ -1434,3 +1434,164 @@ Sé muy conciso, directo, empírico y académico.`;
         throw new Error('No se pudo sugerir los instrumentos. Verifica tu conexión.');
     }
 }
+
+export async function suggestCronograma(title, objetivos) {
+    const prompt = `Eres un experto académico en planificación y gestión de proyectos de investigación.
+
+TÍTULO DE INVESTIGACIÓN: "${title}"
+OBJETIVOS: "${objetivos || 'No proporcionados, infiere los pasos lógicos.'}"
+
+INSTRUCCIONES:
+El estudiante necesita diseñar el Cronograma de actividades para su proyecto de investigación.
+Analiza el título propuesto (y los objetivos si los hay) y sugiere un aproximado de las actividades secuenciales organizadas por Fases (ej. Fase de Diseño, Fase de Recolección, Fase de Análisis, Fase de Redacción).
+Para cada actividad, sugiere una duración estimada en semanas o meses (asumiendo un proyecto estándar de 6 a 12 meses).
+
+Formato estricto (no uses markdown complejo, solo texto claro):
+
+FASE 1: [Nombre de la Fase]
+- Actividad 1: [Descripción] (Duración estimada)
+- Actividad n: [Descripción] (Duración estimada)
+
+FASE 2: [Nombre de la Fase]
+...
+
+MANTÉNLO ACADÉMICO, PRÁCTICO Y REALISTA.`;
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Eres un investigador experto ayudando a planificar cronogramas viables para proyectos de grado o investigación.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            model: import.meta.env.VITE_GROQ_MODEL,
+            temperature: 0.7,
+            max_tokens: 1200,
+        });
+
+        return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al sugerir cronograma';
+    } catch (error) {
+        console.error('Error calling Groq API:', error);
+        throw new Error('No se pudo sugerir el cronograma. Verifica tu conexión.');
+    }
+}
+
+export async function generateGanttData(objetivo, unidadTiempo, cantidadPeriodos, periodoInicio = 1) {
+    const prompt = `Eres un experto académico en planificación de proyectos.
+
+OBJETIVO ESPECÍFICO: "${objetivo}"
+UNIDAD DE TIEMPO: ${unidadTiempo} (semanal, mensual, trimestral o semestral)
+DURACIÓN TOTAL DEL PROYECTO: ${cantidadPeriodos} ${unidadTiempo}(s)
+PERIODO DE INICIO PARA ESTE OBJETIVO: Empezar en periodo ${periodoInicio}
+
+INSTRUCCIONES:
+El estudiante necesita un Diagrama de Gantt específico para lograr este objetivo. 
+Desglosa el objetivo en 4 a 7 ACTIVIDADES secuenciales necesarias para cumplirlo.
+Para cada actividad, asigna en qué periodo(s) de tiempo se ejecutará. El inicio de la primera actividad debe ser exactamente el periodo ${periodoInicio} y el final máximo de ninguna actividad puede superar el periodo ${cantidadPeriodos}.
+Múltiples actividades pueden solaparse.
+
+IMPORTANTE: DEBES DEVOLVER ESTRICTAMENTE UNA ESTRUCTURA JSON VÁLIDA y NADA MÁS (sin backticks, sin markdown, sin texto introductorio).
+El formato debe ser un array de objetos con esta estructura exacta:
+[
+  { "actividad": "Nombre corto de la actividad", "inicio": 1, "duracion": 2 },
+  { "actividad": "Siguiente actividad", "inicio": 3, "duracion": 1 }
+]
+
+Consideraciones: 
+- "inicio" es el periodo donde comienza (número entero).
+- "duracion" es cuántos periodos requiere de forma continua (número entero).
+- inicio + duracion - 1 no puede superar ${cantidadPeriodos}.
+RESPONDE SÓLO CON EL JSON.`;
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Eres una API que solo devuelve JSON válido. No devuelves markdown ni texto extra.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            model: import.meta.env.VITE_GROQ_MODEL,
+            temperature: 0.2, // Low temp for structured JSON
+            max_tokens: 1500,
+        });
+
+        const rawContent = chatCompletion.choices[0]?.message?.content?.trim() || '';
+        
+        // Remove markdown formatting if the model still includes it
+        const jsonString = rawContent.replace(/^```json/i, '').replace(/^```/, '').replace(/```$/, '').trim();
+        
+        try {
+            return JSON.parse(jsonString);
+        } catch (e) {
+            console.error('Error parsing Gantt JSON:', jsonString);
+            throw new Error('La respuesta de la IA no fue un formato válido. Intenta de nuevo.');
+        }
+
+    } catch (error) {
+        console.error('Error calling Groq API:', error);
+        throw new Error(error.message || 'No se pudo generar el diagrama. Verifica tu conexión.');
+    }
+}
+
+export async function suggestPresupuesto(titulo) {
+    const prompt = `Eres un experto financiero en formulación de proyectos tecnológicos y de analítica de datos.
+
+TÍTULO O TEMA DEL PROYECTO: "${titulo}"
+
+INSTRUCCIONES:
+El estudiante de analítica de datos requiere un presupuesto base estimativo para su proyecto. 
+Debes generar un desglose estructurado con los rubros necesarios para un proyecto empírico/experimental de esta naturaleza (recursos humanos, servidores físicos/cloud, material, encuestas, muestreos, licencias o bibliografía de pago, viajes, etc.).
+Para cada ítem, estima un costo referencial razonable, indica una fuente de financiación típica sugerida ("Personal", "Universidad/Institución", "Externa") y añade una justificación clara de por qué es necesario ese recurso.
+
+IMPORTANTE: LOS COSTOS DEBEN ESTAR EN PESOS COLOMBIANOS (COP). Es decir, los valores deben ser altos correspondientes a la moneda real (ejemplo: un servidor no cuesta "500", sino "2500000").
+IMPORTANTE: DEBES DEVOLVER ESTRICTAMENTE UNA ESTRUCTURA JSON VÁLIDA y NADA MÁS (sin backticks, sin markdown).
+El formato debe ser un array de objetos con esta estructura exacta:
+[
+  { "categoria": "Recursos Humanos", "descripcion": "Ingeniero de Datos (6 meses)", "justificacion": "Para procesar y limpiar conjuntos de datos", "costo": 6000000, "fuente": "Externa" },
+  { "categoria": "Infraestructura Cloud", "descripcion": "Servidor AWS EC2", "justificacion": "Requerido para alojar el pipeline de datos", "costo": 1500000, "fuente": "Personal" }
+]
+Categorías recomendadas: "Recursos Humanos", "Infraestructura Física", "Infraestructura Cloud", "Materiales/Muestreos", "Viajes", "Bibliografía/Licencias", "Otros".
+RESPONDE SÓLO CON EL JSON.`;
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Eres una API que solo devuelve JSON válido. No devuelves markdown ni texto extra.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            model: import.meta.env.VITE_GROQ_MODEL,
+            temperature: 0.3,
+            max_tokens: 1500,
+        });
+
+        const rawContent = chatCompletion.choices[0]?.message?.content?.trim() || '';
+        const jsonString = rawContent.replace(/^```json/i, '').replace(/^```/, '').replace(/```$/, '').trim();
+        
+        try {
+            return JSON.parse(jsonString);
+        } catch (e) {
+            console.error('Error parsing Presupuesto JSON:', jsonString);
+            throw new Error('La respuesta de la IA no fue un formato válido. Intenta de nuevo.');
+        }
+
+    } catch (error) {
+        console.error('Error calling Groq API:', error);
+        throw new Error(error.message || 'No se pudo generar el presupuesto. Verifica tu conexión.');
+    }
+}

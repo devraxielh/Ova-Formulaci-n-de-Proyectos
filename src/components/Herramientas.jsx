@@ -1,7 +1,7 @@
 import React from 'react';
 import {
     Lightbulb, Type, HelpCircle, FileText, Scale,
-    Target, BookOpen, ArrowRight, Sparkles, Layers, Link, Compass, Library, Microscope, Users, AreaChart
+    Target, BookOpen, ArrowRight, Sparkles, Layers, Link, Compass, Library, Microscope, Users, AreaChart, Calendar, DollarSign
 } from 'lucide-react';
 
 const tools = [
@@ -124,6 +124,26 @@ const tools = [
         title: 'Plan de Análisis e Instrumentos',
         description: 'Mapas de ruta para procesar y validar los datos obtenidos a través de tus instrumentos de recolección de información.',
         badge: 'Teoría'
+    },
+    {
+        id: 'cronograma',
+        icon: Calendar,
+        color: '#be123c',
+        bg: 'linear-gradient(135deg, #fff1f2, #ffe4e6)',
+        border: '#fecdd3',
+        title: 'Cronograma',
+        description: 'Organiza en el tiempo todas las actividades necesarias para llevar a cabo el estudio con nuestro asistente de IA.',
+        badge: 'IA'
+    },
+    {
+        id: 'presupuesto',
+        icon: DollarSign,
+        color: '#10b981',
+        bg: 'linear-gradient(135deg, #d1fae5, #a7f3d0)',
+        border: '#6ee7b7',
+        title: 'Presupuesto Financiero',
+        description: 'Estructura la inversión de recursos humanos, nube, encuestas y define las fuentes de financiación requeridas.',
+        badge: 'IA'
     },
     {
         id: 'doi',
