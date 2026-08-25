@@ -1,0 +1,44 @@
+\section{Descripción General (IEEE 830)}
+
+\subsection{Perspectiva del Producto}
+El Software IA es una aplicación independiente basada en la web. No forma parte de un sistema mayor o monolítico (como un Moodle o un LMS institucional), lo que le permite escalar de manera aislada y ser actualizado de forma continua (Continuous Deployment) mediante plataformas como Vercel o Netlify. El ecosistema tecnológico confía enteramente en \textit{Frontend Tooling} moderno (Vite) para orquestar los paquetes y en servicios en la nube de terceros (API de Groq) para la capa de procesamiento inteligente.
+
+\subsection{Funciones del Producto}
+A nivel general, el sistema realiza las siguientes funciones:
+\begin{itemize}
+    \item \textbf{Recolección guiada de datos:} Presenta formularios estructurados (usando HTML5 y TailwindCSS) que impiden el avance si los campos críticos están vacíos.
+    \item \textbf{Ensamblaje de Prompts:} Mediante lógica en JavaScript (\texttt{groqService.js}), el sistema concatena los datos del usuario con reglas ocultas del sistema (\textit{System Prompts}) para obligar a la IA a adoptar el rol de tutor.
+    \item \textbf{Transacción Asíncrona (Fetch):} Se comunica de forma asíncrona sobre HTTPS a los clústeres de inferencia de Groq.
+    \item \textbf{Renderizado Reactivo:} El estado global de React capta la respuesta en formato *Markdown* y la renderiza de vuelta a la UI sin recargar la pantalla.
+\end{itemize}
+
+\subsection{Características de los Usuarios}
+Se han identificado dos perfiles de usuario principales interactuando directa o indirectamente con el software:
+
+\textbf{1. Estudiante de Pregrado / Posgrado (Usuario Final Directo)}
+\begin{itemize}
+    \item \textbf{Nivel Técnico:} Conocimientos básicos de navegación web e interacción con formularios. No se requieren conocimientos previos sobre \textit{prompt engineering}.
+    \item \textbf{Necesidad:} Superar el bloqueo inicial en la escritura académica, encontrar verbos adecuados, y obtener formatos precisos sin lidiar con los errores de "alucinación" comunes de IAs genéricas no configuradas.
+\end{itemize}
+
+\textbf{2. Asesor de Tesis / Docente (Beneficiario Indirecto)}
+\begin{itemize}
+    \item \textbf{Nivel Técnico:} Variado.
+    \item \textbf{Necesidad:} Recibir propuestas de investigación que ya posean una estructura lógica mínima (congruencia entre problema y objetivos), permitiendo enfocar la tutoría en la profundidad del conocimiento y no en correcciones de forma o sintaxis.
+\end{itemize}
+
+\subsection{Restricciones Generales}
+El desarrollo y la operación diaria del Software IA están limitados por las siguientes restricciones técnicas e institucionales:
+\begin{itemize}
+    \item \textbf{Costo Operativo Cero:} El sistema debe aprovechar las capas gratuitas (Free Tier) de Groq y Crossref. No se pueden requerir tarjetas de crédito al usuario ni imponer costos al desarrollador.
+    \item \textbf{Límites de Rate (Rate Limiting):} Groq API impone un límite de RPM (Requests Per Minute) y RPD (Requests Per Day). La aplicación debe manejar las fallas de red informando al usuario (HTTP Status 429).
+    \item \textbf{Disponibilidad de Red:} Debido a que la IA se ejecuta remotamente, la aplicación no es funcional en modo \textit{offline}.
+    \item \textbf{Regulaciones de Privacidad:} Al no contar con autenticación ni persistencia de datos (como una base de datos MySQL o MongoDB), la aplicación es intrínsecamente pasiva y no recolecta PII (\textit{Personally Identifiable Information}), evadiendo regulaciones estrictas como GDPR.
+\end{itemize}
+
+\subsection{Suposiciones y Dependencias}
+\begin{itemize}
+    \item \textbf{Suposición de Hardware:} Se asume que el usuario operará el software en un dispositivo (PC, tablet o móvil) con un navegador web moderno que soporte ES6+ (Chrome, Firefox, Safari o Edge actualizados).
+    \item \textbf{Dependencia de Servicio:} La operatividad central depende al 100\% del *uptime* de la API de Groq y del enrutamiento DNS de Crossref.
+    \item \textbf{Dependencia de NPM:} La construcción del software depende de la disponibilidad de la red de paquetes *Node Package Manager* (NPM) para dependencias de interfaz como \texttt{lucide-react} y \texttt{react-markdown}.
+\end{itemize}

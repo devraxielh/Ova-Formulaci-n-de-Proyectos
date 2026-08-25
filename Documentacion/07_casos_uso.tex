@@ -1,0 +1,102 @@
+\section{Casos de Uso (IEEE 830)}
+
+Esta sección provee la especificación detallada de los Casos de Uso, definiendo el comportamiento del sistema bajo diversas condiciones de interacción. La Figura \ref{fig:casos_uso} modela a los actores involucrados.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+    scale=0.75, transform shape,
+    actor/.style={draw, circle, fill=white, minimum size=0.5cm},
+    usecase/.style={draw, ellipse, fill=blue!10, text width=2.5cm, align=center, minimum height=1cm},
+    system/.style={rectangle, draw, thick, minimum width=6cm, minimum height=5cm}
+]
+
+% Sistema
+\node[system] (sys) at (3, -1.5) {};
+\node[above=0.1cm of sys] {\textbf{Software IA}};
+
+% Actores
+\node (student) at (-1, 0) {\textbf{Usuario}};
+\node[below=0cm of student] {Estudiante};
+
+\node (api) at (7, 0) {\textbf{API Groq}};
+
+% Casos de Uso
+\node[usecase] (uc1) at (3, 0) {Formular Problema};
+\node[usecase] (uc2) at (3, -1.5) {Generar Objetivos};
+\node[usecase] (uc3) at (3, -3) {Buscar Antecedentes};
+
+% Conexiones
+\draw (student) -- (uc1);
+\draw (student) -- (uc2);
+\draw (student) -- (uc3);
+
+\draw[dashed, ->] (uc1) -- node[above] {\footnotesize \textit{<<invoke>>}} (api);
+\draw[dashed, ->] (uc2) -- node[above] {\footnotesize \textit{<<invoke>>}} (api);
+\draw[dashed, ->] (uc3) -- node[above] {\footnotesize \textit{<<invoke>>}} (api);
+
+\end{tikzpicture}
+\caption{Diagrama de Casos de Uso con Extensión de Actor Remoto}
+\label{fig:casos_uso}
+\end{figure}
+
+\subsection{Especificación: Formular Objetivos de Investigación (CU-02)}
+
+A continuación, se detalla formalmente el escenario nominal del Caso de Uso \textbf{Generar Objetivos} (modelado como CU-02).
+
+\begin{itemize}
+    \item \textbf{Actor Principal:} Estudiante / Tesista.
+    \item \textbf{Actor Secundario:} API Groq (Sistema Experto LLM).
+    \item \textbf{Precondiciones:} El usuario debe tener conexión a internet activa y debe encontrarse en la vista "Objetivos".
+    \item \textbf{Flujo Principal (Nominal):}
+    \begin{enumerate}
+        \item El Estudiante introduce el \textit{Tema de Investigación} (Ej: "IA en Educación").
+        \item El Estudiante ingresa el \textit{Propósito del Estudio} (Ej: "Evaluar el impacto de...").
+        \item El Estudiante hace clic en el botón "Generar Objetivos".
+        \item El Sistema (Frontend) verifica que los campos obligatorios no estén vacíos.
+        \item El Sistema invoca al Actor Secundario (API Groq) enviando el payload.
+        \item La API Groq procesa los datos y devuelve el texto con verbos taxonómicos.
+        \item El Sistema renderiza los resultados en el componente de Markdown.
+    \end{enumerate}
+    \item \textbf{Flujos Alternativos (Errores y Excepciones):}
+    \begin{itemize}
+        \item \textbf{4a. Formulario Incompleto:} Si los campos están vacíos, el sistema despliega un \textit{Toast} (notificación visual) en rojo indicando el error. El flujo retorna al paso 1 sin comunicarse con la API.
+        \item \textbf{5a. Falla de Red / Rate Limit:} Si el servidor de Groq no responde (HTTP 500) o está saturado (HTTP 429), el bloque \texttt{catch} interceptará la promesa fallida y mostrará el mensaje "Error de Comunicación: Por favor intente en unos minutos". El estado del botón volverá a estar habilitado.
+    \end{itemize}
+    \item \textbf{Postcondiciones:} El usuario visualiza una propuesta de 1 Objetivo General y 3 Objetivos Específicos formateados y estructurados.
+\end{itemize}
+
+\subsection{Especificación: Formular Problema de Investigación (CU-01)}
+\begin{itemize}
+    \item \textbf{Actor Principal:} Estudiante / Tesista.
+    \item \textbf{Actor Secundario:} API Groq (Sistema Experto LLM).
+    \item \textbf{Precondiciones:} Conexión a internet activa; vista "Problema" seleccionada.
+    \item \textbf{Flujo Principal:}
+    \begin{enumerate}
+        \item El Estudiante ingresa el \textit{Tema} y el contexto sintomático del problema.
+        \item Selecciona la opción "Generar Planteamiento".
+        \item El Sistema valida los datos y bloquea el botón para evitar múltiples envíos.
+        \item El Sistema envía el \textit{payload} al modelo LLM.
+        \item La API Groq responde con la estructura del problema (Síntomas, Causas, Pronóstico y Control).
+        \item El Sistema muestra el resultado en pantalla en formato Markdown.
+    \end{enumerate}
+    \item \textbf{Flujos Alternativos:} 
+    \begin{itemize}
+        \item \textbf{Falta de contexto:} Si el LLM considera que la entrada del usuario es demasiado vaga o incoherente, devolverá un texto sugiriendo al usuario reformular su idea inicial.
+    \end{itemize}
+\end{itemize}
+
+\subsection{Especificación: Buscar Antecedentes (CU-03)}
+\begin{itemize}
+    \item \textbf{Actor Principal:} Estudiante / Tesista.
+    \item \textbf{Actor Secundario:} API Groq y Base de datos bibliográfica.
+    \item \textbf{Precondiciones:} El usuario debe tener un tema definido.
+    \item \textbf{Flujo Principal:}
+    \begin{enumerate}
+        \item El Estudiante introduce las palabras clave de su investigación.
+        \item Selecciona "Generar Antecedentes".
+        \item El Sistema procesa la solicitud mediante \texttt{groqService}.
+        \item La API Groq devuelve un resumen estructurado del estado del arte, sugiriendo posibles líneas teóricas históricas (máximo de 5 años de antigüedad según la directriz del *System Prompt*).
+        \item El Sistema renderiza los párrafos y viñetas correspondientes.
+    \end{enumerate}
+\end{itemize}

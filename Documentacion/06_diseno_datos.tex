@@ -1,0 +1,57 @@
+\section{Diseño de Datos (IEEE 1016)}
+
+Aunque el sistema es \textit{stateless} y no administra bases de datos relacionales tradicionales como PostgreSQL ni no relacionales como MongoDB, existe un modelo de datos lógico muy riguroso para la transferencia de información (Data Transfer Objects - DTOs) vía HTTP. Toda la comunicación entre la capa de negocio y la API LLM se rige por la sintaxis estándar de OpenAI \textit{Chat Completions} adoptada por Groq.
+
+\subsection{Estructuras de Datos de Petición (Payload JSON)}
+Cuando el usuario presiona "Generar" (por ejemplo, en el módulo de Objetivos), la vista envía al \texttt{groqService} un objeto estructurado. El servicio ensambla la siguiente estructura JSON sobre el protocolo HTTP POST.
+
+\begin{verbatim}
+POST /openai/v1/chat/completions
+Content-Type: application/json
+Authorization: Bearer VITE_GROQ_API_KEY
+
+{
+  "model": "llama3-70b-8192", // Modelo optimizado (70B parámetros)
+  "temperature": 0.5,         // Baja entropía, mayor determinismo
+  "messages": [
+    {
+      "role": "system",
+      "content": "Eres un tutor académico de tesis..."
+    },
+    {
+      "role": "user",
+      "content": "Formula objetivos. Tema: IA en Salud. 
+                  Propósito: Mejorar diagnósticos."
+    }
+  ]
+}
+\end{verbatim}
+
+\textbf{Justificación de variables técnicas:}
+\begin{itemize}
+    \item \textbf{Modelo (llama3-70b-8192):} Se eligió Meta LLaMA 3 alojado en Groq debido a sus excelentes capacidades de razonamiento textual y su ventana de contexto de 8192 tokens, suficiente para procesar formulaciones extensas sin truncamiento.
+    \item \textbf{Temperature (0.5):} En \textit{Machine Learning}, una temperatura de 0 resultará en el texto más predecible (ideal para código), mientras que un 1 lo hace altamente creativo (ideal para cuentos). Se ajustó a 0.5 para permitir cierta creatividad al proponer sin desviarse a respuestas sin coherencia académica.
+\end{itemize}
+
+\subsection{Estructuras de Respuesta y Estado (Respuesta JSON)}
+El modelo responde con el siguiente formato, del cual la interfaz debe extraer exclusivamente el nodo de contenido (\texttt{choices[0].message.content}):
+
+\begin{verbatim}
+{
+  "id": "chatcmpl-92a...",
+  "object": "chat.completion",
+  "created": 1722881144,
+  "model": "llama3-70b-8192",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "### Objetivo General...\n\n### Específicos..."
+      },
+      "finish_reason": "stop"
+    }
+  ]
+}
+\end{verbatim}
+El frontend capta este string (Markdown) y lo aloja en una variable de estado inmutable (\texttt{const [resultado, setResultado]}). Al cambiar este estado, el React DOM vuelve a renderizar, provocando que la UI dibuje el texto resultante a través del componente \texttt{<ReactMarkdown>}.

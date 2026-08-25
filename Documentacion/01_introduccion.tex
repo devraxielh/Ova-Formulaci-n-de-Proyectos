@@ -1,0 +1,35 @@
+\section{Introducción (IEEE 830)}
+
+\subsection{Propósito}
+El propósito de este documento es especificar exhaustivamente los requisitos funcionales, no funcionales y el diseño arquitectónico de un "Software IA" enfocado en asistir a estudiantes de educación superior en la formulación de proyectos de investigación. Este documento está dirigido a desarrolladores, arquitectos de software, auditores académicos y directores de tesis, garantizando que todas las partes compartan una visión unificada sobre las capacidades técnicas, las restricciones operativas y las decisiones de diseño implementadas.
+
+\subsection{Alcance del Proyecto}
+El Software IA se presenta como una aplicación web (\textit{Single Page Application}) construida sobre React. Su alcance se limita a proporcionar interfaces interactivas donde el usuario ingrese variables y metadatos de su proyecto. A través de integraciones mediante API con modelos de lenguaje de gran tamaño (LLM) provistos por Groq, el sistema procesará estas variables y devolverá sugerencias redactadas, evaluaciones críticas y formatos estandarizados. 
+Las áreas de conocimiento que cubre la aplicación son:
+\begin{itemize}
+    \item Generación y refinamiento de Títulos de Investigación.
+    \item Redacción estructurada del Problema de Investigación y Pregunta Problema.
+    \item Desglose taxonómico de Objetivos (General y Específicos) basado en la Taxonomía de Bloom.
+    \item Estructuración de Justificaciones (teórica, práctica y metodológica).
+    \item Marco de Antecedentes respaldado por integraciones con APIs bibliográficas (Crossref).
+\end{itemize}
+El sistema \textbf{no} almacenará datos persistentes de usuarios en esta primera versión (operación sin estado / *stateless*), ni ejecutará lógica de IA directamente en el navegador del usuario para no comprometer el rendimiento de dispositivos de gama baja.
+
+\subsection{Definiciones, Acrónimos y Abreviaturas}
+\begin{itemize}
+    \item \textbf{SPA:} \textit{Single Page Application}. Aplicación web que interactúa con el usuario reescribiendo dinámicamente la página actual en lugar de cargar páginas enteras desde un servidor.
+    \item \textbf{LLM:} \textit{Large Language Model}. Modelo de IA entrenado en vastas cantidades de texto para comprender y generar lenguaje natural.
+    \item \textbf{Groq:} Empresa proveedora de hardware y APIs especializadas en inferencia ultrarrápida de modelos de IA (usando LPUs - \textit{Language Processing Units}).
+    \item \textbf{CORS:} \textit{Cross-Origin Resource Sharing}. Mecanismo de seguridad de los navegadores que restringe cómo un recurso web puede ser solicitado desde otro dominio.
+    \item \textbf{Prompt Injection:} Vulnerabilidad de seguridad donde un usuario ingresa instrucciones maliciosas para alterar el comportamiento previsto del modelo de IA.
+\end{itemize}
+
+\subsection{Referencias}
+El documento ha sido desarrollado siguiendo las convenciones de:
+\begin{itemize}
+    \item IEEE Std 830-1998, \textit{IEEE Recommended Practice for Software Requirements Specifications}.
+    \item IEEE Std 1016-2009, \textit{IEEE Standard for Information Technology—Systems Design—Software Design Descriptions}.
+\end{itemize}
+
+\subsection{Visión General del Documento}
+El resto de este documento está estructurado de la siguiente manera: la Sección 2 proporciona una descripción general del producto y el entorno del usuario. La Sección 3 detalla los requisitos específicos (funcionales y no funcionales). A partir de la Sección 4 y hasta la Sección 12, se abordan los aspectos arquitectónicos, diseño de componentes, flujos de datos, modelos de interfaz y esquemas de seguridad según el estándar IEEE 1016. Finalmente, se presentan conclusiones y trabajos futuros.

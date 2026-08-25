@@ -1,0 +1,40 @@
+\section{Diagrama de Despliegue (IEEE 1016)}
+
+El modelo de despliegue describe la topología física, la red de hospedaje de la aplicación y la canalización de Integración Continua y Despliegue Continuo (CI/CD). Al ser una SPA, no requiere de máquinas virtuales (IaaS) ni de contenedores Docker, reduciéndose a un CDN (Content Delivery Network) global.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+    scale=0.8, transform shape,
+    node distance=2.5cm and 3cm,
+    device/.style={rectangle, draw=black, thick, fill=gray!20, minimum width=3.5cm, minimum height=2.5cm, align=center, rounded corners},
+    cloud/.style={ellipse, draw=blue, thick, fill=blue!5, minimum width=4cm, minimum height=2cm, align=center},
+    arrow/.style={->, thick, >=stealth, dashed}
+]
+
+% Dispositivos
+\node[device] (client) {\textbf{Dispositivo Cliente} \\ (Navegador Web) \\ \textit{React SPA}};
+\node[device, right=of client, yshift=2cm] (hosting) {\textbf{Edge CDN} \\ (Vercel / GitHub Pages) \\ \textit{Archivos HTML/JS/CSS}};
+\node[cloud, right=of client, yshift=-2cm] (groq) {\textbf{Groq Cloud API} \\ \textit{Inferencia LLM}};
+\node[cloud, right=of hosting] (crossref) {\textbf{Crossref API} \\ \textit{Metadatos Bibliográficos}};
+
+% Conexiones
+\draw[arrow] (client) -- node[anchor=south, sloped] {HTTPS (Descarga SPA inicial)} (hosting);
+\draw[arrow] (client) -- node[anchor=north, sloped] {HTTPS REST / JSON} (groq);
+\draw[arrow] (client) -- node[anchor=south, sloped] {HTTPS GET} (crossref);
+
+\end{tikzpicture}
+\caption{Topología de Red y Arquitectura Serverless}
+\label{fig:despliegue}
+\end{figure}
+
+\subsection{Proceso de Construcción (Build Pipeline)}
+El código fuente de React está escrito utilizando ECMAScript 6+ y extensiones \textit{JSX} que los navegadores web modernos no entienden directamente sin ser preprocesados.
+\begin{itemize}
+    \item \textbf{Herramienta Vite:} Al ejecutar el comando \texttt{npm run build}, Vite utiliza esbuild (una herramienta escrita en Go) para transpilar el código JSX a JavaScript puro compatible (Vanilla JS).
+    \item \textbf{Minificación y Bundling:} Todos los archivos, librerías (Tailwind, Lucide, ReactMarkdown) se comprimen (\textit{minification}) y se agrupan (\textit{bundling}) en una carpeta \texttt{/dist} que generalmente contiene un archivo \texttt{index.html}, un archivo \texttt{index.css} y un único archivo \texttt{index.js} altamente optimizado.
+    \item \textbf{Despliegue y Distribución:} El contenido de la carpeta \texttt{/dist} es lo único que se sube al proveedor de CDN (como Vercel, Netlify o GitHub Pages). Los servidores del CDN distribuyen estos archivos a nodos en todo el mundo. Cuando un usuario de Colombia ingresa a la URL, descarga la aplicación desde el servidor Edge más cercano en Sudamérica.
+\end{itemize}
+
+\subsection{Ausencia de Servidor Intermediario}
+Como muestra la Figura \ref{fig:despliegue}, el flujo es altamente descentralizado. Tras la carga inicial de los milisegundos que toma descargar los estáticos desde el CDN, este último deja de intervenir en la aplicación. Todo el peso del procesamiento queda del lado de la CPU y Memoria RAM del \textit{Dispositivo Cliente}. Las transacciones HTTP para consumir la inteligencia artificial fluyen de extremo a extremo (End-to-End) desde el navegador hasta los servidores de Groq Inc.

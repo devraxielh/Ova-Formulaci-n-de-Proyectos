@@ -1,0 +1,98 @@
+\section{Diagrama de Secuencia (IEEE 1016)}
+
+El diagrama de secuencia expone la interacción temporal entre los objetos del software a medida que se ejecuta un caso de uso. Dado el comportamiento puramente \textit{Frontend} de la aplicación, este diagrama hace especial énfasis en el ciclo de vida asíncrono.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+    scale=0.75, transform shape,
+    node distance=2.5cm,
+    actor/.style={draw, rectangle, fill=gray!20, minimum width=2cm, minimum height=0.8cm, align=center},
+    lifeline/.style={thick, dashed},
+    message/.style={->, thick, >=stealth},
+    return/.style={->, thick, dashed, >=stealth}
+]
+
+% Nodos principales
+\node[actor] (user) {Usuario};
+\node[actor, right=2.5cm of user] (ui) {Vista React};
+\node[actor, right=3cm of ui] (service) {groqService};
+\node[actor, right=3cm of service] (api) {Groq API};
+
+% Líneas de vida
+\draw[lifeline] (user.south) -- ++(0,-5) coordinate (user_end);
+\draw[lifeline] (ui.south) -- ++(0,-5) coordinate (ui_end);
+\draw[lifeline] (service.south) -- ++(0,-5) coordinate (service_end);
+\draw[lifeline] (api.south) -- ++(0,-5) coordinate (api_end);
+
+% Mensajes
+\draw[message] ([yshift=-1cm]user.south) -- node[above] {\scriptsize 1. Clic Generar} ([yshift=-1cm]ui.south);
+\draw[message] ([yshift=-1.5cm]ui.south) -- node[above] {\scriptsize 2. setCargando(true)} ([yshift=-1.5cm]ui.south -| ui.east); 
+\draw[message] ([yshift=-2cm]ui.south) -- node[above] {\scriptsize 3. generar(datos)} ([yshift=-2cm]service.south);
+\draw[message] ([yshift=-2.5cm]service.south) -- node[above] {\scriptsize 4. POST /chat/completions} ([yshift=-2.5cm]api.south);
+\draw[return] ([yshift=-3.5cm]api.south) -- node[above] {\scriptsize 5. Respuesta JSON} ([yshift=-3.5cm]service.south);
+\draw[return] ([yshift=-4cm]service.south) -- node[above] {\scriptsize 6. String (Markdown)} ([yshift=-4cm]ui.south);
+\draw[message] ([yshift=-4.5cm]ui.south) -- node[above] {\scriptsize 7. setCargando(false)} ([yshift=-4.5cm]ui.south -| ui.east);
+\draw[return] ([yshift=-4.8cm]ui.south) -- node[above] {\scriptsize 8. Render UI} ([yshift=-4.8cm]user.south);
+
+\end{tikzpicture}
+\caption{Diagrama de Secuencia de Petición HTTP}
+\label{fig:secuencia}
+\end{figure}
+
+\subsection{Explicación del Flujo de Eventos (Asincronía)}
+\begin{itemize}
+    \item \textbf{Paso 1 y 2 (Activación de Estados):} En el preciso instante en que el usuario da clic (Paso 1), la vista muta el estado interno mediante el Hook \texttt{setCargando(true)} (Paso 2). Esto provoca un re-renderizado instantáneo en el DOM que deshabilita todos los campos de texto e inyecta un \textit{spinner} CSS para indicar que se está procesando la solicitud.
+    \item \textbf{Paso 3 y 4 (Promesa):} La vista invoca a \texttt{groqService} inyectando las dependencias necesarias. El hilo principal de JavaScript (\textit{Main Thread}) no se detiene, sino que emite una promesa (Paso 4) y queda en un bucle de eventos (\textit{Event Loop}) a la espera de la resolución.
+    \item \textbf{Paso 5 y 6 (Resolución DTO):} La API responde (Paso 5) con un código HTTP 200 OK y un \textit{payload} JSON masivo. La función del servicio es purificar esa respuesta, extrayendo el contenido exacto y pasando únicamente el texto plano (String en Markdown) de regreso al componente visual (Paso 6).
+    \item \textbf{Paso 7 y 8 (Restauración de Estados):} Finalmente, dentro de un bloque \texttt{finally \{\}} de JavaScript, se ejecuta obligatoriamente el \texttt{setCargando(false)} (Paso 7), removiendo el \textit{spinner}, habilitando botones y mostrando el texto renderizado en tarjetas HTML.
+\end{itemize}
+
+\subsection{Diagrama de Secuencia: Flujo de Excepción (Fallo de Red / Timeout)}
+
+El siguiente diagrama detalla la recuperación del sistema cuando ocurre un fallo, ya sea por pérdida de conectividad del cliente o por indisponibilidad del servidor remoto.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+    scale=0.75, transform shape,
+    node distance=2.5cm,
+    actor/.style={draw, rectangle, fill=red!10, minimum width=2cm, minimum height=0.8cm, align=center},
+    lifeline/.style={thick, dashed},
+    message/.style={->, thick, >=stealth},
+    return/.style={->, thick, dashed, >=stealth, draw=red}
+]
+
+% Nodos principales
+\node[actor] (user) {Usuario};
+\node[actor, right=2.5cm of user] (ui) {Vista React};
+\node[actor, right=3cm of ui] (service) {groqService};
+\node[actor, right=3cm of service] (api) {Groq API};
+
+% Líneas de vida
+\draw[lifeline] (user.south) -- ++(0,-4.5) coordinate (user_end);
+\draw[lifeline] (ui.south) -- ++(0,-4.5) coordinate (ui_end);
+\draw[lifeline] (service.south) -- ++(0,-4.5) coordinate (service_end);
+\draw[lifeline] (api.south) -- ++(0,-4.5) coordinate (api_end);
+
+% Mensajes
+\draw[message] ([yshift=-0.8cm]user.south) -- node[above] {\scriptsize 1. Clic Generar} ([yshift=-0.8cm]ui.south);
+\draw[message] ([yshift=-1.2cm]ui.south) -- node[above] {\scriptsize 2. setCargando(true)} ([yshift=-1.2cm]ui.south -| ui.east); 
+\draw[message] ([yshift=-1.8cm]ui.south) -- node[above] {\scriptsize 3. generar(datos)} ([yshift=-1.8cm]service.south);
+\draw[message] ([yshift=-2.2cm]service.south) -- node[above] {\scriptsize 4. POST (Intento)} ([yshift=-2.2cm]api.south);
+\node[text=red] at ([yshift=-2.5cm]api.south) {\textbf{X}};
+\draw[return] ([yshift=-2.8cm]api.south) -- node[above] {\scriptsize 5. HTTP 429 / Timeout} ([yshift=-2.8cm]service.south);
+\draw[return] ([yshift=-3.3cm]service.south) -- node[above] {\scriptsize 6. throw Error("Fallo API")} ([yshift=-3.3cm]ui.south);
+\draw[message] ([yshift=-3.8cm]ui.south) -- node[above] {\scriptsize 7. setCargando(false)} ([yshift=-3.8cm]ui.south -| ui.east);
+\draw[return] ([yshift=-4.2cm]ui.south) -- node[above] {\scriptsize 8. Render Alerta Roja} ([yshift=-4.2cm]user.south);
+
+\end{tikzpicture}
+\caption{Diagrama de Secuencia de Excepción (Error HTTP)}
+\label{fig:secuencia_error}
+\end{figure}
+
+\subsection{Explicación del Flujo de Excepción}
+\begin{itemize}
+    \item \textbf{Rechazo de la Promesa (Pasos 4 al 6):} Si la red falla o la API devuelve un código de error (ej. HTTP 429 Too Many Requests), la promesa originada en el Paso 4 es rechazada. El bloque \texttt{catch} dentro de \texttt{groqService} captura este rechazo y escala la excepción arrojando (\textit{throw}) el error hacia la capa visual de React.
+    \item \textbf{Recuperación Graceful (Pasos 7 y 8):} Es vital que el sistema no se congele permanentemente. El bloque \texttt{finally} de React ejecuta el paso 7 sin importar si hubo éxito o error. Al establecer el estado de carga en falso, el botón de envío se desbloquea, permitiendo al usuario reintentar la operación una vez haya recuperado su conexión a internet, informándole previamente del suceso mediante un componente de Alerta de Error (Paso 8).
+\end{itemize}

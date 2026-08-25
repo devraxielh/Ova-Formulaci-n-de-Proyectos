@@ -1,0 +1,27 @@
+\section{Trabajo Futuro y Escalabilidad del Sistema}
+
+El diseño modular del Software IA asegura que está estructuralmente preparado para soportar nuevas iteraciones a corto, mediano y largo plazo. Las siguientes son las directrices recomendadas para la evolución del producto hacia una versión *Enterprise* (v2.0).
+
+\subsection{Corto Plazo: Autenticación, Roles y Persistencia en la Nube}
+El limitante más significativo de la arquitectura \textit{stateless} actual es la amnesia transaccional: un refresco de página borra horas de ideación.
+\begin{itemize}
+    \item \textbf{Integración Backend-as-a-Service (BaaS):} Se propone integrar *Firebase* (de Google) o *Supabase* (alternativa Open Source). Estas herramientas proveen APIs directas para el Frontend que permitirían:
+    \begin{itemize}
+        \item \textbf{Autenticación (Auth):} Inicios de sesión nativos mediante \textit{Google OAuth 2.0} institucionales (correos @universidad.edu.co).
+        \item \textbf{Bases de Datos (Firestore/PostgreSQL):} Almacenar el árbol de investigación del estudiante, creando un historial y versiones (drafts) de sus problemas, objetivos y antecedentes recuperables en cualquier momento y dispositivo.
+    \end{itemize}
+    \item \textbf{Sistema de Roles (RBAC):} Diferenciar la sesión de un "Estudiante" de la de un "Tutor". El Tutor podría visualizar en su *Dashboard* los avances de todos sus asesorados y añadir comentarios.
+\end{itemize}
+
+\subsection{Mediano Plazo: Interoperabilidad Documental (Generación PDF/DOCX)}
+El objetivo final de cualquier formulación académica es su presentación oficial impresa o en formato digital paginado.
+\begin{itemize}
+    \item \textbf{Motor de Renderizado Dinámico:} Implementar librerías puras de JavaScript (como \texttt{docx.js} o \texttt{pdfmake}) para leer el estado global de React (*Context API* o *Redux*) e inyectar el texto, de manera procedimental, en una plantilla que respete milimétricamente los márgenes, fuentes e interlineados exigidos por la Norma APA 7ma Edición.
+\end{itemize}
+
+\subsection{Largo Plazo: Bases de Datos Vectoriales y Sistemas RAG}
+En su estado actual, la IA basa sus correcciones puramente en el entrenamiento general del modelo (LLaMA 3). Esto conlleva un riesgo latente de sesgo o incompatibilidad metodológica con los estándares internos de una facultad específica.
+\begin{itemize}
+    \item \textbf{Retrieval-Augmented Generation (RAG):} El paso definitivo hacia un "Tutor Experto y Localizado". Consiste en crear una base de datos vectorial (\textit{Pinecone, Weaviate o Qdrant}) y llenarla de \textit{embeddings} generados a partir de manuales institucionales de metodología (ej. lineamientos de grado de la facultad, libros de Sampieri, manuales de APA).
+    \item \textbf{Mecánica del RAG:} Cuando el estudiante pregunte por un método, el Backend no acudirá ciegamente al LLM, sino que buscará por similitud cosenoidal en la base vectorial, extraerá los párrafos oficiales del libro de metodología de la universidad, se los inyectará al *System Prompt* y le ordenará a la IA: \textit{"Responde la duda del alumno basándote estrictamente en este extracto del manual de grado"}. Esto erradica las alucinaciones al 100\%.
+\end{itemize}

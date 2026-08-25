@@ -1,0 +1,39 @@
+\section{Requisitos Específicos (IEEE 830)}
+
+Esta sección detalla los requerimientos a un nivel que permita a los desarrolladores diseñar el sistema y a los evaluadores verificar que el sistema satisface sus propósitos fundamentales.
+
+\subsection{Requisitos Funcionales (RF)}
+Los requisitos funcionales detallan las acciones específicas y calculables que el sistema debe ejecutar. Se identifican mediante la convención \textbf{RF-XX}.
+
+\begin{itemize}
+    \item \textbf{RF-01 (Módulo de Título):} El sistema debe permitir al usuario ingresar las variables principales (tema, población, espacio, tiempo). Tras enviar los datos, el sistema generará tres (3) opciones de títulos descriptivos, delimitados y coherentes con la norma APA.
+    \item \textbf{RF-02 (Módulo de Problema):} El sistema debe solicitar un diagnóstico, pronóstico y control al pronóstico (Método de Ishikawa o Árbol de problemas). A partir de esto, redactará un planteamiento de problema cohesivo de al menos tres párrafos.
+    \item \textbf{RF-03 (Módulo de Pregunta Problema):} El sistema generará una pregunta de investigación explícita derivada de las variables del RF-02, asegurando que su formulación invite a una respuesta investigativa.
+    \item \textbf{RF-04 (Módulo de Objetivos):} El sistema requerirá el propósito principal del estudio. A partir de ello, formulará un objetivo general utilizando la Taxonomía de Bloom y al menos tres objetivos específicos lógicamente secuenciados para alcanzar el general.
+    \item \textbf{RF-05 (Módulo de Justificación):} El sistema solicitará argumentos sociales, prácticos, teóricos o metodológicos. Luego redactará una justificación académica que exponga el "por qué" y "para qué" de la investigación.
+    \item \textbf{RF-06 (Módulo de Antecedentes):} El sistema se integrará asíncronamente con la API de Crossref (o similar) para extraer metadatos bibliográficos reales a partir de un tema de búsqueda, evitando la alucinación de referencias y fomentando la revisión de literatura empírica verídica.
+    \item \textbf{RF-07 (Navegación e Interfaz):} El sistema debe permitir la navegación entre todos los módulos mencionados anteriormente sin recargar el navegador web, reteniendo el estado temporal de la vista activa a través de componentes en React.
+\end{itemize}
+
+\subsection{Requisitos No Funcionales (RNF)}
+Los requisitos no funcionales definen los atributos de calidad, rendimiento, restricciones de diseño y características de seguridad del sistema. Se identifican mediante la convención \textbf{RNF-XX}.
+
+\subsubsection{Atributos de Rendimiento}
+\begin{itemize}
+    \item \textbf{RNF-01 (Latencia de Interfaz):} Las transiciones de vistas (ej. pasar del formulario de Objetivos al de Justificación) deben ocurrir en menos de 100 milisegundos, garantizando la experiencia de una SPA real.
+    \item \textbf{RNF-02 (Latencia de Inferencia):} Las respuestas procedentes de la API de Groq no deben demorar más de 5 segundos en completarse bajo condiciones normales de red. Si exceden este tiempo, el sistema debe mostrar *spinners* o indicadores visuales para apaciguar al usuario.
+\end{itemize}
+
+\subsubsection{Atributos de Usabilidad y UI/UX}
+\begin{itemize}
+    \item \textbf{RNF-03 (Responsividad):} La aplicación debe ser completamente responsiva (*mobile-first*), utilizando \textit{media queries} de TailwindCSS para reestructurar el menú lateral (`Sidebar`) a un menú de navegación inferior o colapsable en pantallas con un ancho menor a 768px.
+    \item \textbf{RNF-04 (Retroalimentación Visual):} El sistema debe prevenir el envío de formularios vacíos desactivando los botones de acción (`disabled=true`) o mostrando notificaciones de tipo *toast* (ej. "Llene todos los campos").
+    \item \textbf{RNF-05 (Renderizado Seguro de Texto):} Las respuestas de la IA, que llegarán formateadas en Markdown, deben ser parseadas de forma segura a HTML mediante \texttt{react-markdown} o librerías equivalentes que automaticen el saneamiento contra inyección HTML maliciosa.
+\end{itemize}
+
+\subsubsection{Atributos de Seguridad y Mantenibilidad}
+\begin{itemize}
+    \item \textbf{RNF-06 (Protección de Llaves):} Ninguna credencial, token o llave de API (\texttt{VITE\_GROQ\_API\_KEY}) debe estar *harcodeada* directamente en el código fuente. Se debe recurrir a variables de entorno inyectadas al momento de compilación (Build Step).
+    \item \textbf{RNF-07 (Defensa Prompt Injection):} Se implementará un mecanismo fuerte en el *System Prompt* indicándole al modelo de lenguaje que ignore instrucciones operativas que vengan integradas dentro del *User Prompt* si estas buscan alterar su propósito educativo.
+    \item \textbf{RNF-08 (Arquitectura Limpia):} Todo llamado a servicios externos, configuración de APIs o manipulación de datos JSON, debe realizarse fuera de los componentes visuales (*Views*). Deben agruparse en archivos de servicio dedicados (como \texttt{groqService.js}) para favorecer la separación de responsabilidades (*Separation of Concerns*).
+\end{itemize}

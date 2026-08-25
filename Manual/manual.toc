@@ -1,0 +1,28 @@
+\babel@toc {spanish}{}\relax 
+\contentsline {section}{\numberline {1}Introducción y Filosofía del Sistema}{2}{section.1}%
+\contentsline {section}{\numberline {2}Requisitos y Modalidades de Despliegue}{2}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Modalidad Usuario Final (Cloud / Web)}{2}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Modalidad Desarrollador (Ejecución Local)}{2}{subsection.2.2}%
+\contentsline {section}{\numberline {3}Guía Exhaustiva de Módulos del Sistema}{4}{section.3}%
+\contentsline {subsection}{\numberline {3.1}1. Herramientas (Dashboard)}{4}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}2. Ideación (Lluvia de Ideas Asistida)}{4}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}3. Construcción del Título}{4}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}4. Pregunta de Investigación}{5}{subsection.3.4}%
+\contentsline {subsection}{\numberline {3.5}5. Planteamiento del Problema}{5}{subsection.3.5}%
+\contentsline {subsection}{\numberline {3.6}6. Justificación}{5}{subsection.3.6}%
+\contentsline {subsection}{\numberline {3.7}7. Alcances y Limitaciones}{6}{subsection.3.7}%
+\contentsline {subsection}{\numberline {3.8}8. Objetivos (Taxonomía de Bloom)}{6}{subsection.3.8}%
+\contentsline {subsection}{\numberline {3.9}9. Introducción}{6}{subsection.3.9}%
+\contentsline {subsection}{\numberline {3.10}10. Marco Referencial (Antecedentes)}{6}{subsection.3.10}%
+\contentsline {subsection}{\numberline {3.11}11. Metodología}{6}{subsection.3.11}%
+\contentsline {subsection}{\numberline {3.12}12. Población y Muestra}{7}{subsection.3.12}%
+\contentsline {subsection}{\numberline {3.13}13. Plan de Análisis e Instrumentos}{7}{subsection.3.13}%
+\contentsline {subsection}{\numberline {3.14}14. Cronograma}{7}{subsection.3.14}%
+\contentsline {subsection}{\numberline {3.15}15. Presupuesto}{7}{subsection.3.15}%
+\contentsline {subsection}{\numberline {3.16}16. DOI to Cite (Utilidad de Citación)}{7}{subsection.3.16}%
+\contentsline {section}{\numberline {4}Buenas Prácticas (Ingeniería de Prompts Académica)}{9}{section.4}%
+\contentsline {section}{\numberline {5}Manejo de Errores y Solución de Problemas Avanzado (Troubleshooting)}{9}{section.5}%
+\contentsline {section}{\numberline {6}Privacidad, Resguardo y Manejo Anti-Plagio}{10}{section.6}%
+\contentsline {subsection}{\numberline {6.1}Política de Datos Volátiles}{10}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}Guía de Exportación a Microsoft Word}{10}{subsection.6.2}%
+\contentsline {subsection}{\numberline {6.3}Consideraciones sobre Plagio y Turnitin}{10}{subsection.6.3}%

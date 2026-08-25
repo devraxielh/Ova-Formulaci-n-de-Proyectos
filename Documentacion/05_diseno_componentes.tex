@@ -1,0 +1,37 @@
+\section{Diseño Detallado de Componentes (IEEE 1016)}
+
+El diseño detallado muestra el interior de la caja negra arquitectónica definida en el ítem previo, desglosando las funciones y el ciclo de vida de los componentes individuales codificados en la aplicación React. 
+
+\subsection{Componentes Visuales (Views)}
+La aplicación sigue un enfoque modular, en la que el componente \texttt{App.jsx} actúa como el enrutador lógico (*Router*) mediante el manejo de estados (`activeTab`).
+
+\begin{itemize}
+    \item \textbf{\texttt{App.jsx} (Componente Raíz):}
+    \begin{itemize}
+        \item \textbf{Propósito:} Funciona como el orquestador global. Contiene el estado que determina qué sección de la formulación se muestra (Ej: Título, Objetivos, etc.).
+        \item \textbf{Estado Principal:} \texttt{const [activeTab, setActiveTab] = useState('titulo')}
+    \end{itemize}
+    
+    \item \textbf{\texttt{Sidebar.jsx} (Menú Lateral):}
+    \begin{itemize}
+        \item \textbf{Propósito:} Proporcionar navegación constante. Utiliza íconos vectoriales (\texttt{lucide-react}) y emite un evento al \texttt{App.jsx} cada vez que el usuario hace clic en una opción.
+        \item \textbf{Props Recibidos:} \texttt{activeTab} (cadena), \texttt{setActiveTab} (función \textit{callback}).
+    \end{itemize}
+
+    \item \textbf{\texttt{FormulacionProblema.jsx}, \texttt{Objetivos.jsx}, etc.:}
+    \begin{itemize}
+        \item \textbf{Propósito:} Archivos dedicados a cada fase académica. Renderizan el formulario particular.
+        \item \textbf{Gestión Interna:} Usan múltiples \texttt{useState} para capturar los valores de cada \textit{input} HTML. Disparan la función \texttt{handleGenerate()} al hacer submit, invocando el servicio de IA.
+    \end{itemize}
+\end{itemize}
+
+\subsection{Componentes de Servicio (Lógica)}
+El diseño del software separa intencionalmente las vistas de la comunicación de red.
+
+\begin{itemize}
+    \item \textbf{\texttt{groqService.js}:}
+    \begin{itemize}
+        \item \textbf{Responsabilidades:} Es un módulo de JavaScript puro. Inicializa el cliente \texttt{Groq} inyectando la variable de entorno \texttt{import.meta.env.VITE\_GROQ\_API\_KEY}.
+        \item \textbf{Funciones Exportadas:} Expone promesas (usando sintaxis \texttt{async/await}) como \texttt{generateTitle(params)}, \texttt{generateObjectives(params)}, las cuales reciben objetos con los datos del usuario, construyen el \textit{Prompt}, ejecutan la llamada al endpoint de \texttt{chat/completions}, e interceptan fallos (bloque \texttt{try/catch}).
+    \end{itemize}
+\end{itemize}

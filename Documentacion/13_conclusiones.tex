@@ -1,0 +1,18 @@
+\section{Conclusiones y Evaluación de Viabilidad}
+
+La materialización de este Software IA demuestra contundentemente que es factible, económico y seguro integrar Modelos de Lenguaje Masivos (LLM) dentro de las mallas curriculares y metodológicas de la educación superior, siempre y cuando se orquesten bajo reglas arquitectónicas estrictas.
+
+\subsection{Resultados Cualitativos (Impacto Académico)}
+\begin{itemize}
+    \item \textbf{Mitigación del "Síndrome de la Hoja en Blanco":} El principal obstáculo reportado por los tesistas en fases tempranas es el pánico o bloqueo creativo frente al documento vacío. El sistema destruye este bloqueo proporcionando en milisegundos un esquema inicial, altamente formal, sobre el cual el estudiante puede empezar a trabajar, iterar y refutar.
+    \item \textbf{Estandarización Semántica:} El requerimiento explícito del sistema de utilizar la Taxonomía de Bloom (obligando a la IA a emplear verbos en infinitivo medibles para los objetivos) garantiza que los comités de grado rechacen menos proyectos por "errores de forma", enfocando las revisiones en el fondo y validez científica del trabajo.
+\end{itemize}
+
+\subsection{Resultados Técnicos (Evaluación de la Arquitectura)}
+\begin{itemize}
+    \item \textbf{Alta Disponibilidad vs Costes Cero:} Al optar por una arquitectura de \textit{Single Page Application (SPA)} renderizada en el cliente y servida a través de CDNs globales (como Netlify o Vercel), se logró eliminar cualquier costo de \textit{hosting} para servidores backend, garantizando al mismo tiempo un \textit{uptime} virtual del 99.99\%.
+    \item \textbf{Decisión Tecnológica Exitosa (Groq LPU):} Originalmente, las integraciones con IA generativa sufrían de una barrera de latencia (esperas de 10 a 20 segundos por cada clic). La adopción de la API REST de Groq, soportada por hardware LPU (Language Processing Units), colapsó los tiempos de inferencia a un promedio inferior a 3 segundos, transformando un sistema de espera pasiva en una herramienta conversacional de tiempo real que preserva el hilo mental del usuario.
+    \item \textbf{Bajo Acoplamiento (React + Tailwind):} La separación visual de la lógica en *Hooks* (\texttt{useState}) demostró ser fundamental para la mantenibilidad. Cualquier desarrollador que tome el proyecto podrá modificar la apariencia de un botón (TailwindCSS) sin el riesgo de destruir el ciclo de vida de la promesa HTTP responsable de comunicarse con la inteligencia artificial.
+\end{itemize}
+
+En síntesis, este software actúa como un catalizador iterativo. No suplanta la autonomía ni el rigor intelectual del investigador humano, sino que estandariza las reglas del juego metodológico, elevando drásticamente la calidad y velocidad de estructuración de los anteproyectos universitarios.

@@ -1,0 +1,61 @@
+\section{Diagrama de Actividades (Gestión de Estados)}
+
+El diagrama de actividades profundiza en la robustez del diseño interactivo. Modela qué debe hacer el software no solo en su camino "feliz" (Happy Path), sino cuando el usuario interactúa erráticamente o las integraciones de red colapsan, detallando el ciclo de \textit{Feedback} visual.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+    scale=0.75, transform shape,
+    node distance=1.5cm,
+    start/.style={circle, draw=black, thick, fill=black, minimum size=0.5cm},
+    end/.style={circle, draw=black, thick, fill=white, minimum size=0.6cm, inner sep=0pt},
+    endfill/.style={circle, draw=black, fill=black, minimum size=0.4cm},
+    activity/.style={rectangle, draw=black, thick, fill=blue!10, rounded corners, minimum width=3.5cm, minimum height=1cm, align=center},
+    decision/.style={diamond, draw=black, thick, fill=orange!20, minimum width=2.5cm, minimum height=2.5cm, align=center, aspect=1.5},
+    arrow/.style={->, thick, >=stealth}
+]
+
+% Nodos
+\node[start] (inicio) {};
+\node[activity, below=0.8cm of inicio] (act1) {Seleccionar Fase en \\ Menú Lateral};
+\node[activity, below=of act1] (act2) {Llenar Campos del \\ Formulario};
+\node[activity, below=of act2] (act3) {Clic en Generar/Evaluar};
+\node[decision, below=of act3] (dec1) {¿Datos \\ completos?};
+\node[activity, right=2cm of dec1] (err1) {Alert UI: Bloquear \\ Envío HTTP};
+\node[activity, below=of dec1] (act4) {Estado UI: Cargando\\ (Bloquear botón)};
+\node[activity, below=of act4] (act5) {Promesa a groqService};
+\node[decision, below=of act5] (dec2) {¿HTTP 200\\ (Éxito)?};
+\node[activity, right=2cm of dec2] (err2) {Catch: Notificar Error\\ (429, 500, Timeout)};
+\node[activity, below=of dec2] (act6) {Parsear Markdown a \\ UI (ReactMarkdown)};
+\node[end, below=0.8cm of act6] (fin) {};
+\node[endfill] at (fin) {};
+
+% Flechas
+\draw[arrow] (inicio) -- (act1);
+\draw[arrow] (act1) -- (act2);
+\draw[arrow] (act2) -- (act3);
+\draw[arrow] (act3) -- (dec1);
+
+\draw[arrow] (dec1) -- node[anchor=south] {No} (err1);
+\draw[arrow] (err1) |- (act2); % Regresa a llenar datos
+
+\draw[arrow] (dec1) -- node[anchor=east] {Sí} (act4);
+\draw[arrow] (act4) -- (act5);
+\draw[arrow] (act5) -- (dec2);
+
+\draw[arrow] (dec2) -- node[anchor=south] {No} (err2);
+\draw[arrow] (err2) |- (act2); % Regresa a intentar (y libera botón)
+
+\draw[arrow] (dec2) -- node[anchor=east] {Sí} (act6);
+\draw[arrow] (act6) -- (fin);
+
+\end{tikzpicture}
+\caption{Diagrama de Actividades para Control de Errores y UI}
+\label{fig:actividades}
+\end{figure}
+
+\subsection{Gestión Lógica de Fallos (Edge Cases)}
+\begin{itemize}
+    \item \textbf{Intercepción Temprana (Fail-Fast):} Si el estudiante da clic en enviar repetidas veces muy rápido, podría enviar 10 peticiones simultáneas, sobrecargando su cuota límite gratuita de la API. La actividad previene esto desactivando el botón de envío tras el primer clic (Nodo: \textit{Estado UI: Cargando (Bloquear botón)}).
+    \item \textbf{Gestión de Tiempos de Espera (Timeouts):} Si la red del estudiante decae después de que el *payload* sale hacia el servicio de Groq, la conexión permanecerá "colgada". El diagrama especifica que un fallo de red o error de servidor (Nodo: \textit{Catch: Notificar Error}) interrumpirá la promesa de JavaScript y devolverá al sistema a un estado limpio, restituyendo la funcionalidad de los botones sin obligar al usuario a recargar la pestaña del navegador perdiendo sus datos escritos.
+\end{itemize}

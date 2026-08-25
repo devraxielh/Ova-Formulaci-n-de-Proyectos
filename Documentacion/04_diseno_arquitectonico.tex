@@ -1,0 +1,42 @@
+\section{Diseño Arquitectónico (IEEE 1016)}
+
+Esta sección proporciona una vista de alto nivel del Software IA, detallando la interacción entre los diferentes módulos estructurales que componen el sistema, sus patrones arquitectónicos y la justificación técnica de la selección de tecnologías.
+
+\subsection{Vista Arquitectónica Global}
+La arquitectura seleccionada para el proyecto es \textbf{Cliente-Servidor (Client-Server)}, donde la aplicación React funge como un \textit{Thin Client} que consume \textit{APIs RESTful} alojadas en un entorno \textit{Serverless}. La aplicación en sí misma ha sido estructurada siguiendo un patrón de \textbf{Arquitectura Basada en Componentes} común en los ecosistemas de React moderno, separando la lógica de renderizado de la capa de servicios (\textit{Service Layer Pattern}).
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+    scale=0.75, transform shape,
+    node distance=1.5cm and 2cm,
+    module/.style={rectangle, draw=blue, thick, fill=blue!10, text width=3cm, align=center, rounded corners, minimum height=1.5cm},
+    api/.style={rectangle, draw=orange, thick, fill=orange!10, text width=3cm, align=center, rounded corners, minimum height=1.5cm},
+    arrow/.style={->, thick, >=stealth}
+]
+
+% Nodos
+\node[module] (ui) {\textbf{Interfaz de Usuario} \\ \footnotesize (React / Tailwind)};
+\node[module, right=of ui] (logic) {\textbf{Lógica de Negocio} \\ \footnotesize (groqService.js)};
+\node[module, below=of ui] (state) {\textbf{Gestor de Estado} \\ \footnotesize (React Hooks)};
+\node[api, right=of logic] (llm) {\textbf{Groq API} \\ \footnotesize (LLM remoto)};
+\node[api, below=of llm] (cross) {\textbf{Crossref API} \\ \footnotesize (Metadatos)};
+
+% Conexiones
+\draw[arrow, <->] (ui) -- node[above] {\footnotesize Eventos} (logic);
+\draw[arrow, <->] (ui) -- node[left] {\footnotesize Actualiza} (state);
+\draw[arrow, <->] (logic) -- node[above] {\footnotesize Peticiones HTTP} (llm);
+\draw[arrow, <->] (logic) -- (cross);
+\draw[arrow] (state) -| (logic);
+
+\end{tikzpicture}
+\caption{Diagrama de Arquitectura de Capas}
+\label{fig:arquitectura}
+\end{figure}
+
+\subsection{Justificación de Decisiones de Diseño}
+\begin{itemize}
+    \item \textbf{Por qué React (Client-Side Rendering - CSR):} Se descartó el uso de renderizado en el servidor (\textit{Server-Side Rendering} con Next.js) debido a que la aplicación no requiere optimización de motores de búsqueda (SEO) para las formulaciones privadas de los estudiantes. El CSR disminuye dramáticamente la latencia de interacción al no tener que negociar el HTML completo por cada clic en el menú.
+    \item \textbf{Capa de Servicio Abstracta:} Se optó por sacar toda la lógica de \texttt{fetch} y autenticación de LLMs hacia un archivo externo (`groqService.js`). De este modo, si en el futuro se migra de Groq a OpenAI (ChatGPT) o Anthropic (Claude), los componentes de React no tendrán que ser tocados en absoluto, ya que sólo cambiará el servicio subyacente.
+    \item \textbf{Tailwind CSS (Atomic CSS):} Previene que la hoja de estilos crezca de forma incontrolable a medida que se escalen los módulos, permitiendo el prototipado ultrarrápido de componentes visuales (como tarjetas, botones e inputs) directamente en el \textit{markup} HTML.
+\end{itemize}

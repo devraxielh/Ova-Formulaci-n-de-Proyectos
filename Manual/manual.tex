@@ -1,0 +1,277 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{booktabs}
+\usepackage{tcolorbox}
+\usetikzlibrary{shapes,arrows,positioning,fit,backgrounds,babel}
+
+% Configuración de página
+\geometry{top=2.5cm, bottom=2.5cm, left=3cm, right=2.5cm}
+
+% Colores
+\definecolor{primary}{RGB}{37, 99, 235}
+\definecolor{secondary}{RGB}{75, 85, 99}
+\definecolor{lightgray}{RGB}{243, 244, 246}
+
+% Estilos de hipervínculos
+\hypersetup{
+    colorlinks=true,
+    linkcolor=primary,
+    filecolor=magenta,      
+    urlcolor=primary,
+    pdftitle={Manual de Usuario - Software IA},
+}
+
+% Encabezado y pie de página
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Manual de Usuario Extendido}
+\fancyhead[R]{Software IA para Proyectos}
+\fancyfoot[C]{\thepage}
+
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+    
+    {\Huge \textbf{Manual de Usuario}}\\[1cm]
+    {\LARGE \textbf{Software de IA para Formulación de Proyectos}}\\[1.5cm]
+    {\Large Edición Académica y Técnica Extendida}\\[1.5cm]
+    
+    \begin{tikzpicture}
+        \node[fill=primary, text=white, rounded corners, inner sep=15pt] {
+            \Huge \textbf{IA \textbullet{} Asistente Metodológico}
+        };
+    \end{tikzpicture}\\[3cm]
+    
+    {\Large Guía práctica exhaustiva para Tesistas, Estudiantes y Desarrolladores}\\[1.5cm]
+    
+    \vfill
+    {\large \today}\\[1cm]
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Introducción y Filosofía del Sistema}
+Bienvenido al Manual de Usuario del \textbf{Software IA para Formulación de Proyectos}. Esta herramienta ha sido diseñada con un propósito claro: democratizar el acceso a tutorías metodológicas de alta calidad. En el ecosistema universitario, estructurar un trabajo de grado (tesis, monografías, artículos científicos) suele ser el obstáculo principal que retrasa la graduación de miles de estudiantes.
+
+El software \textbf{no redactará la tesis por usted}. Su filosofía radica en actuar como un \textbf{Tutor Metodológico Estricto}. A través de Modelos de Lenguaje Masivos (LLM) alojados en la infraestructura LPU de Groq, la aplicación le ayudará a transformar ideas abstractas, difusas o desordenadas, en estructuras académicas formalmente válidas. El motor interno obliga a la Inteligencia Artificial a adherirse a la Taxonomía de Bloom (para objetivos) y a normas formales de redacción (como APA 7ma Edición), garantizando que su comité de grado evalúe el rigor científico de su idea, y no penalice su documento por "errores de forma".
+
+\section{Requisitos y Modalidades de Despliegue}
+El sistema está diseñado bajo una arquitectura de \textit{Single Page Application} (SPA) basada en React y Vite, lo que permite dos modalidades de uso principales: como usuario final (en la nube) o como desarrollador/estudiante de sistemas (en local).
+
+\subsection{Modalidad Usuario Final (Cloud / Web)}
+Si su universidad o facultad le ha provisto un enlace oficial, no requiere realizar ninguna instalación.
+\begin{itemize}
+    \item \textbf{Navegadores Soportados:} Se recomienda Google Chrome (v100+), Mozilla Firefox (v90+), Safari (v15+) o Microsoft Edge.
+    \item \textbf{Conectividad:} Conexión a internet estable (mínimo 5 Mbps recomendados para evitar latencias altas en la respuesta del JSON).
+    \item \textbf{Hardware:} Cualquier computadora de escritorio, laptop, tableta o smartphone. La interfaz emplea \textit{TailwindCSS} y diseño \textit{Mobile-First}, asegurando adaptabilidad total a su pantalla.
+\end{itemize}
+
+\subsection{Modalidad Desarrollador (Ejecución Local)}
+Si usted es tesista de Ingeniería de Sistemas o desarrollador y posee el código fuente en GitHub, puede ejecutar el software en su propia máquina.
+\begin{enumerate}
+    \item \textbf{Instalación de Entorno:} Asegúrese de tener instalado \texttt{Node.js} (versión 18 o superior).
+    \item \textbf{Clonar y Dependencias:} Abra una terminal, clone el repositorio y ejecute el comando \texttt{npm install} para descargar las librerías necesarias.
+    \item \textbf{Variables de Entorno:} Cree un archivo \texttt{.env} en la raíz del proyecto. Deberá generar una llave de API gratuita en \texttt{console.groq.com} y declararla como \texttt{VITE\_GROQ\_API\_KEY=gsk\_...}.
+    \item \textbf{Ejecutar Servidor:} Ejecute \texttt{npm run dev}. Acceda en su navegador a \texttt{http://localhost:5173}.
+\end{enumerate}
+
+\newpage
+\section{Guía Exhaustiva de Módulos del Sistema}
+
+El software cuenta con 16 pestañas de navegación diseñadas meticulosamente para cubrir el ciclo de vida completo de la formulación de una investigación. A continuación se detalla el propósito epistemológico, la funcionalidad técnica y los ejemplos de uso de cada una.
+
+% 1. Herramientas
+\subsection{1. Herramientas (Dashboard)}
+Es la pantalla principal o \textit{Home} del sistema. Actúa como un panel de control que agrupa los accesos rápidos a las funciones más utilizadas. 
+\begin{itemize}
+    \item \textbf{Propósito:} Facilitar la navegación del usuario para que no tenga que leer la barra lateral completa. Ideal para saltar directamente a la etapa donde quedó en su última sesión.
+    \item \textbf{Uso Práctico:} Encontrará tarjetas grandes con iconos representativos. Solo haga clic en la tarjeta de la fase que desea abordar (Ej. "Ir a Título").
+\end{itemize}
+
+% 2. Ideación
+\subsection{2. Ideación (Lluvia de Ideas Asistida)}
+La fase más frustrante para un estudiante suele ser "no tener idea de qué investigar". Este módulo utiliza la IA para encontrar la intersección entre las pasiones del estudiante, su carrera y los problemas reales de la sociedad.
+\begin{tcolorbox}[colback=lightgray, colframe=primary, title=Paso a Paso]
+\begin{enumerate}
+    \item Seleccione "Ideación".
+    \item Ingrese su carrera (Ej. "Ingeniería de Sistemas").
+    \item Ingrese sus intereses (Ej. "Inteligencia artificial, educación, videojuegos").
+    \item Describa un problema suelto que haya notado (Ej. "Los niños se aburren leyendo").
+\end{enumerate}
+\end{tcolorbox}
+\textbf{Consejo del Tutor:} No se limite. Entre más creativo sea con sus intereses, más innovadoras serán las 3 rutas de investigación que le devolverá el sistema.
+
+% 3. Título
+\subsection{3. Construcción del Título}
+El título es la carta de presentación de su proyecto. Académicamente, debe contener la acción (verbo), el objeto de estudio, la población y la delimitación espacial/temporal.
+\begin{tcolorbox}[colback=lightgray, colframe=primary, title=Ejemplo Práctico]
+\textbf{Entrada:} "Quiero hacer un sistema web para mejorar las citas en las clínicas veterinarias pequeñas en Bogotá".\\
+\textbf{Salida de la IA:} La IA identificará la variable independiente (sistema web), la dependiente (gestión de citas) y propondrá títulos formales como: \textit{"Diseño e implementación de un sistema web para la optimización de citas en clínicas veterinarias de Bogotá"}.
+\end{tcolorbox}
+
+% 4. Pregunta de Investigación
+\subsection{4. Pregunta de Investigación}
+Todo proyecto de grado debe responder a un interrogante central que guíe la investigación (el hilo conductor).
+\begin{itemize}
+    \item \textbf{Fundamento Teórico:} La pregunta debe estar en sintonía perfecta con el título y el objetivo general.
+    \item \textbf{Uso Práctico:} Usted ingresa su título previamente pulido. El sistema generará una Pregunta Principal ("¿De qué manera el diseño de X impacta a Y?") y además, le proporcionará 3 o 4 "Sub-preguntas" que ayudarán a la sistematización del problema.
+\end{itemize}
+
+% 5. Planteamiento del Problema
+\subsection{5. Planteamiento del Problema}
+Desglosa la situación problemática usando el método del árbol de problemas o el diagnóstico clínico. Es el "Corazón" de la tesis.
+\begin{tcolorbox}[colback=lightgray, colframe=primary, title=Paso a Paso]
+\begin{enumerate}
+    \item En \textbf{Tema central}, ingrese la macro-categoría (Ej. "Deserción universitaria").
+    \item En \textbf{Síntomas / Contexto}, narre el dolor: ¿Qué está fallando? 
+\end{enumerate}
+\end{tcolorbox}
+\textbf{Salida:} La IA estructurará formalmente:
+1. El \textbf{Síntoma} (lo que se ve).
+2. Las \textbf{Causas} (el origen del problema).
+3. El \textbf{Pronóstico} (qué pasará a futuro si nadie resuelve esto).
+4. El \textbf{Control al Pronóstico} (su propuesta como solución).
+
+% 6. Justificación
+\subsection{6. Justificación}
+Responde al "¿Por qué y para qué se hace esto?". Un proyecto sin justificación es un proyecto innecesario.
+\begin{itemize}
+    \item \textbf{Uso Práctico:} Escriba los beneficios generales de su idea.
+    \item \textbf{Salida del Sistema:} La IA tomará sus ideas y las categorizará en 4 dimensiones obligatorias en muchas universidades: \textit{Justificación Teórica} (aportes a la ciencia), \textit{Metodológica} (nuevas formas de hacer las cosas), \textit{Práctica} (solución al problema palpable) y \textit{Social} (beneficios a la comunidad).
+\end{itemize}
+
+% 7. Alcances y Limitaciones
+\subsection{7. Alcances y Limitaciones}
+Protege al estudiante de los jurados. Define exactamente hasta dónde llegará la responsabilidad del investigador y qué factores externos escapan de su control.
+\begin{tcolorbox}[colback=lightgray, colframe=primary, title=Ejemplo Práctico]
+\textbf{Entrada:} "Voy a hacer el software pero no lo voy a subir a internet porque no tengo para pagar el servidor".\\
+\textbf{Salida:} La IA lo redactará formalmente: \textit{"Limitación Técnica: El despliegue de la aplicación se realizará en un entorno local (localhost) para validación de pruebas, absteniéndose de un pase a producción en servidores Cloud por restricciones presupuestales"}.
+\end{tcolorbox}
+
+% 8. Objetivos
+\subsection{8. Objetivos (Taxonomía de Bloom)}
+Módulo crítico. Fuerza el uso estricto de verbos en infinitivo (ar, er, ir) basados en la Taxonomía de Bloom, evitando redundancias (Ej. evitar decir "Analizar para analizar").
+\begin{itemize}
+    \item \textbf{Uso Práctico:} Escriba su propósito. 
+    \item \textbf{Salida:} El sistema entregará un (1) Objetivo General de alto nivel cognitivo (Evaluar, Proponer) y cuatro (4) Objetivos Específicos organizados cronológicamente: Fase Diagnóstica, Fase de Diseño, Fase de Implementación y Fase de Evaluación.
+\end{itemize}
+
+% 9. Introducción
+\subsection{9. Introducción}
+Construye el abrebocas del documento final. La introducción suele ser lo último que se escribe en una tesis real, pero este módulo ayuda a tener un borrador.
+\begin{itemize}
+    \item \textbf{Uso Práctico:} El sistema tomará como insumos su problema, su justificación y sus objetivos para fusionarlos en una redacción cohesiva, fluida y con tono netamente académico que invita a la lectura.
+\end{itemize}
+
+% 10. Marco Referencial
+\subsection{10. Marco Referencial (Antecedentes)}
+Genera un panorama o estado del arte referencial.
+\begin{tcolorbox}[colback=lightgray, colframe=primary, title=Importante]
+\textbf{Uso:} Escriba palabras clave. La IA resumirá las tendencias globales de los últimos 5 años. \textbf{OJO:} La IA puede sufrir de "Alucinaciones" al inventar nombres de tesis. Use esto solo como un \textit{mapa mental} sobre qué buscar luego en Google Scholar o Scopus.
+\end{tcolorbox}
+
+% 11. Metodología
+\subsection{11. Metodología}
+Define el "Cómo" se hará la investigación y bajo qué paradigma científico.
+\begin{itemize}
+    \item \textbf{Salida del Sistema:} Basado en su descripción, la IA categorizará su estudio indicando si es de Enfoque (Cualitativo, Cuantitativo o Mixto), su Tipo (Descriptiva, Correlacional, Explicativa), su Diseño (Experimental o No experimental) y el Método (Deductivo/Inductivo).
+\end{itemize}
+
+% 12. Población y Muestra
+\subsection{12. Población y Muestra}
+Estructura el apartado estadístico del proyecto, vital para investigaciones cuantitativas.
+\begin{itemize}
+    \item \textbf{Uso Práctico:} Indique su universo total (Ej. "1000 estudiantes del colegio"). La IA calculará o sugerirá el tamaño muestral representativo, el tipo de muestreo (Ej. Aleatorio simple o Estratificado) y enlistará los criterios formales de Inclusión y Exclusión.
+\end{itemize}
+
+% 13. Plan de Análisis e Instrumentos
+\subsection{13. Plan de Análisis e Instrumentos}
+Define con qué herramientas se va a extraer la información de la muestra.
+\begin{itemize}
+    \item \textbf{Uso Práctico:} El sistema le ayudará a decidir si su proyecto requiere Encuestas (Cuestionarios de escala Likert), Entrevistas semi-estructuradas, o Fichas de observación documental, así como el software recomendado (SPSS, Excel, NVivo) para procesar los datos.
+\end{itemize}
+
+% 14. Cronograma
+\subsection{14. Cronograma}
+Organiza la investigación en el tiempo.
+\begin{itemize}
+    \item \textbf{Uso Práctico:} Ingrese las fases de su proyecto (generalmente guiadas por sus objetivos específicos). La IA le devolverá una propuesta de formato de matriz cruzada (similar a un Diagrama de Gantt), desglosando los meses en semanas y asignando tiempos realistas a tareas como "Recolección de datos" o "Redacción del documento final".
+\end{itemize}
+
+% 15. Presupuesto
+\subsection{15. Presupuesto}
+Cuantifica económicamente la viabilidad del proyecto.
+\begin{itemize}
+    \item \textbf{Uso Práctico:} El sistema dividirá los gastos en rubros estandarizados: Personal (Horas de investigador), Equipos (Computadoras), Software (Licencias), Salidas de campo (Viáticos) y Materiales. Además, sugerirá una división entre el "Aporte de la Institución" y el "Aporte del Estudiante".
+\end{itemize}
+
+% 16. DOI to Cite
+\subsection{16. DOI to Cite (Utilidad de Citación)}
+Una herramienta invaluable para construir la bibliografía final.
+\begin{tcolorbox}[colback=lightgray, colframe=primary, title=Uso Rápido]
+Pegue un enlace DOI oficial (Digital Object Identifier, ej. \texttt{10.1016/j.procs.2023.01.001}) de un \textit{paper} científico. El sistema accederá a las bases de metadatos globales y generará automáticamente la referencia perfectamente formateada en \textbf{Normas APA 7ma Edición}, lista para copiar y pegar en su documento final.
+\end{tcolorbox}
+
+\newpage
+\section{Buenas Prácticas (Ingeniería de Prompts Académica)}
+La Inteligencia Artificial es altamente dependiente del contexto que usted le proporcione. Para maximizar la utilidad del software, adhiera a estas reglas de oro:
+
+\begin{itemize}
+    \item \textbf{Sea Específico, nunca General:} La IA no puede leer mentes. En lugar de escribir "Contaminación", redacte "Contaminación por metales pesados en la cuenca baja del Río Bogotá ocasionada por la industria curtiembre". A mayor nivel de detalle geográfico y demográfico, mayor calidad en el marco generado.
+    \item \textbf{Defina la Población y Muestra:} Especifique siempre sobre quién recae su estudio ("Estudiantes de colegios públicos de grado 11", "Pacientes diabéticos tipo 2 mayores de 60 años en hospitales distritales").
+    \item \textbf{Acotación Temporal:} Indique el rango de tiempo de su estudio si es relevante (Ej. "Análisis del mercado inmobiliario post-pandemia 2021-2023").
+    \item \textbf{Cuidado de la Ortografía:} Aunque el sistema puede deducir errores tipográficos, un exceso de los mismos puede derivar en interpretaciones sesgadas por parte del LLM.
+\end{itemize}
+
+\section{Manejo de Errores y Solución de Problemas Avanzado (Troubleshooting)}
+
+La infraestructura del sistema es robusta, pero la red de internet o los servidores remotos pueden fallar. El sistema está programado para recuperarse de los siguientes escenarios:
+
+\begin{itemize}
+    \item \textbf{El botón "Generar" se bloquea (se pone gris) y no responde tras 30 segundos:} 
+    Se ha alcanzado un \textit{Timeout}. Ocurre cuando su conexión a internet es inestable y los paquetes JSON no logran descargar. La aplicación detectará este cuelgue, le mostrará una alerta y reactivará el botón para que intente de nuevo sin necesidad de recargar la pestaña o perder lo que escribió.
+    \item \textbf{Alerta Roja "Fallo de API / Rate Limit / HTTP 429":} 
+    Usted ha hecho demasiados clics seguidos, o hay múltiples usuarios en su facultad utilizando la cuota gratuita de Groq al mismo tiempo. El servidor remoto ha aplicado un \textit{Rate Limit} para protegerse de ataques de denegación de servicio (DDoS). Espere pacientemente 2 minutos y vuelva a pulsar el botón.
+    \item \textbf{Respuesta Cortada (Max Tokens Hit):}
+    Si la respuesta de la IA termina abruptamente a mitad de una frase, significa que la extensión teórica superó el límite de memoria asignado por transacción. La recomendación es solicitar cosas más específicas y puntuales.
+\end{itemize}
+
+\newpage
+\section{Privacidad, Resguardo y Manejo Anti-Plagio}
+
+\subsection{Política de Datos Volátiles}
+Debe comprender que \textbf{sus datos no se guardan en ninguna base de datos del sistema}. La arquitectura es \textit{Client-Side}, lo que garantiza total privacidad de su propiedad intelectual. No hay rastreo, ni cuentas secretas robando sus ideas de tesis.
+Sin embargo, esto conlleva un riesgo: \textbf{Si usted cierra o recarga la pestaña del navegador, perderá todo su trabajo.}
+
+\subsection{Guía de Exportación a Microsoft Word}
+1. Sombreé el texto generado en la pantalla de resultados.
+2. Haga clic derecho y seleccione "Copiar" (o presione \texttt{Ctrl+C}). 
+3. Abra su documento de Microsoft Word.
+4. Elija la opción de pegado \textbf{"Mantener solo texto"} (Keep text only) para que las viñetas y títulos hereden la fuente y márgenes Normas APA que usted ya tenga configurados en su Word.
+
+\subsection{Consideraciones sobre Plagio y Turnitin}
+\textbf{¿Los textos generados por esta IA cuentan como plagio?}
+Legalmente, el contenido generado por Inteligencia Artificial no es copia de otro autor, por lo que no inflige derechos de autor directos. Sin embargo, las universidades modernas utilizan escáneres heurísticos (como las últimas versiones de \textit{Turnitin}) capaces de detectar la estructura sintáctica de una IA (el "Tono Robótico").
+
+\textbf{Nuestra recomendación obligatoria:}
+Utilice el resultado de este software como un \textbf{Borrador o Esquema Avanzado}. No copie y pegue textualmente hacia su documento final de grado. Extraiga la lógica metodológica (la organización de causas, la selección de los verbos taxonómicos) y \textbf{reescriba o adapte el contenido con sus propias palabras, tono y estilo humano de redacción}. El valor de su tesis está en su análisis, no en la mecanografía.
+
+\vspace{2cm}
+\begin{center}
+    \rule{0.5\textwidth}{0.4pt}\\[0.5cm]
+    \textit{Este manual técnico ha sido documentado bajo estándares formales de ingeniería para empoderar al investigador humano, no para suplantarlo.}
+\end{center}
+
+\end{document}
