@@ -42,7 +42,7 @@ Título:`;
             ],
             model: import.meta.env.VITE_GROQ_MODEL,
             temperature: 0.7,
-            max_tokens: 100,
+            max_tokens: 1000,
         });
 
         return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al generar título';
@@ -135,7 +135,7 @@ Pregunta de investigación:`;
             ],
             model: import.meta.env.VITE_GROQ_MODEL,
             temperature: 0.7,
-            max_tokens: 150,
+            max_tokens: 1000,
         });
 
         return chatCompletion.choices[0]?.message?.content?.trim() || 'Error al generar pregunta';
