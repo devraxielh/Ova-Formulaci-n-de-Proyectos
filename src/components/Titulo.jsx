@@ -18,7 +18,7 @@ const SECTIONS = construccionPrimero([
     { id: 'calidad', label: 'Calidad' },
     { id: 'cierre', label: 'Cierre' },
     { id: 'construccion', label: 'Construcción' },
-    { id: 'revision', label: 'Revisión final' },
+    { id: 'revision', label: 'Revisión' },
 ]);
 
 const SLIDES = construccionPrimero([

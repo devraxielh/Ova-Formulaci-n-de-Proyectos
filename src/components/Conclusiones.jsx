@@ -330,7 +330,7 @@ const Conclusiones = ({ onNavigate }) => {
                 intro={(
                     <>
                         {heading}
-                        <p>Último paso: revisa tus conclusiones y recomendaciones antes de llevarlas a tu asesor.</p>
+                        <p>Revisa tus conclusiones y recomendaciones antes de llevarlas a tu asesor.</p>
                     </>
                 )}
             />

@@ -569,15 +569,6 @@ const Revision = ({ intro }) => {
 /* ---------- Clase ---------- */
 
 const Metodologia = ({ onNavigate }) => {
-    // Si piden una pestaña concreta del constructor (p. ej. «Instrumentos»), la clase abre en la diapositiva de construcción.
-    useState(() => {
-        try {
-            if (window.sessionStorage.getItem('projectsia:metodologia:tab')) {
-                window.localStorage.setItem(SLIDE_KEY, String(SLIDES.findIndex((slide) => slide.id === 'construye')));
-            }
-        } catch { /* noop */ }
-        return null;
-    });
     const { data } = useProject();
     const { especificos } = partesObjetivos(data.objetivos);
     const [demo, setDemo] = useState({ finita: true, N: 1200, Z: 1.96, e: 0.05 });
@@ -663,7 +654,7 @@ const Metodologia = ({ onNavigate }) => {
                 intro={(
                     <>
                         {heading}
-                        <p>Último paso: revisa que tu metodología sea coherente, válida y viable antes de llevarla a tu asesor.</p>
+                        <p>Revisa que tu metodología sea coherente, válida y viable antes de llevarla a tu asesor.</p>
                     </>
                 )}
             />

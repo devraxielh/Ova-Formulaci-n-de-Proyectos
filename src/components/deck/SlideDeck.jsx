@@ -155,21 +155,10 @@ const fillExample = (event) => {
     fijarValor(el, text);
 };
 
-const readIndex = (key, total) => {
-    try {
-        const stored = Number(window.localStorage.getItem(key));
-        return Number.isInteger(stored) && stored >= 0 && stored < total ? stored : 0;
-    } catch {
-        return 0;
-    }
-};
-
-/**
- * Presentación de una clase: secciones, temporizador por diapositiva, pantalla completa,
- * barra de progreso y navegación con teclado. Cada diapositiva la pinta `renderSlide`.
- */
-const SlideDeck = ({ sections, slides, storageKey, label, renderSlide, finish }) => {
-    const [index, setIndex] = useState(() => readIndex(storageKey, slides.length));
+// `storageKey` se sigue aceptando para no cambiar las clases, pero ya no se usa.
+const SlideDeck = ({ sections, slides, label, renderSlide, finish }) => {
+    // La clase abre siempre en su primera diapositiva, que es «Construcción»: no se recuerda dónde quedó la vez anterior.
+    const [index, setIndex] = useState(0);
     const [direction, setDirection] = useState(1);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const reduceMotion = useReducedMotion();
@@ -203,18 +192,13 @@ const SlideDeck = ({ sections, slides, storageKey, label, renderSlide, finish })
     }, [goTo, index]);
 
     useEffect(() => {
-        try {
-            window.localStorage.setItem(storageKey, String(index));
-        } catch {
-            /* el progreso no se guarda si el almacenamiento está bloqueado */
-        }
         if (!didMount.current) {
             didMount.current = true;
             return;
         }
         slideRef.current?.scrollTo({ top: 0 });
         document.querySelector('.main-content')?.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
-    }, [index, reduceMotion, storageKey]);
+    }, [index, reduceMotion]);
 
     useEffect(() => {
         const onChange = () => setIsFullscreen(document.fullscreenElement === stageRef.current);
@@ -321,15 +305,23 @@ const SlideDeck = ({ sections, slides, storageKey, label, renderSlide, finish })
                         <span className="ide-count">{index + 1} de {slides.length}</span>
                     </div>
 
-                    {isLast && finish ? (
-                        <button type="button" className="ide-btn ide-btn--primary" onClick={finish.onClick}>
-                            {finish.label} <ArrowRight size={16} />
-                        </button>
-                    ) : (
-                        <button type="button" className="ide-btn ide-btn--primary" onClick={() => goTo(index + 1)} disabled={isLast}>
-                            Siguiente <ArrowRight size={16} />
-                        </button>
-                    )}
+                    <div className="ide-nav-fin">
+                        {/* Tras revisar lo construido, el paso natural es la siguiente herramienta; la teoría que sigue es de apoyo. */}
+                        {finish && !isLast && slide.section === 'revision' && (
+                            <button type="button" className="ide-btn ide-btn--ghost ide-btn--siguiente-paso" onClick={finish.onClick}>
+                                {finish.label} <ArrowRight size={16} />
+                            </button>
+                        )}
+                        {isLast && finish ? (
+                            <button type="button" className="ide-btn ide-btn--primary" onClick={finish.onClick}>
+                                {finish.label} <ArrowRight size={16} />
+                            </button>
+                        ) : (
+                            <button type="button" className="ide-btn ide-btn--primary" onClick={() => goTo(index + 1)} disabled={isLast}>
+                                Siguiente <ArrowRight size={16} />
+                            </button>
+                        )}
+                    </div>
                 </nav>
             </section>
 

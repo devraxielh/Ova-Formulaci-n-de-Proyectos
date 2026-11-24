@@ -1356,3 +1356,8 @@
   border-radius: 999px;
   padding: 0.15rem 0.6rem;
 }
+
+/* Pie de la clase: en «Revisión» se ofrece además pasar a la siguiente herramienta. */
+.ide-nav-fin { display: flex; align-items: center; gap: 0.5rem; }
+@container (max-width: 760px) { .ide-btn--siguiente-paso { display: none; } }
+@media (max-width: 900px) { .ide-btn--siguiente-paso { display: none; } }

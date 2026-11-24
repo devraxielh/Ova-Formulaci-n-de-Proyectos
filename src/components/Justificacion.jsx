@@ -20,7 +20,7 @@ const SECTIONS = construccionPrimero([
     { id: 'calidad', label: 'Calidad' },
     { id: 'cierre', label: 'Cierre' },
     { id: 'construccion', label: 'Construcción' },
-    { id: 'revision', label: 'Revisión final' },
+    { id: 'revision', label: 'Revisión' },
 ]);
 
 const SLIDES = construccionPrimero([
@@ -661,7 +661,7 @@ const Justificacion = ({ onNavigate }) => {
                 intro={(
                     <>
                         {heading}
-                        <p>Último paso: revisa tu justificación antes de llevarla a tu asesor. También puedes pegar la justificación de otro trabajo para analizarla.</p>
+                        <p>Revisa tu justificación antes de llevarla a tu asesor. También puedes pegar la justificación de otro trabajo para analizarla.</p>
                     </>
                 )}
             />

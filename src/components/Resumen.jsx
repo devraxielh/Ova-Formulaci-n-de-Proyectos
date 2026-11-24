@@ -413,7 +413,7 @@ const Resumen = ({ onNavigate }) => {
             )}
             />
         ),
-        revision: <Revision intro={(<>{heading}<p>Último paso: revisa tu resumen antes de llevarlo a tu asesor.</p></>)} />,
+        revision: <Revision intro={(<>{heading}<p>Revisa tu resumen antes de llevarlo a tu asesor.</p></>)} />,
     })[slide.id] || (
         <Generica
             slide={slide}

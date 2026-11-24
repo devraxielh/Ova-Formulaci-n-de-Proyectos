@@ -526,7 +526,7 @@ const MarcoReferencial = ({ onNavigate }) => {
                 intro={(
                     <>
                         {heading}
-                        <p>Último paso: revisa tu marco antes de llevarlo a tu asesor. También puedes pegar el de otro trabajo, con sus subtítulos, para analizarlo.</p>
+                        <p>Revisa tu marco antes de llevarlo a tu asesor. También puedes pegar el de otro trabajo, con sus subtítulos, para analizarlo.</p>
                     </>
                 )}
             />

@@ -415,7 +415,7 @@ const Fases = ({ onNavigate }) => {
                 intro={(
                     <>
                         {heading}
-                        <p>Último paso: revisa que tus fases estén completas, en orden y coherentes con el cronograma.</p>
+                        <p>Revisa que tus fases estén completas, en orden y coherentes con el cronograma.</p>
                     </>
                 )}
             />

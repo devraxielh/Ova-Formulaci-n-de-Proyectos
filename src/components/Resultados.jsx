@@ -316,15 +316,6 @@ const Revision = ({ intro }) => {
 /* ---------- Clase ---------- */
 
 const Resultados = ({ onNavigate }) => {
-    // Si piden el análisis de datos (desde los instrumentos), la clase abre en la diapositiva de construcción.
-    useState(() => {
-        try {
-            if (window.sessionStorage.getItem('projectsia:resultados:analisis')) {
-                window.localStorage.setItem(SLIDE_KEY, String(SLIDES.findIndex((slide) => slide.id === 'construye')));
-            }
-        } catch { /* noop */ }
-        return null;
-    });
     const { data } = useProject();
     const { especificos } = partesObjetivos(data.objetivos);
     const [guardados] = useProjectField('resultados', '');
@@ -381,7 +372,7 @@ const Resultados = ({ onNavigate }) => {
                 intro={(
                     <>
                         {heading}
-                        <p>Último paso: revisa tus resultados y tu discusión antes de llevarlos a tu asesor.</p>
+                        <p>Revisa tus resultados y tu discusión antes de llevarlos a tu asesor.</p>
                     </>
                 )}
             />
