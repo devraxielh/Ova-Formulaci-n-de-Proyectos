@@ -94,14 +94,16 @@ const ecuacion = (partes) => ({ type: 'equation', partes, linea: ecuacionEnLinea
 const bloquesEcuaciones = (d) => {
     const p = d.metodologiaForm?.poblacion || {};
     if (!text(d.poblacionSugerida) || !p.muestreo) return [];
+    // Con población finita sin escribir su tamaño no se muestran ecuaciones con un número de ejemplo.
+    if (d.poblacionTipo !== 'infinita' && d.poblacionTamano == null) return [];
     const calc = { finita: d.poblacionTipo !== 'infinita', N: Number(d.poblacionTamano ?? 1000) || 0, Z: Number(d.muestraConfianza) || 1.96, e: Number(d.muestraError) || 0.05 };
-    const ecuaciones = ecuacionesMuestreo({ muestreo: p.muestreo, calc, conglomerados: p.conglomerados }).filter((e) => !e.soloVentana);
+    const ecuaciones = ecuacionesMuestreo({ muestreo: p.muestreo, calc, conglomerados: p.conglomerados, perdidas: p.perdidas }).filter((e) => !e.soloVentana);
     return ecuaciones.flatMap((e) => [
         { type: 'paragraph', text: `${e.titulo}:` },
         ecuacion(e.general),
         ...(e.con ? [ecuacion(e.con)] : []),
         // Las notas de cada ecuación ya están dichas en el párrafo de la población: aquí solo va la leyenda.
-        ...(e.leyenda ? [{ type: 'paragraph', text: `Donde ${LEYENDA_MUESTRA}.` }] : []),
+        ...(e.leyenda ? [{ type: 'paragraph', text: `Donde ${LEYENDA_MUESTRA}.` }] : e.explica ? [{ type: 'paragraph', text: e.explica }] : []),
     ]);
 };
 

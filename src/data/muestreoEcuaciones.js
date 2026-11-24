@@ -3,13 +3,14 @@
  * y para el documento (pantalla y Word). Cada ecuación es una lista de partes: texto o fracción { num, den }.
  */
 import { CONFIANZAS, MUESTREOS, tamanoMuestra } from './metodologia.js';
+import { muestraAjustada } from './muestreo.js';
 
 const num = (v) => Number(v).toLocaleString('es-CO', { maximumFractionDigits: 2 });
 
 export const LEYENDA_MUESTRA = 'N es el tamaño de la población; n, el tamaño de la muestra; Z, el valor de la distribución normal para el nivel de confianza; p y q, la proporción esperada y su complemento (0,5 cuando no se conoce); y e, el margen de error';
 
 // `calc`: { finita, N, Z, e }. Devuelve [{ titulo, general, con, nota, soloVentana }].
-export const ecuacionesMuestreo = ({ muestreo, calc, conglomerados, unidad = 'persona' }) => {
+export const ecuacionesMuestreo = ({ muestreo, calc, conglomerados, perdidas = 0, unidad = 'persona' }) => {
     const m = MUESTREOS.find((x) => x.id === muestreo);
     if (!m) return [];
     const N = Number(calc.N) || 0;
@@ -32,6 +33,11 @@ export const ecuacionesMuestreo = ({ muestreo, calc, conglomerados, unidad = 'pe
             nota: `Nivel de confianza del ${conf} y margen de error del ${Math.round(e * 100)} %.`,
             leyenda: true,
         });
+    }
+    const L = Math.min(60, Math.max(0, Number(perdidas) || 0));
+    if (m.probabilistico && L > 0 && n > 0) {
+        const na = muestraAjustada(n, L, calc.finita ? N : 0);
+        lista.push({ titulo: 'Muestra ajustada por pérdidas esperadas', general: ['nₐ = ', { num: 'n', den: '1 − L' }], con: ['nₐ = ', { num: num(n), den: `1 − ${num(L / 100)}` }, ` = ${num(na)}`], nota: `L es la proporción de pérdidas esperadas (${num(L)} %): personas que no responden o se retiran. Se invita a ${num(na)} para terminar con al menos ${num(n)}.`, explica: `Donde L es la proporción de pérdidas esperadas (${num(L / 100)}).` });
     }
     if (m.id === 'aleatorio simple' && calc.finita && N > 0) {
         lista.push({ titulo: 'Probabilidad de selección de cada elemento', general: ['P = ', { num: 'n', den: 'N' }], con: ['P = ', { num: num(n), den: num(N) }, ` = ${num((n / N) * 100)} %`] });

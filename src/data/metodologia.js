@@ -1,6 +1,6 @@
 import { VALIDACION_DETALLE, VALIDACION_IDS, parrafoConDatos } from './validacion.js';
 import { preguntasDe, ubicacionDe } from '../services/instrumentos.js';
-import { repartoEstratos } from './muestreo.js';
+import { muestraAjustada, repartoEstratos } from './muestreo.js';
 
 /*
  * Datos y redacción de la Metodología: enfoque, tipos, diseños, población y muestra,
@@ -127,17 +127,24 @@ export const redactarPoblacion = (p, calc) => {
     const m = MUESTREOS.find((item) => item.id === p.muestreo);
     const unidad = clean(p.unidad) || 'personas';
     const partes = [
-        `La población está conformada por ${lower(clean(p.descripcion))}${calc.finita && Number(calc.N) > 0 ? `, que suman ${Number(calc.N).toLocaleString('es-CO')} ${lower(unidad)}` : ''}.`,
+        `La población está conformada por ${lower(clean(p.descripcion))}${calc.finita && Number(calc.N) > 0 && calc.definida !== false ? `, que suman ${Number(calc.N).toLocaleString('es-CO')} ${lower(unidad)}` : ''}.`,
         clean(p.unidad) ? `La unidad de análisis corresponde a ${/^(el|la|los|las|cada)\s/i.test(clean(p.unidad)) ? lower(clean(p.unidad)) : `los ${lower(clean(p.unidad))}`}.` : '',
         clean(p.inclusion) ? `Criterios de inclusión: ${lower(clean(p.inclusion))}.` : '',
         clean(p.exclusion) ? `Criterios de exclusión: ${lower(clean(p.exclusion))}.` : '',
     ];
-    if (m?.probabilistico) {
+    // Con población finita sin escribir su tamaño no hay con qué calcular: no se afirma una muestra de ejemplo.
+    if (m?.probabilistico && calc.finita && calc.definida === false) {
+        partes.push(`Se usa un muestreo probabilístico ${m.id}: ${m.def}.`);
+    } else if (m?.probabilistico) {
         const conf = CONFIANZAS.find((c) => c.z === Number(calc.Z))?.label || '95 %';
         partes.push(`El tamaño de la muestra se calculó con la fórmula para población ${calc.finita ? 'finita' : 'infinita'}, con un nivel de confianza del ${conf} y un margen de error del ${Math.round(Number(calc.e) * 100)} %, lo que da una muestra de ${tamanoMuestra(calc)} ${lower(unidad)}.`);
         partes.push(`Se usa un muestreo probabilístico ${m.id}: ${m.def}.`);
-        // Datos guardados desde la ventana de muestreo: intervalo, reparto por estratos o conglomerados sorteados.
+        // Datos guardados desde la ventana de muestreo: pérdidas, intervalo, reparto por estratos o conglomerados sorteados.
         const n = tamanoMuestra(calc);
+        if (Number(p.perdidas) > 0) {
+            const na = muestraAjustada(n, p.perdidas, calc.finita ? Number(calc.N) : 0);
+            if (na > n) partes.push(`Para compensar una pérdida esperada del ${Number(p.perdidas)} % (personas que no responden o se retiran), se invitará a ${na.toLocaleString('es-CO')} ${lower(unidad)}.`);
+        }
         if (m.id === 'sistemático' && calc.finita && Number(calc.N) > 0 && n > 0) {
             const k = Math.max(1, Math.floor(Number(calc.N) / n));
             partes.push(`El intervalo de selección es k = ${Number(calc.N).toLocaleString('es-CO')} / ${n} ≈ ${k}: a partir de un arranque sorteado entre 1 y ${k}, se toma un elemento cada ${k} de la lista.`);

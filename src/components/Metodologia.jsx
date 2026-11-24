@@ -287,7 +287,8 @@ const useMetState = () => {
     const idea = data.idea || {};
     const t = data.tituloForm || {};
     const { especificos } = partesObjetivos(data.objetivos);
-    const calc = { finita: popTipo !== 'infinita', N: Number(popN) || 0, Z: Number(conf) || 1.96, e: Number(err) || 0.05 };
+    // `definida`: el estudiante ya escribió el tamaño de su población (si no, N es el valor de ejemplo).
+    const calc = { finita: popTipo !== 'infinita', N: Number(popN) || 0, Z: Number(conf) || 1.96, e: Number(err) || 0.05, definida: data.poblacionTamano != null };
     const setCalc = (patch) => {
         if ('finita' in patch) setPopTipo(patch.finita ? 'finita' : 'infinita');
         if ('N' in patch) setPopN(patch.N);
@@ -716,7 +717,7 @@ const Constructor = ({ intro, onNavigate }) => {
                                 <span>Muestreo</span>
                                 <div className="mue-elegido">
                                     {f.poblacion.muestreo
-                                        ? <p><strong>{capital(f.poblacion.muestreo)}</strong> · {MUESTREOS.find((m) => m.id === f.poblacion.muestreo)?.probabilistico ? `probabilístico · muestra de ${tamanoMuestra(calc)}` : f.poblacion.muestreo.startsWith('censo') ? 'toda la población' : 'no probabilístico'}</p>
+                                        ? <p><strong>{capital(f.poblacion.muestreo)}</strong> · {MUESTREOS.find((m) => m.id === f.poblacion.muestreo)?.probabilistico ? (calc.finita && !calc.definida ? 'probabilístico · falta escribir el tamaño de la población' : `probabilístico${calc.finita ? ` · población de ${Number(calc.N).toLocaleString('es-CO')}` : ''} · muestra de ${tamanoMuestra(calc)}`) : f.poblacion.muestreo.startsWith('censo') ? 'toda la población' : 'no probabilístico'}</p>
                                         : <p>Todavía no has elegido el muestreo.</p>}
                                     <button type="button" className="ide-btn ide-btn--ghost" onClick={() => setVerMuestreo(true)}><BookOpenCheck size={15} /> {f.poblacion.muestreo ? 'Cambiar el muestreo o su cálculo' : 'Elegir el muestreo y calcular la muestra'}</button>
                                 </div>
@@ -727,7 +728,7 @@ const Constructor = ({ intro, onNavigate }) => {
                                 poblacion={f.poblacion}
                                 calc={calc}
                                 unidad={lower(clean(f.poblacion.unidad)).replace(/s$/, '') || 'persona'}
-                                calculadora={<Calculadora calc={calc} onChange={(patch) => { touch(); setCalc(patch); }} compacta />}
+                                onCalc={(patch) => { touch(); setCalc(patch); }}
                                 onUsar={(patch) => setPob(patch)}
                                 onClose={() => setVerMuestreo(false)}
                             />

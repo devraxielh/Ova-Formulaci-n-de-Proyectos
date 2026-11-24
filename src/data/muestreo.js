@@ -110,6 +110,32 @@ export const MUESTREO_DETALLE = {
     },
 };
 
+// Lee el tamaño de la población tal como lo escribe una persona: «1200», «1.200», «1,200», «1 200».
+// Devuelve { valor } o { error } con el motivo, para decirlo en pantalla.
+export const leerPoblacion = (texto) => {
+    const t = String(texto ?? '').trim();
+    if (!t) return { error: 'Escribe cuántas personas o elementos tiene tu población.' };
+    if (/[a-záéíóúñ]/i.test(t)) return { error: 'Escribe solo el número, sin letras (por ejemplo, 1200).' };
+    if (/^-/.test(t)) return { error: 'La población no puede ser negativa.' };
+    let limpio;
+    if (/^\d{1,3}([.,\s\u00a0]\d{3})+$/.test(t)) limpio = t.replace(/[.,\s\u00a0]/g, ''); // separador de miles
+    else if (/^\d+$/.test(t)) limpio = t;
+    else if (/^\d+[.,]\d+$/.test(t)) return { error: 'La población es un número entero: no lleva decimales. Si el punto era de miles, escríbelo como 1.200 o 1200.' };
+    else return { error: 'No se entiende ese número. Escríbelo solo con cifras (por ejemplo, 1200).' };
+    const valor = Number(limpio);
+    if (valor === 0) return { error: 'La población debe ser mayor que cero.' };
+    if (valor > 9000000000) return { error: 'Ese número es mayor que la población mundial: revísalo.' };
+    return { valor };
+};
+
+// Muestra ajustada por las pérdidas esperadas (personas que no responden o se retiran): nₐ = n / (1 − L).
+export const muestraAjustada = (n, perdidasPct, tope = 0) => {
+    const L = Math.min(60, Math.max(0, Number(perdidasPct) || 0)) / 100;
+    if (!n || !L) return n || 0;
+    const ajustada = Math.ceil(n / (1 - L));
+    return tope > 0 ? Math.min(tope, ajustada) : ajustada;
+};
+
 // Reparto proporcional de la muestra entre los estratos: n_h = n · N_h / N.
 export const repartoEstratos = (estratos, n) => {
     const validos = (estratos || []).map((e) => ({ nombre: String(e?.nombre || '').trim(), N: Math.max(0, Math.round(Number(e?.N) || 0)) })).filter((e) => e.nombre && e.N > 0);
