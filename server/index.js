@@ -1214,6 +1214,65 @@ app.get('/api/buscar/articulos', requireUser, searchLimit, async (req, res) => {
     }
 });
 
+/* ---------- Obras de una teoría (OpenAlex) ---------- */
+
+// Para cada teoría se buscan las obras más citadas que la nombran en el título: suele ser la obra que la propuso.
+// Si se conoce el apellido del autor original, sus obras van primero. El autor y el año salen siempre del registro
+// de la publicación, nunca de la IA. Cada consulta se guarda una semana (el cupo diario de OpenAlex es limitado).
+const OBRAS_CACHE = new Map(); // clave → { hasta, obras }
+const OBRAS_TTL = 7 * 24 * 60 * 60 * 1000;
+const OBRAS_CAMPOS = 'id,display_name,publication_year,authorships,primary_location,biblio,doi,cited_by_count,open_access,language,type,abstract_inverted_index';
+// En un filtro de OpenAlex la coma y la barra separan condiciones: se quitan del texto buscado.
+const paraFiltro = (texto) => String(texto || '').replace(/[^\p{L}\p{N}\s'-]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 100);
+
+const obrasDeTitulo = async (titulo, autor) => {
+    const filtro = [`title.search:${titulo}`, autor ? `raw_author_name.search:${autor}` : ''].filter(Boolean).join(',');
+    const res = await fetch(`https://api.openalex.org/works?filter=${encodeURIComponent(filtro)}&sort=cited_by_count:desc&per-page=3&select=${OBRAS_CAMPOS}`
+        + `&api_key=${encodeURIComponent(OPENALEX_API_KEY)}`, { signal: AbortSignal.timeout(20000) });
+    if (!res.ok) throw Object.assign(new Error(`openalex ${res.status}`), { status: res.status });
+    return ((await res.json()).results || []).filter((w) => w.display_name);
+};
+
+const obrasDeTeoria = async ({ ingles, nombre, autor }) => {
+    const clave = `${ingles}|${nombre}|${autor}`.toLowerCase();
+    const guardada = OBRAS_CACHE.get(clave);
+    if (guardada && guardada.hasta > Date.now()) return guardada.obras;
+    let delAutor = [];
+    let otras = [];
+    for (const titulo of [ingles, nombre].filter(Boolean)) {
+        [delAutor, otras] = await Promise.all([autor ? obrasDeTitulo(titulo, autor) : [], obrasDeTitulo(titulo, '')]);
+        if (delAutor.length || otras.length) break; // con el nombre en inglés basta; el español es el respaldo
+    }
+    const vistas = new Set();
+    const obras = [...delAutor.slice(0, 2).map((w) => ({ ...w, del_autor: true })), ...otras]
+        .filter((w) => (vistas.has(w.id) ? false : vistas.add(w.id)))
+        .slice(0, 3);
+    OBRAS_CACHE.set(clave, { hasta: Date.now() + OBRAS_TTL, obras });
+    if (OBRAS_CACHE.size > 600) OBRAS_CACHE.delete(OBRAS_CACHE.keys().next().value);
+    return obras;
+};
+
+app.post('/api/buscar/teorias', requireUser, searchLimit, async (req, res) => {
+    if (!OPENALEX_API_KEY) return res.status(503).json({ error: 'La búsqueda de teorías no está configurada.', code: 'no_key' });
+    const teorias = (Array.isArray(req.body?.teorias) ? req.body.teorias : []).slice(0, 6)
+        .map((t) => ({ ingles: paraFiltro(t?.ingles), nombre: paraFiltro(t?.nombre), autor: paraFiltro(t?.autor).split(' ').at(-1) || '' }))
+        .filter((t) => (t.ingles || t.nombre).length >= 3);
+    if (!teorias.length) return res.status(400).json({ error: 'Falta el nombre de la teoría.' });
+    try {
+        const items = await Promise.all(teorias.map((t) => obrasDeTeoria(t).then((obras) => ({ obras }), (error) => {
+            if (error?.status === 429) throw error;
+            return { obras: [], fallo: true }; // una teoría que falla no tumba a las demás
+        })));
+        return res.json({ items });
+    } catch (error) {
+        if (error?.status !== 429) logError('buscar', 'openalex (teorías) no respondió', `${error?.name || ''} ${error?.message || ''}`, req.user.id);
+        return res.status(error?.status === 429 ? 429 : 504).json({
+            error: error?.status === 429 ? 'La base de artículos está saturada en este momento. Inténtalo en unos minutos.' : 'La base de artículos tardó demasiado.',
+            code: error?.status === 429 ? 'saturada' : 'upstream',
+        });
+    }
+});
+
 /* ---------- Normas y jurisprudencia (Rulex Data) ---------- */
 
 // La cuota de Rulex es diaria y compartida por toda la plataforma: cada búsqueda se guarda un día,

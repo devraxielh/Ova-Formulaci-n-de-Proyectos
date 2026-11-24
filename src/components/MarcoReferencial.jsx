@@ -14,6 +14,7 @@ import './Objetivos.css';
 import './Justificacion.css';
 import BuscarAntecedentes from './BuscarAntecedentes';
 import BuscarNormas from './BuscarNormas';
+import SugerirTeorias from './SugerirTeorias';
 import { autorCita } from '../services/apa';
 import { groq } from '../services/api';
 import './Marco.css';
@@ -272,11 +273,50 @@ const fichaDesdeResumen = async ({ tipo = 'antecedente', ref, resumen, proyecto 
     return { objetivo: t(json.objetivo), hallazgo: t(json.hallazgo), relacion: rel(json.relacion), lugar: t(json.lugar, 120), ambito: AMBITOS.includes(json.ambito) ? json.ambito : '' };
 };
 
+// «Qué plantea» y «Por qué sustenta tu estudio» de una teoría ya identificada (su nombre y su obra vienen de la búsqueda).
+// Con resumen, se ciñe a él; sin resumen, la IA escribe solo el planteamiento central y conocido de la teoría.
+const teoriaDesdeObra = async ({ nombre, ref, resumen, proyecto }) => {
+    const hay = clean(resumen).length >= 80;
+    const r = await groq.chat.completions.create({
+        messages: [
+            { role: 'system', content: `Ayudas a un estudiante a fichar una teoría para su marco teórico. ${hay ? 'Explicas qué plantea la teoría basándote en el resumen (abstract) que recibes; no agregas cifras ni resultados que el resumen no diga.' : 'No hay resumen de la obra: escribes solo el planteamiento central y ampliamente conocido de esa teoría. Si no la conoces con certeza, dejas "postulado" como cadena vacía.'} No inventas autores, años ni citas. Escribes en español. Respondes solo JSON válido.` },
+            { role: 'user', content: `TEORÍA: ${nombre}
+OBRA: ${ref.titulo} (${ref.autores || 's. a.'}, ${ref.anio || 's. f.'})
+${hay ? `Resumen: ${String(resumen).slice(0, 3500)}
+` : ''}
+PROYECTO DEL ESTUDIANTE
+Título: ${proyecto.titulo || '(sin título)'}
+Problema: ${proyecto.problema || '(sin definir)'}
+Población: ${proyecto.quien || '(sin definir)'}
+Lugar: ${proyecto.donde || '(sin definir)'}
+
+Llena la ficha:
+- "postulado": qué plantea la teoría. Una o dos frases que empiecen en minúscula y puedan seguir a «La teoría plantea que…» (no repitas esas palabras). Ejemplo solo de forma: «el aprendizaje ocurre al relacionar la información nueva con lo que ya se sabe».
+- "relacion": por qué sirve para sustentar el proyecto del estudiante. Una frase que empiece en minúscula y pueda seguir a «Esta teoría sustenta la investigación porque…» (no repitas esas palabras). Este campo SIEMPRE va lleno. Ejemplo solo de forma: «permite explicar el comportamiento que este estudio observa».
+Los ejemplos solo muestran la forma: no copies su contenido.
+Sin punto final en ningún campo.
+
+Responde exactamente con este JSON: {"postulado": "…", "relacion": "…"}` },
+        ],
+        temperature: 0.2,
+        max_tokens: 600,
+        response_format: { type: 'json_object' },
+    });
+    const content = r.choices?.[0]?.message?.content || '';
+    const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+    const t = (v) => clean(String(v ?? '')).replace(/[.\s]+$/, '').slice(0, 600);
+    return {
+        postulado: t(json.postulado).replace(/^(?:(?:la|esta|el|este) (?:teor[ií]a|modelo|enfoque)[^,]*?\s+)?(?:plantea|postula|propone|sostiene)\s+que\s+/i, ''),
+        relacion: t(json.relacion).replace(/^(?:esta teor[ií]a\s+)?sustenta (?:la|esta) investigaci[oó]n\s+(?:porque|ya que|pues)\s+/i, ''),
+    };
+};
+
 const useMarcoState = () => {
     const [form, setForm] = useProjectField('marcoForm', MARCO_FORM);
     const [tituloForm] = useProjectField('tituloForm', null);
     const [idea] = useProjectField('idea', null);
     const [titulo] = useProjectField('titulo', '');
+    const [pregunta] = useProjectField('pregunta', '');
     const setters = {
         marcoAntecedentes: useProjectField('marcoAntecedentes', '')[1],
         marcoTeorico: useProjectField('marcoTeorico', '')[1],
@@ -298,7 +338,7 @@ const useMarcoState = () => {
     const i = idea || {};
     const t = tituloForm || {};
     return {
-        f, update, setForm, setters, guardados, titulo, idea: i,
+        f, update, setForm, setters, guardados, titulo, pregunta, idea: i,
         quien: clean(t.quien || i.quien), donde: clean(t.donde || i.donde),
     };
 };
@@ -333,7 +373,7 @@ const Campo = ({ id, label, value, onChange, placeholder, rows = 1, className = 
 );
 
 const Constructor = ({ intro, onNavigate }) => {
-    const { f, update, setForm, setters, idea, quien, donde, titulo } = useMarcoState();
+    const { f, update, setForm, setters, idea, quien, donde, titulo, pregunta } = useMarcoState();
     const [tab, setTab] = useState('antecedentes');
     const [saved, setSaved] = useState(false);
     const partes = redactar(f);
@@ -371,6 +411,34 @@ const Constructor = ({ intro, onNavigate }) => {
             return 'llena';
         } catch {
             return 'vacia'; // sin IA: queda la ficha con lo que se sabía del artículo
+        }
+    };
+    // «Usar esta obra» de «Sugerir teorías»: el nombre viene de la propuesta; el autor y el año, de la obra encontrada.
+    const usarTeoria = async ({ nombre, ref, resumen, prestado }) => {
+        const fuente = clean(ref.titulo);
+        const ficha = { ...VACIO.teoria, nombre: clean(nombre), autor: autorCita(ref), anio: ref.anio, fuente };
+        const actuales = f.teorias;
+        if (!actuales.some((x) => x.fuente === fuente)) {
+            const libre = actuales.findIndex((x) => !clean(x.nombre) && !clean(x.postulado) && !clean(x.autor));
+            set('teorias')(libre >= 0 ? actuales.map((x, i) => (i === libre ? ficha : x)) : [...actuales, ficha].slice(0, 5));
+        }
+        try {
+            const datos = await teoriaDesdeObra({ nombre, ref, resumen, proyecto: { titulo, problema: clean(idea.problema), quien, donde } });
+            if (!datos.postulado && !datos.relacion) return 'vacia';
+            setForm((prev) => {
+                const base = { ...MARCO_FORM, ...(prev || {}) };
+                const lista = Array.isArray(base.teorias) ? base.teorias : [];
+                const k = lista.findIndex((x) => x.fuente === fuente);
+                if (k < 0) return base;
+                const llena = { ...lista[k] };
+                Object.entries(datos).forEach(([campo, valor]) => { if (valor && !clean(llena[campo])) llena[campo] = valor; });
+                return { ...base, teorias: lista.map((x, i) => (i === k ? llena : x)) };
+            });
+            touch();
+            if (!datos.postulado) return 'vacia';
+            return clean(resumen).length < 80 ? 'ia' : prestado ? 'prestada' : 'llena';
+        } catch {
+            return 'vacia'; // sin IA: queda la ficha con el nombre, el autor y el año
         }
     };
     const save = () => {
@@ -423,6 +491,13 @@ const Constructor = ({ intro, onNavigate }) => {
                             titulo={FICHA_DE[tab].buscar}
                             usarComo={FICHA_DE[tab].nombre}
                             onUsar={usarArticulo(FICHA_DE[tab])}
+                        />
+                    )}
+                    {tab === 'teorico' && (
+                        <SugerirTeorias
+                            proyecto={{ titulo, problema: clean(idea.problema), pregunta: clean(pregunta), quien, donde }}
+                            yaTiene={f.teorias.map((t) => clean(t.nombre)).filter(Boolean)}
+                            onUsar={usarTeoria}
                         />
                     )}
                     {tab === 'antecedentes' && (

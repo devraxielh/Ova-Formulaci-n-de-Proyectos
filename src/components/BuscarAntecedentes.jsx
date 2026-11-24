@@ -29,7 +29,7 @@ const resumenDe = (indice) => {
     return palabras.join(' ').replace(/\s+/g, ' ').trim();
 };
 
-const deOpenAlex = (w) => ({
+export const deOpenAlex = (w) => ({
     clave: w.id,
     resumen: resumenDe(w.abstract_inverted_index),
     citas: w.cited_by_count || 0,
@@ -37,7 +37,7 @@ const deOpenAlex = (w) => ({
     enlace: w.open_access?.oa_url || w.doi || '',
     abierto: Boolean(w.open_access?.is_oa),
     ref: {
-        tipo: 'articulo',
+        tipo: w.type === 'book' ? 'libro' : 'articulo',
         autores: (w.authorships || []).slice(0, 20).map((a) => invertir(a.author?.display_name)).filter(Boolean).join('; '),
         anio: String(w.publication_year || ''),
         titulo: String(w.display_name || '').replace(/<[^>]+>/g, ''),
@@ -96,6 +96,22 @@ const buscar = async ({ texto, desde, idioma, fuente = 'openalex' }) => {
     }
 };
 
+// Con DOI se piden a CrossRef los datos completos (apellidos y nombres separados, volumen, páginas).
+export const completarRef = async (item) => {
+    if (item.completo || !item.ref.doi) return item.ref;
+    try {
+        const r = await fetch(`https://api.crossref.org/works/${encodeURIComponent(item.ref.doi)}`);
+        if (!r.ok) return item.ref;
+        const mejor = desdeCrossref((await r.json()).message);
+        return { ...item.ref, ...Object.fromEntries(Object.entries(mejor).filter(([, v]) => v)) };
+    } catch {
+        return item.ref;
+    }
+};
+
+// Si la referencia ya está en la lista (mismo DOI, o mismo autor-año y comienzo del título).
+export const refYaEsta = (lista, ref) => (lista || []).some((r) => (ref.doi && r.doi && String(r.doi).toLowerCase() === ref.doi.toLowerCase()) || (claveRef(r) === claveRef(ref) && String(r.titulo || '').toLowerCase().slice(0, 40) === String(ref.titulo || '').toLowerCase().slice(0, 40)));
+
 // `usarComo`: para qué ficha se usa el artículo («antecedente», «teoría», «concepto»); `titulo`: encabezado del panel.
 const BuscarAntecedentes = ({ onUsar, sugerencia = '', usarComo = 'antecedente', titulo = 'Buscar artículos sobre tu tema' }) => {
     const { data } = useProject();
@@ -111,7 +127,7 @@ const BuscarAntecedentes = ({ onUsar, sugerencia = '', usarComo = 'antecedente',
     const [abierto, setAbierto] = useState('');
     const [usados, setUsados] = useState({});
     const lista = Array.isArray(refs) ? refs : [];
-    const yaEsta = (ref) => lista.some((r) => (ref.doi && r.doi && String(r.doi).toLowerCase() === ref.doi.toLowerCase()) || (claveRef(r) === claveRef(ref) && String(r.titulo || '').toLowerCase().slice(0, 40) === ref.titulo.toLowerCase().slice(0, 40)));
+    const yaEsta = (ref) => refYaEsta(lista, ref);
     const tema = String(sugerencia || data.tituloForm?.objeto || data.titulo || '').trim().split(/\s+/).slice(0, 8).join(' ');
 
     const enviar = async (event) => {
@@ -132,21 +148,9 @@ const BuscarAntecedentes = ({ onUsar, sugerencia = '', usarComo = 'antecedente',
         }
     };
 
-    // Con DOI se piden a CrossRef los datos completos (apellidos y nombres separados, volumen, páginas).
-    const completar = async (item) => {
-        if (item.completo || !item.ref.doi) return item.ref;
-        try {
-            const r = await fetch(`https://api.crossref.org/works/${encodeURIComponent(item.ref.doi)}`);
-            if (!r.ok) return item.ref;
-            const mejor = desdeCrossref((await r.json()).message);
-            return { ...item.ref, ...Object.fromEntries(Object.entries(mejor).filter(([, v]) => v)) };
-        } catch {
-            return item.ref;
-        }
-    };
     const agregar = async (item, usar) => {
         setUsados((p) => ({ ...p, [item.clave]: 'cargando' }));
-        const ref = await completar(item);
+        const ref = await completarRef(item);
         if (!yaEsta(ref)) setRefs((prev) => [...(Array.isArray(prev) ? prev : []), { ...ref, id: uid() }]);
         // onUsar crea la ficha y, si el artículo trae resumen, la llena con él: dice cómo quedó ('llena' o 'vacia').
         if (usar && onUsar) setUsados((p) => ({ ...p, [item.clave]: 'llenando' }));

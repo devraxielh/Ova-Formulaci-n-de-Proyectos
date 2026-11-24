@@ -22,3 +22,8 @@
 
 /* Buscador de normas: solo el campo y el botón */
 .bus-form--corta { grid-template-columns: minmax(0, 1fr) auto; }
+
+/* Sugerir teorías: cada teoría agrupa sus obras */
+.bus-teorias { max-height: 640px; }
+.bus-obra { display: grid; gap: 0.35rem; padding: 0.55rem 0.7rem; border-left: 3px solid #c7d2fe; background: #f8fafc; border-radius: 0 8px 8px 0; }
+.bus-ok--ojo { color: #b45309; }
