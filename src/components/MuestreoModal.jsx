@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, CheckCircle2, Plus, Save, Trash2, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Loader2, Plus, Save, Sparkles, Trash2, X } from 'lucide-react';
+import { groq } from '../services/api';
 import { CONFIANZAS, MUESTREOS, tamanoMuestra } from '../data/metodologia';
 import { LEYENDA_MUESTRA, ecuacionesMuestreo } from '../data/muestreoEcuaciones';
 import { MUESTREO_DETALLE, leerPoblacion, muestraAjustada, repartoEstratos } from '../data/muestreo';
@@ -33,10 +34,39 @@ const Ecuacion = ({ ec }) => (
     </div>
 );
 
+// La IA recomienda el muestreo que corresponde al proyecto, entre los ocho de la lista.
+const recomendarMuestreo = async ({ proyecto, calc }) => {
+    const t = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
+    const total = calc.finita ? (calc.definida && Number(calc.N) > 0 ? `${Number(calc.N).toLocaleString('es-CO')} (conocido)` : 'se conoce, pero aún no está escrito') : 'desconocido o infinito';
+    const r = await groq.chat.completions.create({
+        messages: [
+            { role: 'system', content: 'Eres asesor metodológico. Recomiendas el tipo de muestreo que corresponde a un proyecto de investigación según su enfoque, su tipo, su diseño, su población y lo que piden sus objetivos. Eliges solo de la lista que recibes. No inventas cifras ni datos del proyecto. Respondes solo JSON válido en español.' },
+            { role: 'user', content: `MUESTREOS POSIBLES\n${MUESTREOS.map((m) => `- ${m.id} (${m.probabilistico ? 'probabilístico' : m.id.startsWith('censo') ? 'sin muestra' : 'no probabilístico'}): ${m.def}`).join('\n')}\n\nPROYECTO\nTítulo: ${t(proyecto.titulo) || '(sin título)'}\nPregunta: ${t(proyecto.pregunta) || '(sin definir)'}\nObjetivo general: ${t(proyecto.general) || '(sin definir)'}\nEnfoque: ${proyecto.enfoque || '(sin definir)'}\nTipo de investigación: ${proyecto.tipo || '(sin definir)'}\nDiseño: ${proyecto.diseno || '(sin definir)'}\nPoblación: ${t(proyecto.poblacion) || '(sin describir)'}\nTamaño de la población: ${total}\n\nCriterios: con enfoque cualitativo corresponde un muestreo no probabilístico (intencional casi siempre; bola de nieve si la población es difícil de ubicar). Con enfoque cuantitativo que busca generalizar corresponde uno probabilístico: aleatorio simple si hay lista y la población es homogénea; estratificado si hay grupos que deben quedar representados; sistemático si hay una lista o fila ordenada; por conglomerados si solo hay lista de grupos (cursos, sedes, barrios). Si la población conocida es de menos de 100, lo indicado es el censo. Por conveniencia solo cuando el estudio es exploratorio o no hay forma de sortear. En el enfoque mixto, recomienda el de la parte principal y dilo.\n- "muestreo": copia exacta de uno de la lista.\n- "porque": dos frases (30 a 55 palabras) que expliquen por qué ese muestreo corresponde a este proyecto, nombrando su población y su enfoque. Sin punto final.\n- "alterno": copia exacta de otro muestreo de la lista que también serviría, o cadena vacía.\n- "cuando": una frase corta que diga en qué caso convendría el alterno. Sin punto final.\n\nResponde exactamente con este JSON: {"muestreo": "…", "porque": "…", "alterno": "…", "cuando": "…"}` },
+        ],
+        temperature: 0.2,
+        max_tokens: 1200,
+        response_format: { type: 'json_object' },
+    });
+    const content = r.choices?.[0]?.message?.content || '';
+    const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+    // La IA a veces agrega «muestreo …» o el tipo entre paréntesis: se reconoce por el nombre, sin tildes ni mayúsculas.
+    const plano = (v) => t(v).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const cual = (v) => {
+        const x = plano(v);
+        if (!x) return '';
+        return [...MUESTREOS].sort((a, b2) => b2.id.length - a.id.length).find((m) => { const base = plano(m.id.split(' (')[0]); return x.includes(base) || base.startsWith(x); })?.id || '';
+    };
+    const id = cual(json.muestreo);
+    const porque = t(json.porque).replace(/[.\s]+$/, '');
+    if (!id || porque.length < 40) throw new Error('vacio');
+    const alterno = cual(json.alterno);
+    return { id, porque, alterno: alterno && alterno !== id ? alterno : '', cuando: t(json.cuando).replace(/[.\s]+$/, '') };
+};
+
 const ERRORES = [0.01, 0.02, 0.03, 0.04, 0.05, 0.07, 0.1];
 
 // `calc`: { finita, N, Z, e, definida } del proyecto; `onCalc(patch)` lo guarda al instante.
-const MuestreoModal = ({ open, inicial, poblacion, calc: calcProyecto, unidad = 'persona', onCalc, onUsar, onClose }) => {
+const MuestreoModal = ({ open, inicial, poblacion, calc: calcProyecto, unidad = 'persona', proyecto, onCalc, onUsar, onSugerencia, onClose }) => {
     const ref = useRef(null);
     const [actual, setActual] = useState(inicial || MUESTREOS[0].id);
     const [estratos, setEstratos] = useState([]);
@@ -45,6 +75,20 @@ const MuestreoModal = ({ open, inicial, poblacion, calc: calcProyecto, unidad = 
     // La población se escribe como texto para aceptar «1.200», «1,200» o «1200» y poder decir qué está mal.
     const [nTexto, setNTexto] = useState('');
     const [perdidas, setPerdidas] = useState('');
+    const [pensando, setPensando] = useState('');
+    const sugerido = poblacion?.muestreoSugerido || null; // { id, porque, alterno, cuando }
+    const sugerir = async () => {
+        setPensando('pensando');
+        try {
+            const r = await recomendarMuestreo({ proyecto: proyecto || {}, calc: calcProyecto });
+            onSugerencia(r);
+            setActual(r.id);
+            setGuardado(false);
+            setPensando('');
+        } catch {
+            setPensando('fallo');
+        }
+    };
 
     useEffect(() => {
         if (!open) return;
@@ -55,6 +99,11 @@ const MuestreoModal = ({ open, inicial, poblacion, calc: calcProyecto, unidad = 
         setPerdidas(poblacion?.perdidas ? String(poblacion.perdidas) : '');
         setGuardado(false);
         // Solo al abrir: al guardar cambia el muestreo del proyecto y no debe reiniciarse la ventana.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open]);
+    // Al abrir sin muestreo elegido ni recomendación previa, se recomienda solo.
+    useEffect(() => {
+        if (open && onSugerencia && !poblacion?.muestreo && !poblacion?.muestreoSugerido) sugerir();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
     useEffect(() => {
@@ -118,10 +167,26 @@ const MuestreoModal = ({ open, inicial, poblacion, calc: calcProyecto, unidad = 
                 <div className="val-tabs" role="tablist" aria-label="Tipos de muestreo">
                     {MUESTREOS.map((x) => (
                         <button key={x.id} type="button" role="tab" aria-selected={x.id === m.id} onClick={() => cambiar(x.id)}>
-                            {poblacion?.muestreo === x.id && <CheckCircle2 size={14} aria-hidden="true" />} {x.id}
+                            {poblacion?.muestreo === x.id && <CheckCircle2 size={14} aria-hidden="true" />}{sugerido?.id === x.id && <Sparkles size={13} aria-label="Recomendado" />} {x.id}
                         </button>
                     ))}
                 </div>
+                {onSugerencia && (
+                    <div className="mue-sugerencia">
+                        <button type="button" className="ide-btn ide-btn--ghost" disabled={pensando === 'pensando'} onClick={sugerir}>
+                            {pensando === 'pensando' ? <Loader2 size={15} className="mue-gira" /> : <Sparkles size={15} />} {pensando === 'pensando' ? 'Eligiendo según tu proyecto…' : sugerido ? 'Volver a sugerir' : 'Sugerir el muestreo para mi proyecto'}
+                        </button>
+                        {pensando === 'fallo' && <span>No se pudo sugerir: inténtalo de nuevo.</span>}
+                        {pensando !== 'fallo' && !sugerido && <span>Se basa en tu enfoque, tu tipo de investigación, tu diseño y tu población.</span>}
+                        {pensando !== 'fallo' && sugerido && (
+                            <p>
+                                <strong>Recomendado: {sugerido.id}.</strong> {sugerido.porque}.
+                                {sugerido.alterno && <> También serviría el <button type="button" className="ide-link" onClick={() => cambiar(sugerido.alterno)}>{sugerido.alterno}</button>{sugerido.cuando ? ` ${/^(si|cuando|en caso)/i.test(sugerido.cuando) ? '' : 'si '}${sugerido.cuando.charAt(0).toLowerCase()}${sugerido.cuando.slice(1)}` : ''}.</>}
+                                {sugerido.id !== m.id && <> <button type="button" className="ide-link" onClick={() => cambiar(sugerido.id)}>Ver el recomendado</button></>}
+                            </p>
+                        )}
+                    </div>
+                )}
                 <div className="val-body">
                     <div className="val-col">
                         <section className="val-intro">

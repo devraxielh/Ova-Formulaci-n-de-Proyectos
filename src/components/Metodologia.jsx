@@ -783,7 +783,8 @@ const Constructor = ({ intro, onNavigate }) => {
                                 <div className="mue-elegido">
                                     {f.poblacion.muestreo
                                         ? <p><strong>{capital(f.poblacion.muestreo)}</strong> · {MUESTREOS.find((m) => m.id === f.poblacion.muestreo)?.probabilistico ? (calc.finita && !calc.definida ? 'probabilístico · falta escribir el tamaño de la población' : `probabilístico${calc.finita ? ` · población de ${Number(calc.N).toLocaleString('es-CO')}` : ''} · muestra de ${tamanoMuestra(calc)}`) : f.poblacion.muestreo.startsWith('censo') ? 'toda la población' : 'no probabilístico'}</p>
-                                        : <p>Todavía no has elegido el muestreo.</p>}
+                                        : <p>Todavía no has elegido el muestreo. Al abrir la ventana se te recomienda uno según tu proyecto.</p>}
+                                    {f.poblacion.muestreo && f.poblacion.muestreoSugerido?.id && f.poblacion.muestreoSugerido.id !== f.poblacion.muestreo && <p>Para tu proyecto se recomendó el {f.poblacion.muestreoSugerido.id}.</p>}
                                     <button type="button" className="ide-btn ide-btn--ghost" onClick={() => setVerMuestreo(true)}><BookOpenCheck size={15} /> {f.poblacion.muestreo ? 'Cambiar el muestreo o su cálculo' : 'Elegir el muestreo y calcular la muestra'}</button>
                                 </div>
                             </div>
@@ -794,6 +795,8 @@ const Constructor = ({ intro, onNavigate }) => {
                                 calc={calc}
                                 unidad={lower(clean(f.poblacion.unidad)).replace(/s$/, '') || 'persona'}
                                 onCalc={(patch) => { touch(); setCalc(patch); }}
+                                proyecto={{ titulo: estado.data.titulo, pregunta: estado.data.pregunta, general: estado.data.objetivoGeneral || partesObjetivos(estado.data.objetivos).general, enfoque, tipo, diseno, poblacion: f.poblacion.descripcion }}
+                                onSugerencia={(r) => setPob({ muestreoSugerido: r })}
                                 onUsar={(patch) => setPob(patch)}
                                 onClose={() => setVerMuestreo(false)}
                             />

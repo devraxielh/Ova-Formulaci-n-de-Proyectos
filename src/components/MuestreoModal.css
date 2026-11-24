@@ -35,3 +35,9 @@
 .mue-resultado b { font-size: 1.6rem; color: #4338ca; margin-right: 0.15rem; }
 .mue-resultado span b { font-size: 1.05rem; }
 .mue-aviso svg { vertical-align: -2px; }
+
+/* Recomendación del muestreo */
+.mue-sugerencia { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.8rem; padding: 0.6rem 1.5rem; background: #f5f7ff; border-bottom: 1px solid #e2e8f0; font-size: 0.86rem; color: #475569; }
+.mue-sugerencia p { margin: 0; flex: 1 1 22rem; line-height: 1.5; color: #334155; }
+.mue-gira { animation: mue-gira 1s linear infinite; }
+@keyframes mue-gira { to { transform: rotate(360deg); } }
