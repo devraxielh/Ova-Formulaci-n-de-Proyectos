@@ -4,6 +4,7 @@
  * tabla de contenido numerada, lista de tablas, preliminares con firmas y capítulos en página nueva.
  * Times New Roman 12, interlineado 1,5, texto justificado, márgenes de 2,5 cm y número de página arriba a la derecha.
  */
+import { estimatePageNumbers } from 'docx/layout';
 import {
     AlignmentType, BorderStyle, Document, Header, HeadingLevel, ImageRun, LineRuleType, Packer, PageBreak, PageNumber,
     Paragraph, SequentialIdentifier, ShadingType, Table, TableCell, TableOfContents, TableRow, TextRun, WidthType,
@@ -225,7 +226,9 @@ export const crearDocx = (name, author, sections, extra = {}) => {
         creator: autores.join(', ') || 'PROJECTSIA',
         title: titulo,
         description: 'Proyecto de investigación',
-        features: { updateFields: true },
+        // Los números de página de la tabla de contenido y de las listas se calculan aquí y se escriben en el archivo.
+        // Así Word abre el documento sin preguntar «¿Deseas actualizar los campos de este documento?».
+        pageNumbers: estimatePageNumbers,
         styles: {
             default: { document: { run: { font: FUENTE, size: TAM }, paragraph: { spacing: LINEA, alignment: AlignmentType.JUSTIFIED } } },
             paragraphStyles: [
