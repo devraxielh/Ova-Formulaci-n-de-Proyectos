@@ -1,3 +1,4 @@
+import Cargando from './components/Cargando';
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, Scale, Link, Compass, Library, PanelLeftClose, PanelLeftOpen, FolderOpen, UserRound, ShieldCheck, LogOut, CheckCircle2, ListOrdered, BarChart3, Flag, BookMarked, AlignLeft, FileSpreadsheet } from 'lucide-react';
 import { useProject } from './context/ProjectContext';
@@ -258,15 +259,15 @@ function App() {
 
     // Enlace público de una encuesta: /?encuesta=TOKEN (los participantes responden sin cuenta).
     if (encuestaToken) {
-        return <Suspense fallback={<p className="app-cargando" role="status">Cargando…</p>}><EncuestaPublica token={encuestaToken} /></Suspense>;
+        return <Suspense fallback={<Cargando pantalla texto="Cargando la encuesta…" />}><EncuestaPublica token={encuestaToken} /></Suspense>;
     }
 
     // La app solo se usa con sesión iniciada: sin cuenta se muestra únicamente el ingreso o el registro.
-    if (!authReady) return <p className="app-cargando" role="status">Cargando…</p>;
+    if (!authReady) return <Cargando pantalla />;
     if (!user) {
         return (
             <div className="app-acceso">
-                <Suspense fallback={<p className="app-cargando" role="status">Cargando…</p>}>
+                <Suspense fallback={<Cargando pantalla />}>
                     <Cuenta onNavigate={handleTabChange} activation={activation} resetToken={resetToken} onResetDone={() => setResetToken('')} />
                 </Suspense>
                 <p className="app-acceso-pie">© Rodrigo García,PhD</p>
@@ -580,7 +581,7 @@ function App() {
                 )}
 
                 <div className="fade-in">
-                    <Suspense fallback={<p className="app-cargando" role="status">Cargando…</p>}>
+                    <Suspense fallback={<Cargando />}>
                         {renderContent()}
                     </Suspense>
                 </div>
