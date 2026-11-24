@@ -965,8 +965,23 @@ const Constructor = ({ intro, onNavigate }) => {
                                         </select>
                                     </label>
                                     {it.nota && <p className="mar-wide met-nota-fila"><Sparkles size={13} aria-hidden="true" /> Sugerido porque {it.nota}.</p>}
+                                    {(() => {
+                                        const armado = s.armados.find((a) => a && it.id && a.filaId === it.id);
+                                        const n = armado ? preguntasDe(armado).length : 0;
+                                        return (
+                                            <div className="mar-wide met-armar" data-listo={n > 0}>
+                                                <span><b className="met-paso">1. Arma el instrumento</b>{n > 0
+                                                    ? <><CheckCircle2 size={16} aria-hidden="true" /> <b>{armado.titulo || 'Instrumento'}</b> · {n} {n === 1 ? 'pregunta' : 'preguntas'}</>
+                                                    : <>Aún no has armado este instrumento: sus preguntas, sus escalas y su versión para aplicar en línea.</>}</span>
+                                                <button type="button" className="ide-btn ide-btn--primary" onClick={() => abrirArmado(it, i)}>
+                                                    <ClipboardList size={16} aria-hidden="true" /> {n > 0 ? 'Editar el instrumento' : 'Arma el instrumento completo'}
+                                                </button>
+                                            </div>
+                                        );
+                                    })()}
                                     <div className="mar-campo mar-wide met-val">
-                                        <span>Validez y confiabilidad (puedes elegir varios)</span>
+                                        <span><b className="met-paso">2. Validez y confiabilidad</b> (puedes elegir varios)</span>
+                                        {!s.armados.some((a) => a && it.id && a.filaId === it.id && preguntasDe(a).length > 0) && <small className="ide-field-hint">Arma primero el instrumento (paso 1): la validación se hace sobre sus preguntas.</small>}
                                         <div className="met-val-chips" role="group" aria-label={`Métodos de validación del instrumento ${i + 1}`}>
                                             {VALIDACION_DETALLE.map((v) => {
                                                 const on = validacionesDe(it).includes(v.id);
@@ -992,20 +1007,6 @@ const Constructor = ({ intro, onNavigate }) => {
                                             <BookOpenCheck size={14} aria-hidden="true" /> ¿Cómo se hace? Paso a paso, ejemplo y calculadora
                                         </button>
                                     </div>
-                                    {(() => {
-                                        const armado = s.armados.find((a) => a && it.id && a.filaId === it.id);
-                                        const n = armado ? preguntasDe(armado).length : 0;
-                                        return (
-                                            <div className="mar-wide met-armar" data-listo={n > 0}>
-                                                <span>{n > 0
-                                                    ? <><CheckCircle2 size={16} aria-hidden="true" /> <b>{armado.titulo || 'Instrumento'}</b> · {n} {n === 1 ? 'pregunta' : 'preguntas'}</>
-                                                    : <>Aún no has armado este instrumento: sus preguntas, sus escalas y su versión para aplicar en línea.</>}</span>
-                                                <button type="button" className="ide-btn ide-btn--primary" onClick={() => abrirArmado(it, i)}>
-                                                    <ClipboardList size={16} aria-hidden="true" /> {n > 0 ? 'Editar el instrumento' : 'Arma el instrumento completo'}
-                                                </button>
-                                            </div>
-                                        );
-                                    })()}
                                     {f.instrumentos.length > 1 && <button type="button" className="ide-link" onClick={() => { touch(); update({ instrumentos: f.instrumentos.filter((_, k) => k !== i) }); }}><Trash2 size={13} /> Quitar</button>}
                                 </div>
                             ))}
