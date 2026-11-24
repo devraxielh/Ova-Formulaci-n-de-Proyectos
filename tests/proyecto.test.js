@@ -216,3 +216,19 @@ test('la fila de instrumentos se redacta con el instrumento armado que tiene aso
     assert.ok(!dos.includes('Consta de')); // la fila sin instrumento armado se redacta igual que antes
     assert.equal(redactarInstrumentos(filas), redactarInstrumentos(filas, [])); // sin instrumentos armados no cambia nada
 });
+
+test('validez y confiabilidad: sin cálculo el documento deja dicho que falta; con cálculo, no', async () => {
+    const { redactarInstrumentos, estadoValidacion } = await import('../src/data/metodologia.js');
+    const fila = { id: 'f1', tecnica: 'Encuesta', instrumento: 'cuestionario', aplicaA: 'los pacientes', validaciones: ['prueba piloto', 'juicio de expertos'] };
+    assert.deepEqual(estadoValidacion(fila).map((v) => [v.titulo, v.hecho]), [['Prueba piloto', false], ['Juicio de expertos', false]]);
+    const sin = redactarInstrumentos([fila]);
+    assert.equal((sin.match(/\[Falta: registra en la calculadora/g) || []).length, 2);
+    assert.ok(sin.includes('los resultados de prueba piloto de el cuestionario') || sin.includes('los resultados de prueba piloto del cuestionario'));
+
+    const conPiloto = { ...fila, validacionDatos: { 'prueba piloto': { participantes: 15, tiempo: 12 } } };
+    assert.deepEqual(estadoValidacion(conPiloto).map((v) => v.hecho), [true, false]);
+    const con = redactarInstrumentos([conPiloto]);
+    assert.equal((con.match(/\[Falta:/g) || []).length, 1); // solo queda pendiente el juicio de expertos
+    assert.ok(con.includes('prueba piloto con 15 personas'));
+    assert.deepEqual(estadoValidacion({ instrumento: 'guía' }), []); // sin métodos elegidos no hay nada pendiente
+});

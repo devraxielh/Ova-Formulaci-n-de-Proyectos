@@ -174,6 +174,12 @@ export const fraseArmado = (armado) => {
 };
 
 // `armados` = instrumentos completos (data.instrumentosGen); cada uno se asocia a su fila por `filaId`.
+// Métodos de validez elegidos para un instrumento y si ya tienen su cálculo: [{ id, titulo, hecho }].
+export const estadoValidacion = (it) => validacionesDe(it).map((id) => {
+    const v = VALIDACION_DETALLE.find((x) => x.id === id);
+    return { id, titulo: v?.titulo || id, hecho: Boolean(parrafoConDatos(id, conArticuloInstr(it.instrumento), it.validacionDatos?.[id])) };
+});
+
 export const redactarInstrumentos = (items, armados = []) => {
     const armadoDe = (it) => (Array.isArray(armados) ? armados : []).find((a) => a && it.id && a.filaId === it.id);
     const validos = items.filter((it) => clean(it.tecnica) && clean(it.instrumento));
@@ -192,7 +198,8 @@ export const redactarInstrumentos = (items, armados = []) => {
         // Con datos de la calculadora: un párrafo por instrumento con sus valores; sin datos: el párrafo modelo.
         const conDatos = usan.map((it) => parrafoConDatos(v.id, conArticuloInstr(it.instrumento), it.validacionDatos?.[v.id])).filter(Boolean);
         const sinDatos = usan.filter((it) => !parrafoConDatos(v.id, conArticuloInstr(it.instrumento), it.validacionDatos?.[v.id]));
-        const modelo = sinDatos.length ? [v.parrafo(listaY(sinDatos.map((it) => conArticuloInstr(it.instrumento))), sinDatos.length > 1)] : [];
+        // Sin resultados registrados: queda el párrafo modelo y, entre corchetes, la advertencia de que falta hacerlo.
+        const modelo = sinDatos.length ? [`${v.parrafo(listaY(sinDatos.map((it) => conArticuloInstr(it.instrumento))), sinDatos.length > 1)} [Falta: registra en la calculadora los resultados de ${lower(v.titulo)} de ${listaY(sinDatos.map((it) => conArticuloInstr(it.instrumento)))}.]`] : [];
         return [...conDatos, ...modelo].map(contraer);
     });
     return `${lista}\n\n### Validez y confiabilidad\n${parrafos.join('\n\n')}`;

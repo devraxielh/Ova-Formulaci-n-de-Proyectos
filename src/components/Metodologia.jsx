@@ -11,7 +11,7 @@ import { partesObjetivos } from '../services/coherencia';
 import { TIPO_ALCANCE } from '../data/ejemplos';
 import {
     CATEGORIAS, CONFIANZAS, DISENOS, ENFOQUES, FASES, FUENTES, MUESTREOS, SOFTWARE, TECNICAS, TECNICAS_ANALISIS, TIPOS, VALIDACIONES,
-    periodoLabel, redactarAnalisis, validacionesDe, redactarDiseno, redactarEnfoque, redactarInstrumentos, redactarPoblacion, redactarTipo, tamanoMuestra,
+    periodoLabel, redactarAnalisis, estadoValidacion, validacionesDe, redactarDiseno, redactarEnfoque, redactarInstrumentos, redactarPoblacion, redactarTipo, tamanoMuestra,
 } from '../data/metodologia';
 import { SECTIONS, SLIDES } from '../data/metodologiaClase';
 import Instrumentos from './Instrumentos';
@@ -310,6 +310,8 @@ const Constructor = ({ intro, onNavigate }) => {
         const actual = validacionesDe(f.instrumentos[index]);
         const next = actual.includes(id) ? actual.filter((x) => x !== id) : [...actual, id];
         setFila('instrumentos', f.instrumentos, index, { validaciones: next, validez: next[0] || '' });
+        // Al elegir un método se abre de una vez su calculadora: sin resultados, el documento deja dicho que falta.
+        if (!actual.includes(id)) setModal({ index, metodo: id, calculadora: true });
     };
 
     return (
@@ -447,6 +449,17 @@ const Constructor = ({ intro, onNavigate }) => {
                                                 );
                                             })}
                                         </div>
+                                        {estadoValidacion(it).length > 0 && (
+                                            <ul className="met-val-estado">
+                                                {estadoValidacion(it).map((v) => (
+                                                    <li key={v.id} data-hecho={v.hecho}>
+                                                        {v.hecho ? <CheckCircle2 size={15} aria-hidden="true" /> : <AlertTriangle size={15} aria-hidden="true" />}
+                                                        <span><b>{v.titulo}:</b> {v.hecho ? 'cálculo registrado; ya está en tu documento.' : 'falta hacer el cálculo. Mientras tanto, tu documento dice que está pendiente.'}</span>
+                                                        <button type="button" className="ide-link" onClick={() => setModal({ index: i, metodo: v.id, calculadora: true })}><Calculator size={13} aria-hidden="true" /> {v.hecho ? 'Ver o cambiar' : 'Hacer el cálculo'}</button>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
                                         <button type="button" className="ide-link" onClick={() => setModal({ index: i, metodo: validacionesDe(it)[0] || VALIDACION_DETALLE[0].id })}>
                                             <BookOpenCheck size={14} aria-hidden="true" /> ¿Cómo se hace? Paso a paso, ejemplo y calculadora
                                         </button>
@@ -542,6 +555,7 @@ const Constructor = ({ intro, onNavigate }) => {
             <ValidacionModal
                 open={Boolean(modal)}
                 inicial={modal?.metodo}
+                enCalculadora={Boolean(modal?.calculadora)}
                 instrumento={modal ? clean(f.instrumentos[modal.index]?.instrumento) : ''}
                 seleccionados={modal ? validacionesDe(f.instrumentos[modal.index]) : []}
                 onToggle={(id) => modal && toggleValidacion(modal.index, id)}
@@ -582,6 +596,7 @@ const checkMetodologia = (s) => {
         { id: 'analisis', ok: especificos.length > 0 && f.analisis.filter((x) => clean(x.tecnica)).length >= especificos.length, label: 'Hay un análisis para cada objetivo específico', detail: `Tienes ${especificos.length} específicos y ${f.analisis.filter((x) => clean(x.tecnica)).length} con técnica de análisis.` },
         { id: 'instrumentos', ok: f.instrumentos.some((x) => clean(x.instrumento) && clean(x.aplicaA)), label: 'Define los instrumentos y a quién se aplican', detail: 'Para cada técnica, el instrumento y a quiénes se aplica.' },
         { id: 'validez', ok: f.instrumentos.every((x) => !clean(x.instrumento) || validacionesDe(x).length > 0), label: 'Asegura la validez de los instrumentos', detail: 'Juicio de expertos, prueba piloto, alfa de Cronbach o un instrumento ya validado.' },
+        { id: 'validez-calculo', ok: f.instrumentos.every((x) => estadoValidacion(x).every((v) => v.hecho)), label: 'Registra los resultados de validez y confiabilidad', detail: `Falta el cálculo de: ${f.instrumentos.flatMap((x) => estadoValidacion(x).filter((v) => !v.hecho).map((v) => `${v.titulo.toLowerCase()} (${clean(x.instrumento) || 'instrumento'})`)).join('; ') || '—'}. Hazlo en Instrumentos › «Hacer el cálculo».` },
         { id: 'cronograma', ok: actividades.length >= 5 && FASES.every((fase) => fasesUsadas.has(fase)), label: 'El cronograma cubre todas las fases', detail: `Tiene ${actividades.length} actividades; incluye preparación, recolección, análisis e informe.` },
         { id: 'presupuesto', ok: presupuesto.length >= 3 && total > 0, label: 'El presupuesto tiene al menos tres rubros', detail: `Tiene ${presupuesto.length} rubros por ${money(total)}.` },
         { id: 'textos', ok: Object.values(partes).filter((x) => clean(x)).length >= 6, label: 'Todos los subtítulos tienen texto', detail: 'Completa enfoque, tipo, diseño, población, plan de análisis e instrumentos.' },

@@ -17,7 +17,7 @@ const contraer = (text) => text.replace(/\bde el\b/g, 'del').replace(/\ba el\b/g
  * - datos / onGuardar: si existen, la calculadora se guarda en el instrumento.
  * - seleccionados / onToggle: agregar o quitar el método del instrumento.
  */
-const ValidacionModal = ({ open, inicial, instrumento, seleccionados = [], onToggle, datos = {}, onGuardar, onClose }) => {
+const ValidacionModal = ({ open, inicial, instrumento, seleccionados = [], onToggle, datos = {}, onGuardar, onClose, enCalculadora = false }) => {
     const ref = useRef(null);
     const [actual, setActual] = useState(inicial || VALIDACION_DETALLE[0].id);
     const [borrador, setBorrador] = useState(datos || {});
@@ -35,6 +35,8 @@ const ValidacionModal = ({ open, inicial, instrumento, seleccionados = [], onTog
         const dialog = ref.current;
         if (!dialog) return;
         if (open && !dialog.open) dialog.showModal();
+        // Al elegir un método en la fila, la ventana abre directo en su calculadora.
+        if (open && enCalculadora) window.setTimeout(() => dialog.querySelector('.val-calc')?.scrollIntoView({ block: 'start' }), 60);
         if (!open && dialog.open) dialog.close();
     }, [open]);
 

@@ -80,3 +80,9 @@
 .met-armar-cuerpo h2 { font-size: 1.15rem; line-height: 1.3; margin: 0 0 0.4rem; }
 .met-armar-cuerpo h3 { font-size: 1rem; margin: 0 0 0.3rem; }
 .met-armar-cuerpo .pro-card p { margin: 0; }
+
+/* Estado de cada método de validez elegido: calculado o pendiente */
+.met-val-estado { list-style: none; margin: 0.5rem 0; padding: 0; display: grid; gap: 0.35rem; }
+.met-val-estado li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; padding: 0.45rem 0.65rem; border-radius: 8px; background: #fef3c7; color: #78350f; font-size: 0.86rem; }
+.met-val-estado li[data-hecho='true'] { background: #dcfce7; color: #14532d; }
+.met-val-estado li span { flex: 1 1 240px; }
