@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Plus, Target, Trash2, Wand2, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, GitFork, Loader2, Plus, Sparkles, Target, Trash2, Wand2, XCircle } from 'lucide-react';
+import { groq } from '../services/api';
+import { arbolCompleto, leerArbolObjetivos } from '../services/arbol';
 import SlideDeck, { Opciones, Pestanas } from './deck/SlideDeck';
 import { useProjectField } from '../context/ProjectContext';
 import { useAutoGuardar } from '../hooks/useAutoGuardar';
@@ -280,6 +282,9 @@ const useObjetivosState = () => {
     const [pregunta] = useProjectField('pregunta', '');
     const [tituloForm] = useProjectField('tituloForm', null);
     const [idea] = useProjectField('idea', null);
+    const [arbolGuardado] = useProjectField('arbolObjetivos', null);
+    // Árbol de objetivos armado en su página: de su centro sale el general y de sus medios, los específicos.
+    const arbol = leerArbolObjetivos({ arbolObjetivos: arbolGuardado });
     const f = { ...OBJ_FORM, ...(form || {}) };
     if (!Array.isArray(f.especificos) || f.especificos.length === 0) f.especificos = ['', '', ''];
     const update = (patch) => setForm((prev) => ({ ...OBJ_FORM, ...(prev || {}), ...patch }));
@@ -287,6 +292,7 @@ const useObjetivosState = () => {
     const t = tituloForm || {};
     return {
         f, update, objetivos, setObjetivos, setObjetivoGeneral, titulo, pregunta, idea: i,
+        arbol: arbol.propio && arbolCompleto(arbol) ? arbol : null,
         quien: clean(t.quien || i.quien), donde: clean(t.donde || i.donde),
     };
 };
@@ -333,8 +339,8 @@ const Verbos = ({ value, sugeridos = [], excluir = '', onPick }) => {
     );
 };
 
-const Constructor = ({ intro }) => {
-    const { f, update, setObjetivos, setObjetivoGeneral, titulo, idea, quien, donde } = useObjetivosState();
+const Constructor = ({ intro, onNavigate }) => {
+    const { f, update, setObjetivos, setObjetivoGeneral, titulo, idea, quien, donde, arbol } = useObjetivosState();
     const [saved, setSaved] = useState(false);
     const [active, setActive] = useState('general');
     const prefilled = useRef(false);
@@ -378,6 +384,42 @@ const Constructor = ({ intro }) => {
     const loadSuggestions = () => {
         touch();
         update({ especificos: list.map((item, index) => item.trim() || sugeridos[index] || '') });
+    };
+    // Específicos desde el árbol de objetivos: la IA convierte cada medio en un objetivo (verbo en infinitivo),
+    // ordenados de lo simple a lo complejo. Solo llena las cajas vacías: lo que el estudiante ya escribió no se toca.
+    const [pensando, setPensando] = useState(false);
+    const [errorArbol, setErrorArbol] = useState('');
+    const vacios = list.filter((item) => !item.trim()).length;
+    const desdeArbol = async () => {
+        if (!arbol) return;
+        setErrorArbol('');
+        setPensando(true);
+        try {
+            const cuantos = Math.min(4, Math.max(list.length, Math.min(arbol.causas.length, 4)));
+            const r = await groq.chat.completions.create({
+                messages: [
+                    { role: 'system', content: 'Ayudas a un estudiante a redactar los objetivos específicos de su proyecto de investigación a partir de su árbol de objetivos. Cada objetivo específico sale de un medio del árbol. No agregas ideas que no estén en el árbol, ni cifras, ni autores. Respondes solo JSON válido en español.' },
+                    { role: 'user', content: `Objetivo general: ${f.general.trim() || arbol.problema}\nObjetivo central del árbol: ${arbol.problema}\nMedios del árbol:\n${arbol.causas.map((m, i) => `${i + 1}. ${m}`).join('\n')}\nPoblación: ${quien || '(la del objetivo general)'}\nLugar: ${donde || '(el del objetivo general)'}\n\nRedacta exactamente ${cuantos} objetivos específicos:\n- Cada uno empieza con un verbo en infinitivo y dice qué se hará y sobre qué, en máximo 22 palabras.\n- Cada uno responde a un medio del árbol${arbol.causas.length > cuantos ? ' (agrupa los medios parecidos)' : ''}.\n- Van ordenados de lo simple a lo complejo, como peldaños: primero conocer o describir (Identificar, Caracterizar, Describir), luego analizar o determinar, y al final proponer o diseñar si aplica.\n- No repitas el verbo del objetivo general ni uses dos veces el mismo verbo.\n- Son pasos para lograr el objetivo general, no beneficios ni fines.\nSin punto final y sin numeración.\n\nResponde exactamente con este JSON: {"especificos": ["…"]}` },
+                ],
+                temperature: 0.3,
+                max_tokens: 700,
+                response_format: { type: 'json_object' },
+            });
+            const content = r.choices?.[0]?.message?.content || '';
+            const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+            const propuestos = (Array.isArray(json.especificos) ? json.especificos : []).map((x) => String(x ?? '').replace(/\s+/g, ' ').replace(/[.\s]+$/, '').trim()).filter(Boolean).slice(0, 4);
+            if (!propuestos.length) throw new Error('La IA no devolvió objetivos. Inténtalo de nuevo.');
+            touch();
+            // Se respetan los ya escritos, en su lugar; las propuestas ocupan las cajas vacías, en orden.
+            const base = [...list, ...Array(Math.max(0, propuestos.length - list.length)).fill('')];
+            const escritos = new Set(base.map((x) => x.trim().toLowerCase()).filter(Boolean));
+            const libres = propuestos.filter((x) => !escritos.has(x.toLowerCase()));
+            update({ especificos: base.map((item) => (item.trim() ? item : libres.shift() || '')) });
+        } catch (err) {
+            setErrorArbol(err.message || 'No se pudieron proponer los objetivos.');
+        } finally {
+            setPensando(false);
+        }
     };
     const save = () => {
         if (!text) return;
@@ -423,15 +465,34 @@ const Constructor = ({ intro }) => {
                             onFocus={() => setActive('general')}
                             placeholder={`Ej: ${desdeTitulo || 'Determinar los factores asociados a la inasistencia a citas médicas en los pacientes de consulta externa de un hospital de Sincelejo'}`}
                         />
-                        <Verbos value={f.general} sugeridos={nivelDe(f.general) ? [] : NIVELES.map((grupo) => grupo.nivel)} onPick={(verb) => putVerb('general', verb)} />
-                        <small className="ide-field-hint">
-                            Tu título con el verbo en infinitivo. Responde tu pregunta completa.
-                        </small>
                         <Warnings value={f.general} />
                         {desdeTitulo && f.general.trim() !== desdeTitulo && (
                             <button type="button" className="ide-link" onClick={() => { touch(); update({ general: desdeTitulo }); }}>Usar el de mi título: «{desdeTitulo}»</button>
                         )}
                     </div>
+
+                    {/* El árbol de objetivos a la vista: de aquí salen el general y los específicos. */}
+                    {arbol ? (
+                        <div className="obj-arbol">
+                            <b><GitFork size={15} aria-hidden="true" /> Tu árbol de objetivos</b>
+                            <p><span>Objetivo central</span>{arbol.problema}</p>
+                            <p><span>Medios · de aquí salen tus específicos</span>{arbol.causas.join(' · ')}</p>
+                            <div className="obj-arbol-acciones">
+                                <button type="button" className="ide-btn ide-btn--ghost" onClick={desdeArbol} disabled={pensando || vacios === 0}>
+                                    {pensando ? <Loader2 size={15} className="obj-gira" /> : <Sparkles size={15} />} {pensando ? 'Redactando…' : 'Sacar los específicos de mis medios'}
+                                </button>
+                                {f.general.trim() !== arbol.problema && (
+                                    <button type="button" className="ide-link" onClick={() => { touch(); update({ general: arbol.problema }); }}>Usar el objetivo central como objetivo general</button>
+                                )}
+                            </div>
+                            <small>{vacios === 0 ? 'Todas las cajas tienen texto: borra un específico para volver a llenarlo desde el árbol.' : 'Llena solo las cajas vacías; lo que ya escribiste no se toca. Revisa la redacción: son un punto de partida.'}</small>
+                            {errorArbol && <small className="obj-warn"><AlertTriangle size={14} aria-hidden="true" /> {errorArbol}</small>}
+                        </div>
+                    ) : onNavigate && (
+                        <p className="obj-arbol obj-arbol--falta">
+                            Tus objetivos salen de tu árbol de objetivos: el centro es el general y cada medio, un específico. <button type="button" className="ide-link" onClick={() => onNavigate('arbolobjetivos')}>Armar mi árbol de objetivos</button>
+                        </p>
+                    )}
 
                     <div className="obj-esp-head">
                         <h3>Objetivos específicos</h3>
@@ -770,10 +831,11 @@ const Objetivos = ({ onNavigate }) => {
         ),
         construye: (
             <Constructor
+                onNavigate={onNavigate}
                 intro={(
                     <>
                         {heading}
-                        <p>Tu objetivo general ya viene de tu título. Escribe los específicos como peldaños de una escalera: cada uno trae los verbos de su paso; toca uno para usarlo.</p>
+                        <p>Tu objetivo general ya viene de tu título y tus específicos salen de los medios de tu árbol de objetivos. Escríbelos como peldaños de una escalera: cada uno trae los verbos de su paso; toca uno para usarlo.</p>
                     </>
                 )}
             />

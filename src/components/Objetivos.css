@@ -135,3 +135,14 @@
 .obj-level-group > summary small { color: #64748b; font-size: 0.78rem; }
 .obj-level-group[data-sugerido] > summary small { color: #4338ca; font-weight: 600; }
 .obj-level-group > .obj-verbs { padding: 0 0.6rem 0.55rem; }
+
+/* El árbol de objetivos dentro del constructor de objetivos */
+.obj-arbol { display: grid; gap: 0.4rem; padding: 0.75rem 0.9rem; border: 1px solid #c7d2fe; border-radius: 0.8rem; background: #eef2ff; }
+.obj-arbol > b { display: flex; align-items: center; gap: 0.4rem; color: #3730a3; font-size: 0.92rem; }
+.ide-slide .obj-arbol p, .obj-arbol p { margin: 0; max-width: none; font-size: 0.9rem; line-height: 1.45; color: #1e293b; }
+.obj-arbol p span { display: block; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; }
+.obj-arbol-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.9rem; margin-top: 0.15rem; }
+.obj-arbol small { color: #64748b; font-size: 0.82rem; }
+.ide-slide p.obj-arbol--falta, .obj-arbol--falta { display: block; margin: 0; max-width: none; font-size: 0.9rem; color: #92400e; background: #fffbeb; border-color: #fde68a; }
+.obj-gira { animation: obj-gira 0.9s linear infinite; }
+@keyframes obj-gira { to { transform: rotate(360deg); } }
