@@ -235,8 +235,8 @@ const PIDE = {
     },
     norma: {
         que: 'fichar una norma o sentencia para el marco legal',
-        campos: `- "establece": qué establece o decide la norma o sentencia en lo que toca al proyecto del estudiante, según el extracto. Una o dos frases que empiecen en minúscula y puedan seguir a «La Ley X establece…». Ejemplo solo de forma: «el derecho de los usuarios a recibir información clara sobre el servicio». Cadena vacía si el extracto no trata nada relacionado con el proyecto.
-- "relacion": por qué se relaciona con el proyecto del estudiante. Una frase que empiece en minúscula y pueda seguir a «Se relaciona con el estudio porque…». Ejemplo solo de forma: «regula la actividad que este estudio analiza».`,
+        campos: `- "establece": qué establece o decide la norma o sentencia, según el extracto y su título. Una o dos frases que empiecen en minúscula y puedan seguir a «La Ley X establece…». Prefiere lo que más toque al proyecto del estudiante; si el extracto no lo toca, resume de qué trata la norma. Este campo SIEMPRE va lleno. Ejemplo solo de forma: «el derecho de los usuarios a recibir información clara sobre el servicio».
+- "relacion": por qué se relaciona con el proyecto del estudiante: qué aspecto de su problema, su población o su actividad regula o protege. Una frase que empiece en minúscula y pueda seguir a «Se relaciona con el estudio porque…» (no repitas esas palabras). Este campo SIEMPRE va lleno; si la relación es indirecta, dilo así («regula de forma general…»). Ejemplo solo de forma: «regula la actividad que este estudio analiza».`,
         json: '{"establece": "…", "relacion": "…"}',
     },
     concepto: {
@@ -267,7 +267,8 @@ const fichaDesdeResumen = async ({ tipo = 'antecedente', ref, resumen, proyecto 
     const rel = (v) => t(v).replace(/^(?:se relaciona con (?:el|este) (?:estudio|proyecto)|este antecedente se relaciona con[^,]*?)\s+(?:porque|ya que|pues)\s+/i, '');
     if (tipo === 'teoria') return { nombre: t(json.nombre, 160), postulado: t(json.postulado), relacion: rel(json.relacion), autor: t(json.autor, 120), anio: (String(json.anio ?? '').match(/\b(1[5-9]|20)\d{2}\b/) || [''])[0] };
     if (tipo === 'concepto') return { termino: t(json.termino, 120), definicion: t(json.definicion) };
-    if (tipo === 'norma') return { establece: t(json.establece), relacion: rel(json.relacion) };
+    // El texto final ya dice «La Ley X establece…»: si la IA empieza con «establece», se quita para no repetirlo.
+    if (tipo === 'norma') return { establece: t(json.establece).replace(/^(?:establece|dispone|decide|señala)(?:\s+que)?\s+/i, ''), relacion: rel(json.relacion) };
     return { objetivo: t(json.objetivo), hallazgo: t(json.hallazgo), relacion: rel(json.relacion), lugar: t(json.lugar, 120), ambito: AMBITOS.includes(json.ambito) ? json.ambito : '' };
 };
 
@@ -348,9 +349,14 @@ const Constructor = ({ intro, onNavigate }) => {
         const actuales = f[cfg.lista];
         const libre = actuales.findIndex((x) => cfg.campos.every((k) => !clean(x[k])) && !clean(x.autor));
         set(cfg.lista)(libre >= 0 ? actuales.map((x, i) => (i === libre ? ficha : x)) : [...actuales, ficha].slice(0, cfg.max));
-        if (clean(resumen).length < 80) return 'vacia';
+        if (clean(resumen).length < (cfg.tipo === 'norma' ? 20 : 80)) return 'vacia';
         try {
-            const datos = await fichaDesdeResumen({ tipo: cfg.tipo, ref, resumen, proyecto: { titulo, problema: clean(idea.problema), quien, donde } });
+            let datos = await fichaDesdeResumen({ tipo: cfg.tipo, ref, resumen, proyecto: { titulo, problema: clean(idea.problema), quien, donde } });
+            // En las normas los dos campos deben quedar llenos: si la IA dejó alguno vacío, se le pide una vez más.
+            if (cfg.tipo === 'norma' && (!datos.establece || !datos.relacion)) {
+                const otra = await fichaDesdeResumen({ tipo: cfg.tipo, ref, resumen, proyecto: { titulo, problema: clean(idea.problema), quien, donde } }).catch(() => ({}));
+                datos = { establece: datos.establece || otra.establece || '', relacion: datos.relacion || otra.relacion || '' };
+            }
             if (!cfg.campos.slice(0, 2).some((k) => datos[k])) return 'vacia';
             setForm((prev) => {
                 const base = { ...MARCO_FORM, ...(prev || {}) };
