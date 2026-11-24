@@ -13,6 +13,7 @@ import './Planteamiento.css';
 import './Objetivos.css';
 import './Justificacion.css';
 import BuscarAntecedentes from './BuscarAntecedentes';
+import BuscarNormas from './BuscarNormas';
 import { autorCita } from '../services/apa';
 import { groq } from '../services/api';
 import './Marco.css';
@@ -42,7 +43,7 @@ const APARTADOS = [
 ];
 
 const AMBITOS = ['Internacional', 'Nacional', 'Regional o local'];
-const TIPOS_NORMA = ['Constitución Política', 'Ley', 'Decreto', 'Resolución', 'Acuerdo u ordenanza', 'Norma institucional'];
+const TIPOS_NORMA = ['Constitución Política', 'Ley', 'Decreto', 'Resolución', 'Acuerdo u ordenanza', 'Sentencia', 'Norma institucional'];
 
 const VACIO = {
     antecedente: { autor: '', anio: '', titulo: '', ambito: 'Nacional', lugar: '', objetivo: '', hallazgo: '', relacion: '' },
@@ -101,6 +102,7 @@ const nombreNorma = (n) => {
         case 'Decreto': return `El Decreto ${num}${anio}`;
         case 'Resolución': return `La Resolución ${num}${anio}`;
         case 'Acuerdo u ordenanza': return `El acuerdo ${num}${anio}`;
+        case 'Sentencia': return `La Sentencia ${num}${anio}`;
         default: return `${capital(num)}${anio}`;
     }
 };
@@ -172,6 +174,22 @@ const checkMarco = (text, { quien, donde }) => {
 
 /* ---------- Constructor ---------- */
 
+// «Ley 1751 de 2015», «Decreto 780 de 2016», «T-265 de 2020»… → tipo, número y año de la ficha de norma.
+const normaDeCita = (cita, anio) => {
+    const c = String(cita || '');
+    const y = (c.match(/\bde\s+((?:19|20)\d{2})\b/) || [])[1] || (anio ? String(anio) : '');
+    const ley = c.match(/\b(Ley|Decreto|Resoluci[oó]n|Acuerdo|Ordenanza)\s+(?:Estatutaria\s+|Ley\s+)?(?:N[°ºo.]*\s*)?(\d[\d.]*)/i);
+    if (ley) {
+        const t = ley[1].toLowerCase();
+        return { tipo: t === 'ley' ? 'Ley' : t === 'decreto' ? 'Decreto' : t.startsWith('resol') ? 'Resolución' : 'Acuerdo u ordenanza', numero: ley[2].replace(/\./g, ''), anio: y };
+    }
+    const sentencia = c.match(/\b((?:SU|[CTA])-?\s?\d+[A-Z]?)(?:\s+de\s+|\/)(\d{2,4})\b/i);
+    if (sentencia) return { tipo: 'Sentencia', numero: sentencia[1].toUpperCase().replace(/\s/g, ''), anio: y || (sentencia[2].length === 2 ? `20${sentencia[2]}` : sentencia[2]) };
+    if (/constituci[oó]n pol[ií]tica/i.test(c)) return { tipo: 'Constitución Política', numero: '', anio: '' };
+    // Sentencias de otras cortes: se identifican por su radicado.
+    return { tipo: 'Sentencia', numero: c.replace(/^.*?-\s*SENTENCIA\s*-\s*/i, '').slice(0, 80), anio: y };
+};
+
 // Qué ficha se arma en cada apartado que tiene búsqueda, y qué se le pide a la IA que saque del resumen.
 const FICHA_DE = {
     antecedentes: {
@@ -183,6 +201,11 @@ const FICHA_DE = {
         tipo: 'teoria', nombre: 'teoría', buscar: 'Buscar teorías y modelos en artículos', lista: 'teorias', max: 5,
         campos: ['nombre', 'postulado'], reemplaza: ['autor', 'anio'],
         base: (ref) => ({ ...VACIO.teoria, autor: autorCita(ref), anio: ref.anio }),
+    },
+    legal: {
+        tipo: 'norma', nombre: 'norma', lista: 'normas', max: 10,
+        campos: ['numero', 'establece'],
+        base: (ref) => ({ ...VACIO.norma, ...normaDeCita(ref.cita, ref.anio) }),
     },
     conceptual: {
         tipo: 'concepto', nombre: 'concepto', buscar: 'Buscar definiciones en artículos', lista: 'conceptos', max: 12,
@@ -210,6 +233,12 @@ const PIDE = {
 - "anio": el año original de la teoría SOLO si el resumen lo menciona; si no, cadena vacía.`,
         json: '{"nombre": "…", "postulado": "…", "relacion": "…", "autor": "…", "anio": "…"}',
     },
+    norma: {
+        que: 'fichar una norma o sentencia para el marco legal',
+        campos: `- "establece": qué establece o decide la norma o sentencia en lo que toca al proyecto del estudiante, según el extracto. Una o dos frases que empiecen en minúscula y puedan seguir a «La Ley X establece…». Ejemplo solo de forma: «el derecho de los usuarios a recibir información clara sobre el servicio». Cadena vacía si el extracto no trata nada relacionado con el proyecto.
+- "relacion": por qué se relaciona con el proyecto del estudiante. Una frase que empiece en minúscula y pueda seguir a «Se relaciona con el estudio porque…». Ejemplo solo de forma: «regula la actividad que este estudio analiza».`,
+        json: '{"establece": "…", "relacion": "…"}',
+    },
     concepto: {
         que: 'fichar la definición de un concepto clave',
         campos: `- "termino": el concepto o variable principal que el artículo define o estudia y que más se relaciona con el proyecto del estudiante. De una a cinco palabras, con mayúscula inicial. Ejemplo solo de forma: «Deserción estudiantil».
@@ -234,9 +263,12 @@ const fichaDesdeResumen = async ({ tipo = 'antecedente', ref, resumen, proyecto 
     const content = r.choices?.[0]?.message?.content || '';
     const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
     const t = (v, max = 600) => clean(String(v ?? '')).replace(/[.\s]+$/, '').slice(0, max);
-    if (tipo === 'teoria') return { nombre: t(json.nombre, 160), postulado: t(json.postulado), relacion: t(json.relacion), autor: t(json.autor, 120), anio: (String(json.anio ?? '').match(/\b(1[5-9]|20)\d{2}\b/) || [''])[0] };
+    // El texto final ya antepone «se relaciona con el estudio porque…»: si la IA lo repite, se quita.
+    const rel = (v) => t(v).replace(/^(?:se relaciona con (?:el|este) (?:estudio|proyecto)|este antecedente se relaciona con[^,]*?)\s+(?:porque|ya que|pues)\s+/i, '');
+    if (tipo === 'teoria') return { nombre: t(json.nombre, 160), postulado: t(json.postulado), relacion: rel(json.relacion), autor: t(json.autor, 120), anio: (String(json.anio ?? '').match(/\b(1[5-9]|20)\d{2}\b/) || [''])[0] };
     if (tipo === 'concepto') return { termino: t(json.termino, 120), definicion: t(json.definicion) };
-    return { objetivo: t(json.objetivo), hallazgo: t(json.hallazgo), relacion: t(json.relacion), lugar: t(json.lugar, 120), ambito: AMBITOS.includes(json.ambito) ? json.ambito : '' };
+    if (tipo === 'norma') return { establece: t(json.establece), relacion: rel(json.relacion) };
+    return { objetivo: t(json.objetivo), hallazgo: t(json.hallazgo), relacion: rel(json.relacion), lugar: t(json.lugar, 120), ambito: AMBITOS.includes(json.ambito) ? json.ambito : '' };
 };
 
 const useMarcoState = () => {
@@ -378,7 +410,7 @@ const Constructor = ({ intro, onNavigate }) => {
                     <p className="ide-field-hint mar-pregunta">{APARTADOS.find((a) => a.key === tab).pregunta}</p>
 
                     {/* Búsqueda en bases de datos: en antecedentes, marco teórico y marco conceptual. La ficha se llena con el resumen. */}
-                    {FICHA_DE[tab] && (
+                    {FICHA_DE[tab]?.buscar && (
                         <BuscarAntecedentes
                             key={tab}
                             sugerencia={tab === 'teorico' ? `teoría ${problema}` : problema}
@@ -460,6 +492,13 @@ const Constructor = ({ intro, onNavigate }) => {
                         </div>
                     )}
 
+                    {tab === 'legal' && (
+                        <BuscarNormas
+                            sugerencia={problema}
+                            // La norma se trata como un «artículo»: su cita es el título y su extracto, el resumen.
+                            onUsar={(norma) => usarArticulo(FICHA_DE.legal)({ titulo: norma.cita, cita: norma.cita, anio: norma.anio, autores: norma.fuente }, norma.extracto)}
+                        />
+                    )}
                     {tab === 'legal' && (
                         <Fichas
                             items={f.normas}

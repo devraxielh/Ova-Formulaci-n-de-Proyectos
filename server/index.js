@@ -24,6 +24,8 @@ const GROQ_URL = process.env.GROQ_URL || 'https://api.groq.com/openai/v1/chat/co
 const OPENALEX_API_KEY = process.env.OPENALEX_API_KEY || '';
 // Clave opcional de Semantic Scholar (sin ella comparte un cupo público que casi siempre está agotado).
 const SEMANTIC_SCHOLAR_API_KEY = process.env.SEMANTIC_SCHOLAR_API_KEY || '';
+// Rulex Data: normas y jurisprudencia de Colombia para el Marco legal (https://rulex.org/docs/api).
+const RULEX_API_KEY = process.env.RULEX_API_KEY || '';
 const GROQ_REASONING_EFFORT = process.env.GROQ_REASONING_EFFORT || 'low';
 const DB_PATH = process.env.DB_PATH || path.join(here, 'data', 'projectsia.db');
 const IS_PROD = process.env.NODE_ENV === 'production';
@@ -460,7 +462,7 @@ const requireAdmin = (req, res, next) => {
     return next();
 };
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, ai: Boolean(GROQ_API_KEY), mail: Boolean(mailer), articulos: Boolean(OPENALEX_API_KEY) }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, ai: Boolean(GROQ_API_KEY), mail: Boolean(mailer), articulos: Boolean(OPENALEX_API_KEY), normas: Boolean(RULEX_API_KEY) }));
 
 /* ---------- Cuentas ---------- */
 
@@ -1209,6 +1211,58 @@ app.get('/api/buscar/articulos', requireUser, searchLimit, async (req, res) => {
     } catch (error) {
         logError('buscar', `${fuente} no respondió`, `${error?.name || ''} ${error?.message || ''}`, req.user.id);
         return res.status(504).json({ error: 'La base de artículos tardó demasiado.', code: 'upstream' });
+    }
+});
+
+/* ---------- Normas y jurisprudencia (Rulex Data) ---------- */
+
+// La cuota de Rulex es diaria y compartida por toda la plataforma: cada búsqueda se guarda un día,
+// así una misma consulta de varios estudiantes cuenta una sola vez.
+const NORMAS_CACHE = new Map(); // clave → { hasta, datos }
+const NORMAS_TTL = 24 * 60 * 60 * 1000;
+let normasRestantes = null; // lo que Rulex dice que queda hoy; null = aún no se sabe
+
+app.get('/api/buscar/normas', requireUser, searchLimit, async (req, res) => {
+    const q = String(req.query.q || '').trim().replace(/\s+/g, ' ').slice(0, 200);
+    const fuente = String(req.query.fuente) === 'todas' ? 'todas' : 'normas';
+    if (q.length < 3) return res.status(400).json({ error: 'Escribe al menos una palabra para buscar.' });
+    if (!RULEX_API_KEY) return res.status(503).json({ error: 'La búsqueda de normas no está configurada.', code: 'no_key' });
+    const clave = `${fuente}|${q.toLowerCase()}`;
+    const guardada = NORMAS_CACHE.get(clave);
+    if (guardada && guardada.hasta > Date.now()) return res.json({ ...guardada.datos, restantes: normasRestantes });
+    try {
+        const r = await fetch('https://rulex.org/api/data/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${RULEX_API_KEY}` },
+            body: JSON.stringify({ tool: 'rulex_rag_juridico', args: { query: q, limit: 8, ...(fuente === 'normas' ? { fuente: 'normas' } : {}) } }),
+            signal: AbortSignal.timeout(25000),
+        });
+        if (r.status === 429) { normasRestantes = 0; return res.status(429).json({ error: 'Se agotaron las búsquedas de normas de hoy. Vuelve mañana o agrega la norma a mano.', code: 'cuota' }); }
+        if (!r.ok) {
+            logError('buscar', `rulex respondió ${r.status}`, '', req.user.id);
+            return res.status(502).json({ error: r.status === 401 ? 'La clave de la búsqueda de normas no es válida.' : 'La base de normas no respondió.', code: 'upstream' });
+        }
+        const json = await r.json();
+        if (Number.isFinite(json?.usage?.remainingToday)) normasRestantes = json.usage.remainingToday;
+        const datos = {
+            total: Number(json?.data?.total_encontrados) || 0,
+            items: (Array.isArray(json?.data?.providencias) ? json.data.providencias : []).map((p) => ({
+                clave: String(p.documentKey || p.citation || ''),
+                cita: String(p.citation || p.title || '').slice(0, 200),
+                titulo: String(p.title || '').slice(0, 300),
+                fuente: String(p.source || '').slice(0, 120),
+                clase: String(p.authorityKind || ''),
+                anio: Number(p.year) || '',
+                extracto: String(p.extracto || '').slice(0, 2500),
+                enlace: /^https:\/\//.test(String(p.officialUrl || '')) ? String(p.officialUrl) : '',
+            })).filter((x) => x.cita),
+        };
+        NORMAS_CACHE.set(clave, { hasta: Date.now() + NORMAS_TTL, datos });
+        if (NORMAS_CACHE.size > 400) NORMAS_CACHE.delete(NORMAS_CACHE.keys().next().value);
+        return res.json({ ...datos, restantes: normasRestantes });
+    } catch (error) {
+        logError('buscar', 'rulex no respondió', `${error?.name || ''} ${error?.message || ''}`, req.user.id);
+        return res.status(504).json({ error: 'La base de normas tardó demasiado.', code: 'upstream' });
     }
 });
 
