@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { BookPlus, CheckCircle2, ExternalLink, Loader2, Search } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { BookPlus, CheckCircle2, ExternalLink, Loader2, Search, Sparkles } from 'lucide-react';
 import { useProject, useProjectField } from '../context/ProjectContext';
-import { api } from '../services/api';
+import { api, groq } from '../services/api';
 import { claveRef, desdeCrossref, referenciaAPA } from '../services/apa';
 import './BuscarAntecedentes.css';
 
@@ -112,6 +112,24 @@ export const completarRef = async (item) => {
 // Si la referencia ya está en la lista (mismo DOI, o mismo autor-año y comienzo del título).
 export const refYaEsta = (lista, ref) => (lista || []).some((r) => (ref.doi && r.doi && String(r.doi).toLowerCase() === ref.doi.toLowerCase()) || (claveRef(r) === claveRef(ref) && String(r.titulo || '').toLowerCase().slice(0, 40) === String(ref.titulo || '').toLowerCase().slice(0, 40)));
 
+// Búsquedas recomendadas por la IA para el proyecto: pocas palabras clave, en español y en inglés.
+const recomendarBusquedas = async (d) => {
+    const t = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
+    const r = await groq.chat.completions.create({
+        messages: [
+            { role: 'system', content: 'Ayudas a un estudiante a buscar antecedentes de investigación en bases de artículos científicos. Propones búsquedas cortas, de dos a cinco palabras clave, como las escribiría un investigador: sin signos, sin comillas, sin el nombre del lugar ni de la institución (los antecedentes pueden ser de otros lugares). Respondes solo JSON válido.' },
+            { role: 'user', content: `PROYECTO\nTítulo: ${t(d?.titulo) || '(sin título)'}\nPregunta: ${t(d?.pregunta) || '(sin definir)'}\nProblema: ${t(d?.idea?.problema) || '(sin definir)'}\nPoblación: ${t(d?.tituloForm?.quien || d?.idea?.quien) || '(sin definir)'}\n\nPropón seis búsquedas distintas para encontrar estudios parecidos: tres en español y tres en inglés. Varía el ángulo: el fenómeno central, sus causas o factores, y cómo se ha intervenido o medido.\n\nResponde exactamente con este JSON: {"es": ["…", "…", "…"], "en": ["…", "…", "…"]}` },
+        ],
+        temperature: 0.4,
+        max_tokens: 300,
+        response_format: { type: 'json_object' },
+    });
+    const content = r.choices?.[0]?.message?.content || '';
+    const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+    const lista = (v) => (Array.isArray(v) ? v : []).map((x) => t(x).replace(/["«»¿?]/g, '').slice(0, 80)).filter((x) => x.length > 3).slice(0, 3);
+    return [...lista(json.es), ...lista(json.en)];
+};
+
 // `usarComo`: para qué ficha se usa el artículo («antecedente», «teoría», «concepto»); `titulo`: encabezado del panel.
 const BuscarAntecedentes = ({ onUsar, sugerencia = '', usarComo = 'antecedente', titulo = 'Buscar artículos sobre tu tema' }) => {
     const { data } = useProject();
@@ -129,12 +147,49 @@ const BuscarAntecedentes = ({ onUsar, sugerencia = '', usarComo = 'antecedente',
     const lista = Array.isArray(refs) ? refs : [];
     const yaEsta = (ref) => refYaEsta(lista, ref);
     const tema = String(sugerencia || data.tituloForm?.objeto || data.titulo || '').trim().split(/\s+/).slice(0, 8).join(' ');
+    // Recomendadas: la del tema (sale del proyecto, sin IA) y las que proponga la IA al pedirlas.
+    const [ideas, setIdeas] = useState([]);
+    const [pidiendo, setPidiendo] = useState('');
+    // Con las de la IA ya no hace falta la del tema, que suele ser una frase larga.
+    const recomendadas = ideas.length ? ideas : [tema].filter(Boolean);
+    // Se piden solas al abrir (una vez por proyecto en la sesión) y la primera queda escrita en el campo.
+    const claveIdeas = `projectsia:busquedas:${String(data.titulo || '').slice(0, 80)}|${String(data.pregunta || '').slice(0, 80)}`;
+    useEffect(() => {
+        if (!String(data.titulo || data.pregunta || data.idea?.problema || '').trim()) return;
+        let vivo = true;
+        const poner = (lista) => { if (!vivo || !lista.length) return; setIdeas(lista); setTexto((actual) => actual || lista[0]); };
+        try {
+            const guardadas = JSON.parse(sessionStorage.getItem(claveIdeas) || 'null');
+            if (Array.isArray(guardadas) && guardadas.length) { poner(guardadas); return undefined; }
+        } catch { /* sin almacenamiento: se piden */ }
+        setPidiendo('pensando');
+        recomendarBusquedas(data).then((lista) => {
+            try { sessionStorage.setItem(claveIdeas, JSON.stringify(lista)); } catch { /* no pasa nada */ }
+            poner(lista);
+            if (vivo) setPidiendo(lista.length ? '' : 'nada');
+        }).catch(() => { if (vivo) setPidiendo('nada'); });
+        return () => { vivo = false; };
+        // Solo al abrir o al cambiar de proyecto.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [claveIdeas]);
+    const masIdeas = async () => {
+        setPidiendo('pensando');
+        try {
+            const nuevas = await recomendarBusquedas(data);
+            setIdeas(nuevas);
+            try { sessionStorage.setItem(claveIdeas, JSON.stringify(nuevas)); } catch { /* no pasa nada */ }
+            setPidiendo(nuevas.length ? '' : 'nada');
+        } catch {
+            setPidiendo('nada');
+        }
+    };
 
-    const enviar = async (event) => {
+
+    const enviar = async (event, directo) => {
         event?.preventDefault();
-        const q = (texto || tema).trim();
+        const q = (directo || texto || tema).trim();
         if (!q) return;
-        if (!texto) setTexto(q);
+        if (directo || !texto) setTexto(q);
         if (baseActual.externo) { window.open(baseActual.externo(q), '_blank', 'noopener,noreferrer'); return; }
         setEstado('buscando');
         setError('');
@@ -182,6 +237,15 @@ const BuscarAntecedentes = ({ onUsar, sugerencia = '', usarComo = 'antecedente',
                     {estado === 'buscando' ? <Loader2 size={16} className="bus-spin" /> : <Search size={16} />} {baseActual.externo ? 'Abrir SciELO' : 'Buscar'}
                 </button>
             </form>
+            {recomendadas.length > 0 && !baseActual.externo && (
+                <div className="bus-recomendadas">
+                    <span>Búsquedas recomendadas para tu proyecto:</span>
+                    {recomendadas.map((q) => <button key={q} type="button" className="bus-chip" disabled={estado === 'buscando'} onClick={() => enviar(null, q)}>{q}</button>)}
+                    <button type="button" className="ide-link" disabled={pidiendo === 'pensando'} onClick={masIdeas}>
+                        {pidiendo === 'pensando' ? <Loader2 size={13} className="bus-spin" /> : <Sparkles size={13} />} {pidiendo === 'pensando' ? 'Pensando búsquedas…' : pidiendo === 'nada' ? 'No se pudo: intentar de nuevo' : ideas.length ? 'Recomendar otras' : 'Recomendar con IA'}
+                    </button>
+                </div>
+            )}
             <p className="ide-field-hint">Usa pocas palabras clave{base === 'arxiv' || base === 'semantic' ? ' y escríbelas en inglés' : '; prueba también en inglés'}. Lee el artículo antes de citarlo: aquí solo ves su resumen.</p>
             {error && <p className="ide-feedback ide-feedback--bad" role="alert">{error}</p>}
             {res && (
