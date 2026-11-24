@@ -1364,8 +1364,9 @@
 .ide-elegir { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin: 0.75rem 0; }
 
 /* «Presentación»: la teoría de la clase en una ventana grande */
-.ide-section--pres { display: inline-flex; align-items: center; gap: 0.35rem; color: #3730a3; background: #eef2ff; font-weight: 600; }
-.ide-section--pres:hover { background: #e0e7ff; }
+/* Naranja: se distingue de la pestaña activa (índigo), porque no es una pestaña más sino un botón que abre la ventana. */
+.ide-section--pres { display: inline-flex; align-items: center; gap: 0.35rem; color: #fff; background: #ea580c; font-weight: 600; }
+.ide-section--pres:hover { background: #c2410c; color: #fff; }
 .ide-pres-modal { position: fixed; inset: 0; margin: auto; width: calc(100vw - 1rem); height: calc(100dvh - 1rem); max-width: none; max-height: none; padding: 0; border: 0; border-radius: 1.25rem; background: transparent; overflow: visible; }
 .ide-pres-modal::backdrop { background: rgb(15 23 42 / 0.6); }
 .ide-deck--modal { height: 100%; }
