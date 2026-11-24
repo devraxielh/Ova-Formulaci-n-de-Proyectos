@@ -172,13 +172,60 @@ const checkMarco = (text, { quien, donde }) => {
 
 /* ---------- Constructor ---------- */
 
-// Llena la ficha de un antecedente a partir del resumen del artículo. Solo usa lo que el resumen dice:
-// si no trae resultados, «hallazgo» queda vacío para que el estudiante lo complete al leer el artículo.
-const fichaDesdeResumen = async ({ ref, resumen, proyecto }) => {
+// Qué ficha se arma en cada apartado que tiene búsqueda, y qué se le pide a la IA que saque del resumen.
+const FICHA_DE = {
+    antecedentes: {
+        tipo: 'antecedente', nombre: 'antecedente', buscar: 'Buscar artículos sobre tu tema', lista: 'antecedentes', max: 10,
+        campos: ['objetivo', 'hallazgo', 'titulo'], reemplaza: ['ambito'],
+        base: (ref) => ({ ...VACIO.antecedente, autor: autorCita(ref), anio: ref.anio, titulo: ref.titulo, ambito: 'Internacional' }),
+    },
+    teorico: {
+        tipo: 'teoria', nombre: 'teoría', buscar: 'Buscar teorías y modelos en artículos', lista: 'teorias', max: 5,
+        campos: ['nombre', 'postulado'], reemplaza: ['autor', 'anio'],
+        base: (ref) => ({ ...VACIO.teoria, autor: autorCita(ref), anio: ref.anio }),
+    },
+    conceptual: {
+        tipo: 'concepto', nombre: 'concepto', buscar: 'Buscar definiciones en artículos', lista: 'conceptos', max: 12,
+        campos: ['termino', 'definicion'],
+        base: (ref) => ({ ...VACIO.concepto, autor: autorCita(ref), anio: ref.anio }),
+    },
+};
+
+const PIDE = {
+    antecedente: {
+        que: 'fichar un antecedente de investigación',
+        campos: `- "objetivo": qué buscó el estudio y cómo lo hizo (método, muestra o instrumento, si el resumen lo dice). Una o dos frases que empiecen con un verbo en infinitivo en minúscula. Ejemplo solo de forma: «comparar el consumo de agua de dos barrios mediante mediciones mensuales en 150 hogares».
+- "hallazgo": qué encontró, con las cifras que dé el resumen. Una o dos frases que empiecen en minúscula. Cadena vacía si el resumen no informa resultados.
+- "relacion": cómo se relaciona con el proyecto del estudiante (qué le aporta: una variable, un método, un resultado para comparar). Una frase que empiece con un verbo en tercera persona en minúscula. Ejemplo solo de forma: «aporta un instrumento que puede adaptarse a esta población».
+- "lugar": país, ciudad o institución donde se hizo el estudio, tal como lo diga el resumen. Cadena vacía si no lo dice.
+- "ambito": "Regional o local" si se hizo en la misma ciudad, departamento o región del proyecto; "Nacional" si se hizo en Colombia fuera de esa región; "Internacional" si fue en otro país o el resumen no dice dónde.`,
+        json: '{"objetivo": "…", "hallazgo": "…", "relacion": "…", "lugar": "…", "ambito": "…"}',
+    },
+    teoria: {
+        que: 'fichar la teoría o el modelo que sustenta un estudio',
+        campos: `- "nombre": el nombre de la teoría, modelo o enfoque teórico principal que el artículo usa o propone, tal como lo nombra el resumen. Si tiene un nombre habitual en español, úsalo. Cadena vacía si el resumen no nombra ninguno.
+- "postulado": qué plantea esa teoría o modelo, según el resumen. Una o dos frases que empiecen en minúscula. Ejemplo solo de forma: «el aprendizaje ocurre al relacionar la información nueva con lo que ya se sabe».
+- "relacion": por qué esa teoría sirve para sustentar el proyecto del estudiante. Una frase que empiece con un verbo en tercera persona en minúscula. Ejemplo solo de forma: «permite explicar el comportamiento que este estudio observa».
+- "autor": el autor original de la teoría SOLO si el resumen lo menciona; si no, cadena vacía.
+- "anio": el año original de la teoría SOLO si el resumen lo menciona; si no, cadena vacía.`,
+        json: '{"nombre": "…", "postulado": "…", "relacion": "…", "autor": "…", "anio": "…"}',
+    },
+    concepto: {
+        que: 'fichar la definición de un concepto clave',
+        campos: `- "termino": el concepto o variable principal que el artículo define o estudia y que más se relaciona con el proyecto del estudiante. De una a cinco palabras, con mayúscula inicial. Ejemplo solo de forma: «Deserción estudiantil».
+- "definicion": cómo define o entiende ese concepto el artículo, según el resumen. Una o dos frases que empiecen en minúscula. Ejemplo solo de forma: «abandono de los estudios antes de obtener el título». Cadena vacía si el resumen no permite definirlo.`,
+        json: '{"termino": "…", "definicion": "…"}',
+    },
+};
+
+// Llena una ficha (antecedente, teoría o concepto) a partir del resumen del artículo. Solo usa lo que el resumen dice:
+// lo que no aparece queda vacío para que el estudiante lo complete al leer el artículo.
+const fichaDesdeResumen = async ({ tipo = 'antecedente', ref, resumen, proyecto }) => {
+    const pide = PIDE[tipo];
     const r = await groq.chat.completions.create({
         messages: [
-            { role: 'system', content: 'Ayudas a un estudiante a fichar un antecedente de investigación a partir del resumen (abstract) de un artículo. Te basas únicamente en lo que dice el resumen: no inventas cifras, resultados, métodos ni lugares. Si el resumen no dice algo, dejas ese campo como cadena vacía. Escribes en español aunque el resumen esté en otro idioma. Respondes solo JSON válido.' },
-            { role: 'user', content: `ARTÍCULO\nTítulo: ${ref.titulo}\nAutores: ${ref.autores || ''}\nAño: ${ref.anio || ''}\nResumen: ${String(resumen).slice(0, 3500)}\n\nPROYECTO DEL ESTUDIANTE\nTítulo: ${proyecto.titulo || '(sin título)'}\nProblema: ${proyecto.problema || '(sin definir)'}\nPoblación: ${proyecto.quien || '(sin definir)'}\nLugar: ${proyecto.donde || '(sin definir)'}\n\nLlena la ficha del antecedente:\n- "objetivo": qué buscó el estudio y cómo lo hizo (método, muestra o instrumento, si el resumen lo dice). Una o dos frases que empiecen con un verbo en infinitivo en minúscula. Ej: «identificar las causas de la inasistencia mediante una encuesta a 320 pacientes».\n- "hallazgo": qué encontró, con las cifras que dé el resumen. Una o dos frases que empiecen en minúscula. Cadena vacía si el resumen no informa resultados.\n- "relacion": cómo se relaciona con el proyecto del estudiante (qué le aporta: una variable, un método, un resultado para comparar). Una frase que empiece con un verbo en tercera persona en minúscula. Ej: «aporta una de las causas que este estudio va a medir».\n- "lugar": país, ciudad o institución donde se hizo el estudio, tal como lo diga el resumen. Cadena vacía si no lo dice.\n- "ambito": "Regional o local" si se hizo en la misma ciudad, departamento o región del proyecto; "Nacional" si se hizo en Colombia fuera de esa región; "Internacional" si fue en otro país o el resumen no dice dónde.\nSin punto final en ningún campo.\n\nResponde exactamente con este JSON: {"objetivo": "…", "hallazgo": "…", "relacion": "…", "lugar": "…", "ambito": "…"}` },
+            { role: 'system', content: `Ayudas a un estudiante a ${pide.que} a partir del resumen (abstract) de un artículo. Te basas únicamente en lo que dice el resumen: no inventas cifras, resultados, métodos, teorías, autores ni lugares. Si el resumen no dice algo, dejas ese campo como cadena vacía. Escribes en español aunque el resumen esté en otro idioma. Respondes solo JSON válido.` },
+            { role: 'user', content: `ARTÍCULO\nTítulo: ${ref.titulo}\nAutores: ${ref.autores || ''}\nAño: ${ref.anio || ''}\nResumen: ${String(resumen).slice(0, 3500)}\n\nPROYECTO DEL ESTUDIANTE\nTítulo: ${proyecto.titulo || '(sin título)'}\nProblema: ${proyecto.problema || '(sin definir)'}\nPoblación: ${proyecto.quien || '(sin definir)'}\nLugar: ${proyecto.donde || '(sin definir)'}\n\nLlena la ficha:\n${pide.campos}\nLos ejemplos solo muestran la forma: no copies su contenido; escribe lo que diga este resumen.\nSin punto final en ningún campo.\n\nResponde exactamente con este JSON: ${pide.json}` },
         ],
         temperature: 0.2,
         max_tokens: 700,
@@ -186,8 +233,10 @@ const fichaDesdeResumen = async ({ ref, resumen, proyecto }) => {
     });
     const content = r.choices?.[0]?.message?.content || '';
     const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
-    const t = (v) => clean(String(v ?? '')).replace(/[.\s]+$/, '').slice(0, 600);
-    return { objetivo: t(json.objetivo), hallazgo: t(json.hallazgo), relacion: t(json.relacion), lugar: t(json.lugar).slice(0, 120), ambito: AMBITOS.includes(json.ambito) ? json.ambito : '' };
+    const t = (v, max = 600) => clean(String(v ?? '')).replace(/[.\s]+$/, '').slice(0, max);
+    if (tipo === 'teoria') return { nombre: t(json.nombre, 160), postulado: t(json.postulado), relacion: t(json.relacion), autor: t(json.autor, 120), anio: (String(json.anio ?? '').match(/\b(1[5-9]|20)\d{2}\b/) || [''])[0] };
+    if (tipo === 'concepto') return { termino: t(json.termino, 120), definicion: t(json.definicion) };
+    return { objetivo: t(json.objetivo), hallazgo: t(json.hallazgo), relacion: t(json.relacion), lugar: t(json.lugar, 120), ambito: AMBITOS.includes(json.ambito) ? json.ambito : '' };
 };
 
 const useMarcoState = () => {
@@ -259,6 +308,33 @@ const Constructor = ({ intro, onNavigate }) => {
     const problema = lower(clean(idea.problema)) || 'la inasistencia a citas médicas';
     const touch = () => setSaved(false);
     const set = (key) => (value) => { touch(); update({ [key]: value }); };
+
+    // «Usar como…» de la búsqueda: crea la ficha con lo que se sabe del artículo y, si trae resumen, la IA la llena con él.
+    // La ficha se reconoce después por `fuente` (el título del artículo), y nunca se pisa lo que el estudiante ya escribió.
+    const usarArticulo = (cfg) => async (ref, resumen) => {
+        const ficha = { ...cfg.base(ref), fuente: clean(ref.titulo) };
+        const actuales = f[cfg.lista];
+        const libre = actuales.findIndex((x) => cfg.campos.every((k) => !clean(x[k])) && !clean(x.autor));
+        set(cfg.lista)(libre >= 0 ? actuales.map((x, i) => (i === libre ? ficha : x)) : [...actuales, ficha].slice(0, cfg.max));
+        if (clean(resumen).length < 80) return 'vacia';
+        try {
+            const datos = await fichaDesdeResumen({ tipo: cfg.tipo, ref, resumen, proyecto: { titulo, problema: clean(idea.problema), quien, donde } });
+            if (!cfg.campos.slice(0, 2).some((k) => datos[k])) return 'vacia';
+            setForm((prev) => {
+                const base = { ...MARCO_FORM, ...(prev || {}) };
+                const lista = Array.isArray(base[cfg.lista]) ? base[cfg.lista] : [];
+                const k = lista.findIndex((x) => x.fuente === ficha.fuente);
+                if (k < 0) return base;
+                const llena = { ...lista[k] };
+                Object.entries(datos).forEach(([campo, valor]) => { if (valor && (!clean(llena[campo]) || cfg.reemplaza?.includes(campo))) llena[campo] = valor; });
+                return { ...base, [cfg.lista]: lista.map((x, i) => (i === k ? llena : x)) };
+            });
+            touch();
+            return 'llena';
+        } catch {
+            return 'vacia'; // sin IA: queda la ficha con lo que se sabía del artículo
+        }
+    };
     const save = () => {
         Object.entries(partes).forEach(([field, value]) => { if (value.trim()) setters[field](value); });
         setSaved(true);
@@ -301,35 +377,14 @@ const Constructor = ({ intro, onNavigate }) => {
                     </div>
                     <p className="ide-field-hint mar-pregunta">{APARTADOS.find((a) => a.key === tab).pregunta}</p>
 
-                    {tab === 'antecedentes' && (
+                    {/* Búsqueda en bases de datos: en antecedentes, marco teórico y marco conceptual. La ficha se llena con el resumen. */}
+                    {FICHA_DE[tab] && (
                         <BuscarAntecedentes
-                            sugerencia={problema}
-                            onUsar={async (ref, resumen) => {
-                                // La ficha se crea de una vez con autor, año y título. Si el artículo trae resumen, la IA saca de él
-                                // qué buscó, qué encontró y dónde, y propone cómo se relaciona con este proyecto.
-                                const ficha = { ...VACIO.antecedente, autor: autorCita(ref), anio: ref.anio, titulo: ref.titulo, ambito: 'Internacional' };
-                                const libre = f.antecedentes.findIndex((a) => !clean(a.autor) && !clean(a.titulo) && !clean(a.hallazgo));
-                                set('antecedentes')(libre >= 0 ? f.antecedentes.map((a, i) => (i === libre ? ficha : a)) : [...f.antecedentes, ficha].slice(0, 10));
-                                if (clean(resumen).length < 80) return 'vacia';
-                                try {
-                                    const datos = await fichaDesdeResumen({ ref, resumen, proyecto: { titulo, problema: clean(idea.problema), quien, donde } });
-                                    if (!datos.objetivo && !datos.hallazgo) return 'vacia';
-                                    // Se completa la ficha de ese artículo (por su título) sin pisar lo que el estudiante ya haya escrito en ella.
-                                    setForm((prev) => {
-                                        const base = { ...MARCO_FORM, ...(prev || {}) };
-                                        const lista = Array.isArray(base.antecedentes) ? base.antecedentes : [];
-                                        const k = lista.findIndex((a) => clean(a.titulo) === clean(ficha.titulo) && clean(a.autor) === clean(ficha.autor));
-                                        if (k < 0) return base;
-                                        const a = lista[k];
-                                        const llena = { ...a, objetivo: clean(a.objetivo) || datos.objetivo, hallazgo: clean(a.hallazgo) || datos.hallazgo, relacion: clean(a.relacion) || datos.relacion, lugar: clean(a.lugar) || datos.lugar, ambito: datos.ambito || a.ambito };
-                                        return { ...base, antecedentes: lista.map((x, i) => (i === k ? llena : x)) };
-                                    });
-                                    touch();
-                                    return 'llena';
-                                } catch {
-                                    return 'vacia'; // sin IA: queda la ficha con autor, año y título
-                                }
-                            }}
+                            key={tab}
+                            sugerencia={tab === 'teorico' ? `teoría ${problema}` : problema}
+                            titulo={FICHA_DE[tab].buscar}
+                            usarComo={FICHA_DE[tab].nombre}
+                            onUsar={usarArticulo(FICHA_DE[tab])}
                         />
                     )}
                     {tab === 'antecedentes' && (

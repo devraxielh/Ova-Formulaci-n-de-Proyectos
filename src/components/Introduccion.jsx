@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import EditorRico from './EditorRico';
 import { AlertTriangle, BookOpen, CheckCircle2, Clock, Eye, Target, Wand2, XCircle } from 'lucide-react';
 import SlideDeck, { Opciones, Pestanas } from './deck/SlideDeck';
@@ -115,6 +115,25 @@ const conLos = (text) => {
     return /^(el|la|los|las|un|una|unos|unas)\s/i.test(t) ? t : `los ${t}`;
 };
 
+// La parte «Método» no se escribe a mano: sale de la Metodología (enfoque, tipo, diseño, población y técnicas).
+// Devuelve '' mientras la Metodología no tenga al menos el enfoque o el tipo.
+export const metodoDesdeMetodologia = (data) => {
+    const halla = (texto, patron) => (String(texto || '').match(patron) || [])[1]?.toLowerCase() || '';
+    const enfoque = halla(data.metEnfoque, /enfoque\s+(cuantitativo|cualitativo|mixto)/i) || halla(data.metEnfoque, /\b(cuantitativo|cualitativo|mixto)\b/i);
+    const tipo = halla(data.metTipo, /\b(exploratori[oa]|descriptiv[oa]|correlacional|explicativ[oa]|evaluativ[oa]|propositiv[oa]|proyectiv[oa]|aplicad[oa])\b/i);
+    const diseno = halla(data.metDiseno, /\b(no experimental|cuasiexperimental|preexperimental|experimental|estudio de caso|fenomenológico|etnográfico|investigación[- ]acción|teoría fundamentada|narrativo)\b/i);
+    const corte = halla(data.metDiseno, /\b(transversal|longitudinal)\b/i);
+    if (!enfoque && !tipo) return '';
+    const idea = data.idea || {};
+    const t = data.tituloForm || {};
+    const quien = clean(t.quien || idea.quien);
+    const donde = clean(t.donde || idea.donde);
+    const tecnicas = [...new Set((Array.isArray(data.metodologiaForm?.instrumentos) ? data.metodologiaForm.instrumentos : []).map((i) => lower(clean(i?.tecnica))).filter(Boolean))];
+    const lista = (items) => (items.length > 1 ? `${items.slice(0, -1).join(', ')} y ${items[items.length - 1]}` : items[0] || '');
+    const rasgos = [enfoque && `de enfoque ${enfoque}`, tipo && `de tipo ${tipo.replace(/a$/, 'o')}`, diseno && `con un diseño ${diseno}${corte ? ` ${corte}` : ''}`].filter(Boolean);
+    return `Para ello, se desarrolla un estudio ${lista(rasgos)}${quien ? `, con ${conLos(quien)}` : ''}${quien && donde ? ` de ${donde}` : ''}${tecnicas.length ? `, mediante ${lista(tecnicas)}` : ''}.`;
+};
+
 // Borradores de cada movimiento armados con lo que ya está en el proyecto.
 const borradores = (data) => {
     const idea = data.idea || {};
@@ -139,9 +158,9 @@ const borradores = (data) => {
         problema: problema ? `${donde ? `En ${donde}, ` : ''}${quien ? `${conLos(quien)} presentan` : 'se presenta'} ${problema}${idea.efecto1 ? `, lo que genera ${lower(clean(idea.efecto1))}` : ''}.` : '',
         importancia: primeraOracion(jf.importancia) || (problema ? `Aunque ${problema} es conocido, no se han estudiado sus causas en esta población, lo que impide [di qué no se puede hacer sin este conocimiento].` : ''),
         objetivo: general ? `En consecuencia, esta investigación tiene como objetivo ${lower(general.replace(/\.$/, ''))}${pregunta ? `, para responder a la pregunta: ${pregunta}` : '.'}` : '',
-        metodo: tipo || enfoque
+        metodo: metodoDesdeMetodologia(data) || (tipo || enfoque
             ? `Para ello, se desarrolla un estudio${enfoque ? ` de enfoque ${enfoque.toLowerCase()}` : ''}${tipo ? ` de alcance ${tipo.toLowerCase()}` : ''}${quien ? ` con ${lower(quien)}` : ''}${donde ? ` de ${donde}` : ''}, mediante [nombra la técnica principal, por ejemplo una encuesta].`
-            : '',
+            : ''),
         organizacion,
     };
 };
@@ -332,11 +351,19 @@ const useIntroState = () => {
     };
 };
 
-const Constructor = ({ intro }) => {
+const Constructor = ({ intro, onNavigate }) => {
     const { data, f, update, setIntroduccion } = useIntroState();
     const [saved, setSaved] = useState(false);
     const [active, setActive] = useState('contexto');
     const ejemplos = borradores(data);
+
+    // «Método» es automático: se copia de la Metodología cada vez que cambia. Mientras la Metodología no esté,
+    // la parte queda desactivada (y conserva lo que tuviera de antes, para no borrar trabajo).
+    const metodoAuto = metodoDesdeMetodologia(data);
+    useEffect(() => {
+        if (metodoAuto && f.metodo !== metodoAuto) update({ metodo: metodoAuto });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [metodoAuto]);
 
     const text = assemble(f);
     const words = countWords(text);
@@ -352,7 +379,7 @@ const Constructor = ({ intro }) => {
     const componer = () => {
         setSaved(false);
         const patch = {};
-        PARTES.forEach((parte) => { if (!String(f[parte.key] || '').trim() && ejemplos[parte.key]) patch[parte.key] = ejemplos[parte.key]; });
+        PARTES.forEach((parte) => { if (parte.key !== 'metodo' && !String(f[parte.key] || '').trim() && ejemplos[parte.key]) patch[parte.key] = ejemplos[parte.key]; });
         update(patch);
     };
     const save = () => {
@@ -363,7 +390,7 @@ const Constructor = ({ intro }) => {
     // Guardado automático: lo redactado pasa a Mi proyecto sin tener que tocar «Guardar».
     useAutoGuardar(text, save);
     const meterState = words === 0 ? 'empty' : words < MIN_PALABRAS ? 'short' : words <= MAX_PALABRAS ? 'ok' : 'over';
-    const vacios = PARTES.filter((parte) => !String(f[parte.key] || '').trim() && ejemplos[parte.key]).length;
+    const vacios = PARTES.filter((parte) => parte.key !== 'metodo' && !String(f[parte.key] || '').trim() && ejemplos[parte.key]).length;
 
     return (
         <div className="pla-builder-wrap">
@@ -395,6 +422,16 @@ const Constructor = ({ intro }) => {
                                 <mark data-part={parte.color} data-active="true">{index + 1}</mark> {parte.label}
                             </label>
                             <small className="jus-what">{parte.what}</small>
+                            {parte.key === 'metodo' ? (
+                                <div className="int-auto" data-lista={Boolean(metodoAuto)} aria-live="polite">
+                                    <p id="int-metodo" className="int-auto-texto">{metodoAuto || clean(f.metodo) || 'Se llenará sola cuando completes tu Metodología (enfoque y tipo de investigación).'}</p>
+                                    <small>
+                                        {metodoAuto ? 'Sale de tu Metodología y se actualiza sola. Para cambiarla, edita la Metodología.' : 'Esta parte no se escribe aquí: sale de tu Metodología.'}
+                                        {onNavigate && <> <button type="button" className="ide-link" onClick={() => onNavigate('metodologia')}>{metodoAuto ? 'Ir a Metodología' : 'Definir la Metodología'}</button></>}
+                                    </small>
+                                </div>
+                            ) : (
+                            <>
                             <EditorRico
                                 id={`int-${parte.key}`}
                                 className="textarea-field pla-textarea"
@@ -412,6 +449,8 @@ const Constructor = ({ intro }) => {
                                     </button>
                                 ))}
                             </div>
+                            </>
+                            )}
                         </div>
                     ))}
                 </form>
@@ -694,6 +733,7 @@ const Introduccion = ({ onNavigate }) => {
         ),
         construye: (
             <Constructor
+                onNavigate={onNavigate}
                 intro={(
                     <>
                         {heading}
