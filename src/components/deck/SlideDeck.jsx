@@ -243,7 +243,7 @@ const Mazo = ({ sections, slides, label, renderSlide, finish, enModal = false, a
     const heading = <h2 ref={headingRef} tabIndex={-1}>{slide.title}</h2>;
 
     return (
-        <div className={`ide-deck${enModal ? ' ide-deck--modal' : ''}`}>
+        <div className={`ide-deck${enModal ? ' ide-deck--modal' : ''}${sinPasos ? ' ide-deck--pagina' : ''}`}>
             <section ref={stageRef} className="ide-stage" aria-roledescription="presentación" aria-label={enModal ? `Presentación de la clase: ${label}` : label} onKeyDown={fillExample}>
                 <header className="ide-top">
                     <div className="ide-sections" role="group" aria-label="Secciones de la clase">
@@ -269,8 +269,9 @@ const Mazo = ({ sections, slides, label, renderSlide, finish, enModal = false, a
                         {!enModal && <RevisarIA etiqueta={label} />}
                         {!enModal && <Redactar stageRef={stageRef} />}
                         {!enModal && <Citar stageRef={stageRef} />}
-                        <Temporizador key={slide.id} minutes={slide.min} />
-                        {canFullscreen && (
+                        {/* En la página no hay tiempo ni pantalla completa: eso es de la presentación. */}
+                        {!sinPasos && <Temporizador key={slide.id} minutes={slide.min} />}
+                        {!sinPasos && canFullscreen && (
                             <button
                                 type="button"
                                 className="ide-icon-btn"
@@ -314,6 +315,12 @@ const Mazo = ({ sections, slides, label, renderSlide, finish, enModal = false, a
                             {renderSlide({ slide, heading, goTo, goToSection, sectionMinutes, totalMinutes })}
                         </motion.div>
                     </AnimatePresence>
+                    {/* En la página, una pestaña con varias partes (p. ej. «Construye tu título» y «Mejóralo con IA») las muestra todas, una bajo otra. */}
+                    {sinPasos && slides.filter((item) => item.section === slide.section && item.id !== slide.id).map((item) => (
+                        <div key={item.id} className={`ide-slide ide-slide--split ide-slide--extra${item.layout ? ` ide-slide--${item.layout}` : ''}`} role="group" aria-label={item.title}>
+                            {renderSlide({ slide: item, heading: <h2>{item.title}</h2>, goTo, goToSection, sectionMinutes, totalMinutes })}
+                        </div>
+                    ))}
                 </div>
 
                 {/* En la página (Construcción y Revisión) se cambia con las pestañas: sin Anterior/Siguiente; solo queda el paso a la siguiente herramienta. */}

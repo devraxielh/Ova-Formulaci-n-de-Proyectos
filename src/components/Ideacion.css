@@ -1388,3 +1388,8 @@
 .ide-pres-full:fullscreen .ide-stage { border: none; border-radius: 0; }
 /* Barra inferior de la página: solo el botón de la siguiente herramienta, a la derecha */
 .ide-nav.ide-nav--solo { display: flex; justify-content: flex-end; }
+/* Página de trabajo (Construcción y Revisión): crece con su contenido en vez de desplazarse por dentro */
+.ide-deck.ide-deck--pagina .ide-stage:not(:fullscreen) { height: auto; min-height: 0; }
+.ide-deck.ide-deck--pagina .ide-stage:not(:fullscreen) .ide-viewport { overflow-y: visible; flex: none; }
+.ide-deck--pagina .ide-slide { align-items: start; flex: none; }
+.ide-deck--pagina .ide-slide--extra { border-top: 1px solid var(--ide-line); }

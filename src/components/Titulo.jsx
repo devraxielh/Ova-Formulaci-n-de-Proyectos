@@ -902,7 +902,7 @@ const Titulo = ({ onNavigate }) => {
                 intro={(
                     <>
                         {heading}
-                        <p>La IA evalúa tu título, identifica sus variables y propone alternativas con el verbo de tu objetivo. Tú decides cuál usar; en la última diapositiva lo revisarás con los criterios.</p>
+                        <p>La IA evalúa tu título, identifica sus variables y propone alternativas con el verbo de tu objetivo. Tú decides cuál usar; en la pestaña «Revisión» lo revisarás con los criterios.</p>
                     </>
                 )}
             />
