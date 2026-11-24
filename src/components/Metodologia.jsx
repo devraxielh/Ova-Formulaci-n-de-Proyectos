@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import EditorRico from './EditorRico';
 import {
     AlertTriangle, BarChart3, BookOpenCheck, Calculator, CalendarDays, CheckCircle2, ClipboardList, Compass, DollarSign, Layers, Microscope,
     Plus, ShieldCheck, Target, Trash2, Users, XCircle,
@@ -13,6 +14,7 @@ import {
     periodoLabel, redactarAnalisis, validacionesDe, redactarDiseno, redactarEnfoque, redactarInstrumentos, redactarPoblacion, redactarTipo, tamanoMuestra,
 } from '../data/metodologia';
 import { SECTIONS, SLIDES } from '../data/metodologiaClase';
+import Instrumentos from './Instrumentos';
 import { Generica } from './deck/Contenido';
 import ValidacionModal from './ValidacionModal';
 import { VALIDACION_DETALLE } from '../data/validacion';
@@ -176,7 +178,7 @@ const Campo = ({ id, label, value, onChange, placeholder, rows = 1, className = 
     <label className={`mar-campo ${className}`} htmlFor={id}>
         <span>{label}</span>
         {rows > 1
-            ? <textarea id={id} className="textarea-field" rows={rows} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+            ? <EditorRico id={id} className="textarea-field" rows={rows} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
             : <input id={id} className="input-field" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />}
     </label>
 );
@@ -211,7 +213,14 @@ const Gantt = ({ filas, periodos, unidad }) => (
 const Constructor = ({ intro, onNavigate }) => {
     const s = useMetState();
     const { f, update, setters, enfoque, setEnfoque, tipo, setTipo, diseno, setDiseno, calc, setCalc, unidad, setUnidad, periodos, setPeriodos, presupuesto, setPresupuesto, especificos, quien, donde, tipoEsperado } = s;
-    const [tab, setTab] = useState('enfoque');
+    // Si se llega desde «Análisis de datos» u otro enlace a los instrumentos, se abre esa pestaña.
+    const [tab, setTab] = useState(() => {
+        try { return window.sessionStorage.getItem('projectsia:metodologia:tab') || 'enfoque'; } catch { return 'enfoque'; }
+    });
+    // La petición se consume una sola vez, ya con la pestaña abierta.
+    useEffect(() => {
+        try { window.sessionStorage.removeItem('projectsia:metodologia:tab'); } catch { /* noop */ }
+    }, []);
     const [saved, setSaved] = useState(false);
     const prefilled = useRef(false);
     const touch = () => setSaved(false);
@@ -470,6 +479,8 @@ const Constructor = ({ intro, onNavigate }) => {
                     </div>
                 </aside>
             </div>
+            {/* El instrumento completo (encuesta o guía) se arma aquí mismo y sale en el documento bajo «Instrumentos de recolección». */}
+            {tab === 'instrumentos' && <Instrumentos embebido onNavigate={onNavigate} />}
             <ValidacionModal
                 open={Boolean(modal)}
                 inicial={modal?.metodo}
@@ -558,6 +569,15 @@ const Revision = ({ intro }) => {
 /* ---------- Clase ---------- */
 
 const Metodologia = ({ onNavigate }) => {
+    // Si piden una pestaña concreta del constructor (p. ej. «Instrumentos»), la clase abre en la diapositiva de construcción.
+    useState(() => {
+        try {
+            if (window.sessionStorage.getItem('projectsia:metodologia:tab')) {
+                window.localStorage.setItem(SLIDE_KEY, String(SLIDES.findIndex((slide) => slide.id === 'construye')));
+            }
+        } catch { /* noop */ }
+        return null;
+    });
     const { data } = useProject();
     const { especificos } = partesObjetivos(data.objetivos);
     const [demo, setDemo] = useState({ finita: true, N: 1200, Z: 1.96, e: 0.05 });

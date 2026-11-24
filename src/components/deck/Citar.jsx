@@ -2,27 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BookMarked, Quote, Search, X } from 'lucide-react';
 import { useProjectField } from '../../context/ProjectContext';
 import { citaNarrativa, citaParentetica, ordenarReferencias, referenciaAPA } from '../../services/apa';
+import { campoDe, insertarEn, marcaDe } from './campo';
 import './Citar.css';
-
-const esEditable = (el) => el instanceof HTMLTextAreaElement
-    || (el instanceof HTMLInputElement && ['text', 'search', ''].includes(el.type) && !el.readOnly && !el.disabled);
-
-// Escribe `texto` en la posición del cursor de un campo controlado por React.
-const insertar = (el, texto) => {
-    const inicio = el.selectionStart ?? el.value.length;
-    const fin = el.selectionEnd ?? el.value.length;
-    const antes = el.value.slice(0, inicio);
-    const despues = el.value.slice(fin);
-    const espacioAntes = antes && !/[\s(¿¡«]$/.test(antes) ? ' ' : '';
-    const espacioDespues = despues && !/^[\s.,;:)»?!]/.test(despues) ? ' ' : '';
-    const nuevo = `${antes}${espacioAntes}${texto}${espacioDespues}${despues}`;
-    const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-    Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, nuevo);
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    const pos = antes.length + espacioAntes.length + texto.length;
-    el.focus();
-    el.setSelectionRange?.(pos, pos);
-};
 
 /*
  * Botón «Citar» de la barra de las clases: inserta la cita de una referencia guardada
@@ -45,12 +26,15 @@ const Citar = ({ stageRef }) => {
     useEffect(() => {
         const stage = stageRef.current;
         if (!stage) return undefined;
-        const onFocus = (event) => {
+        // Se recuerda el campo y dónde estaba el cursor (en el editor visual se pierde al tocar el botón).
+        const anotar = (event) => {
             if (caja.current?.contains(event.target)) return;
-            if (esEditable(event.target)) ultimo.current = event.target;
+            const el = campoDe(event.target);
+            if (el) ultimo.current = { el, marca: marcaDe(el) };
         };
-        stage.addEventListener('focusin', onFocus);
-        return () => stage.removeEventListener('focusin', onFocus);
+        const tipos = ['focusin', 'keyup', 'mouseup', 'select'];
+        tipos.forEach((t) => stage.addEventListener(t, anotar));
+        return () => tipos.forEach((t) => stage.removeEventListener(t, anotar));
     }, [stageRef]);
 
     useEffect(() => {
@@ -63,16 +47,16 @@ const Citar = ({ stageRef }) => {
     }, [open]);
 
     const abrir = () => {
-        const el = ultimo.current && document.body.contains(ultimo.current) ? ultimo.current : null;
-        setCampo(el);
+        const u = ultimo.current && document.body.contains(ultimo.current.el) ? ultimo.current : null;
+        setCampo(u);
         setHecho('');
         setOpen((prev) => !prev);
     };
 
     const citar = (texto) => {
-        const el = campo && document.body.contains(campo) ? campo : null;
-        if (!el) return;
-        insertar(el, texto);
+        const u = campo && document.body.contains(campo.el) ? campo : null;
+        if (!u) return;
+        insertarEn(u.el, texto, u.marca);
         setHecho(texto);
         setOpen(false);
     };

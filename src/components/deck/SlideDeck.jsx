@@ -2,6 +2,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, CheckCircle2, Clock, Maximize2, Minimize2, Pause, Play, RotateCcw, XCircle } from 'lucide-react';
 import Citar from './Citar';
+import RevisarIA from './RevisarIA';
+import Redactar from './Redactar';
+import { campoDe, fijarValor, placeholderDe, valorDe } from './campo';
 import '../Ideacion.css';
 
 /* Piezas compartidas por las clases en diapositivas (Ideación, Título…). */
@@ -142,19 +145,14 @@ export const Opciones = ({ title, questions }) => {
 // Tab en un campo vacío escribe el texto del ejemplo («Ej: …») o el de data-autofill.
 const fillExample = (event) => {
     if (event.key !== 'Tab' || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
-    const el = event.target;
-    const isArea = el instanceof HTMLTextAreaElement;
-    if (!isArea && !(el instanceof HTMLInputElement && ['text', 'search', ''].includes(el.type))) return;
-    if (el.readOnly || el.disabled || el.value.trim() !== '') return;
-    const source = el.dataset.autofill || el.placeholder || '';
+    const el = campoDe(event.target);
+    if (!el || valorDe(el).trim() !== '') return;
+    const source = el.dataset.autofill || placeholderDe(el);
     if (!el.dataset.autofill && !/^Ej[:.]/i.test(source)) return;
     const text = source.replace(/^Ej[:.]\s*/i, '').replace(/(\s*(…|\.\.\.))+\s*$/, '').trim();
     if (!text) return;
     event.preventDefault();
-    const proto = isArea ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-    Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, text);
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.setSelectionRange?.(text.length, text.length);
+    fijarValor(el, text);
 };
 
 const readIndex = (key, total) => {
@@ -255,6 +253,8 @@ const SlideDeck = ({ sections, slides, storageKey, label, renderSlide, finish })
                         ))}
                     </div>
                     <div className="ide-tools">
+                        <RevisarIA etiqueta={label} />
+                        <Redactar stageRef={stageRef} />
                         <Citar stageRef={stageRef} />
                         <Temporizador key={slide.id} minutes={slide.min} />
                         {canFullscreen && (

@@ -471,3 +471,45 @@ label {
 
 /* Mensaje mientras se descarga una página */
 .app-cargando { padding: 3rem 1rem; text-align: center; color: #64748b; }
+
+/* Pantalla de acceso: sin sesión solo se ve el ingreso o el registro. */
+.app-acceso { min-height: 100vh; display: flex; flex-direction: column; padding: 1.25rem clamp(1rem, 4vw, 3rem); background: #f8fafc; }
+.app-acceso-marca { display: flex; align-items: center; gap: 0.6rem; font-weight: 800; font-size: 1.2rem; color: #4f46e5; margin-bottom: 1rem; }
+.app-acceso-pie { margin-top: auto; padding-top: 1rem; font-size: 0.75rem; color: #94a3b8; text-align: center; }
+
+/* Presencia de compañeros y aviso de choque */
+.app-presencia { margin: 0 0 0.75rem; padding: 0.5rem 0.85rem; border-radius: 10px; background: #f1f5f9; color: #475569; font-size: 0.85rem; }
+.app-presencia[data-aqui="true"] { background: #fef3c7; color: #92400e; }
+.app-choque { position: sticky; top: 0.5rem; z-index: 30; margin: 0 0 1rem; padding: 0.9rem 1rem; border-radius: 12px; background: #fff7ed; border: 1px solid #fdba74; color: #7c2d12; display: grid; gap: 0.6rem; box-shadow: 0 8px 24px rgba(124, 45, 18, 0.12); }
+.app-choque div { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.app-choque small { color: #9a3412; }
+.main-content--deck .app-presencia, .main-content--deck .app-choque { margin: 0.5rem 1rem; }
+
+/* Cuenta activa que espera la autorización del administrador */
+.app-espera { max-width: 560px; margin: 12vh auto 0; background: #fff; border-radius: 18px; padding: clamp(1.5rem, 5vw, 2.5rem); box-shadow: 0 12px 36px rgb(15 23 42 / 0.08); display: grid; gap: 0.9rem; justify-items: start; }
+.app-espera h1 { font-size: 1.5rem; margin: 0; }
+.app-espera p { margin: 0; line-height: 1.6; color: #334155; }
+.app-espera div { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.4rem; }
+.app-espera { align-self: center; width: 100%; }
+.app-espera .pro-btn--primary { background: #4f46e5; color: #fff; border: 1px solid #4f46e5; }
+.app-espera .pro-btn--ghost { background: #fff; color: #334155; border: 1px solid #cbd5e1; }
+.app-espera .pro-btn { padding: 0.6rem 1.1rem; border-radius: 10px; font: inherit; font-weight: 700; cursor: pointer; }
+.app-acceso { width: 100%; box-sizing: border-box; }
+
+/* Menú lateral compacto: caben todas las secciones sin tanto desplazamiento. */
+.sidebar { padding: 0.9rem 0.9rem 0.7rem; }
+.sidebar-header { margin-bottom: 0.4rem; padding-bottom: 0.6rem; }
+.nav-button { padding: 0.42rem 0.7rem; margin-bottom: 0.1rem; gap: 0.6rem; font-size: 0.9rem; }
+.nav-button svg { width: 18px; height: 18px; flex: none; }
+.sidebar-account { padding: 0.45rem 0.7rem; margin-bottom: 0.4rem; }
+.sidebar-logout { margin: -0.2rem 0 0.4rem; padding: 0.4rem 0.7rem; }
+.sidebar-footer p { margin: 0; }
+
+/* Menú recogido (solo íconos): más angosto y con menos espacio entre íconos. */
+@media (min-width: 769px) {
+  .sidebar--collapsed { width: 3.6rem; padding: 0.6rem 0.4rem; }
+  .sidebar--collapsed .sidebar-header { margin-bottom: 0.2rem; padding-bottom: 0.4rem; }
+  .sidebar--collapsed .nav-button { padding: 0.36rem 0; margin-bottom: 0.05rem; }
+  .sidebar--collapsed nav { margin: 0.2rem -0.2rem !important; padding: 0 0.2rem !important; }
+  .sidebar--collapsed .sidebar-toggle { height: 2rem; }
+}

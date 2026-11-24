@@ -609,7 +609,10 @@ const EXAMPLE_GROUPS = [...new Set(EJEMPLOS.map((example) => example.grupo))];
 const EXAMPLE_KEYS = ['nivel', 'programa', 'temas', 'problema', 'quien', 'donde', 'cuando', 'alcance'];
 const exampleFields = (example) => Object.fromEntries(EXAMPLE_KEYS.map((key) => [key, example[key]]));
 
-// Un solo formulario: arma la idea en una frase y, con los mismos datos, pide 5 ideas a la IA.
+// Cuántas ideas propone la IA cada vez. Se piden en dos tandas para que la respuesta no se corte.
+const TOTAL_IDEAS = 15;
+
+// Un solo formulario: arma la idea en una frase y, con los mismos datos, pide ideas a la IA.
 const SintesisIA = ({ intro, wb, setWb, onNavigate }) => {
     const [isGenerating, setIsGenerating] = useState(false);
     const [ideas, setIdeas] = useProjectField('ideasIA', []);
@@ -684,11 +687,12 @@ const SintesisIA = ({ intro, wb, setWb, onNavigate }) => {
             v('cuando')
                 ? `- Periodo: escribe exactamente «${v('cuando')}» en el campo Periodo.`
                 : '- El estudiante no definió un periodo: deja el campo Periodo vacío y no incluyas fechas ni años en el título.',
-            alcanceSel && `- Objetivo: ${alcanceSel.label.toUpperCase()} (${alcanceSel.hint.toLowerCase()}). Las 5 ideas deben tener este objetivo, no otro.`,
+            alcanceSel && `- Objetivo: ${alcanceSel.label.toUpperCase()} (${alcanceSel.hint.toLowerCase()}). Todas las ideas deben tener este objetivo, no otro.`,
             alcanceSel && `- La pregunta debe ser ${alcanceSel.pregunta.toLowerCase()}, con una forma como: ${alcanceSel.questionForm}`,
             alcanceSel && `- El "Cómo hacerlo" debe corresponder a ese objetivo: ${alcanceSel.method}.`,
             `- El campo Verbo debe ser EXACTAMENTE uno de estos sustantivos: ${verbs.join(', ')}. El título debe empezar con ese mismo sustantivo (por ejemplo «${verbs[0]} de…»).`,
             avoid.length && `- No repitas estas ideas ya propuestas: ${avoid.map((t) => `«${t}»`).join('; ')}.`,
+            count > 1 && '- Las ideas deben ser distintas entre sí: cambia la causa, la variable, el ángulo o el método; no repitas la misma idea con otras palabras.',
         ].filter(Boolean);
 
         return `Actúa como un profesor experto en metodología de la investigación.
@@ -743,7 +747,7 @@ Para cada idea usa ESTRICTAMENTE este formato, una línea por campo:
         const chatCompletion = await groq.chat.completions.create({
             messages: [{ role: 'user', content: buildPrompt(count, tema, avoid) }],
             temperature: 0.6,
-            max_tokens: 6000,
+            max_tokens: 8000,
         });
         const content = chatCompletion.choices[0]?.message?.content || '';
         return content.split('---IDEA---').map((item) => parseIdea(item)).filter((item) => item.idea).map(checkIdea);
@@ -763,13 +767,18 @@ Para cada idea usa ESTRICTAMENTE este formato, una línea por campo:
         setConfirming(null);
 
         try {
-            let results = await requestIdeas(5, tema, []);
-            let valid = results.filter((item) => item.ok).map((item) => item.idea);
+            // «Generar otras»: no se repiten las que ya están en pantalla.
+            const previas = (Array.isArray(ideas) ? ideas : []).map((item) => item.titulo).filter(Boolean).slice(0, TOTAL_IDEAS);
+            const validas = (lista) => lista.filter((item) => item.ok).map((item) => item.idea);
+            const sinRepetir = (lista) => lista.filter((item, i) => lista.findIndex((x) => (x.titulo || '').trim().toLowerCase() === (item.titulo || '').trim().toLowerCase()) === i);
+            // Primera tanda de 8 y segunda de 7, pidiendo a la segunda que no repita la primera.
+            const primera = Math.ceil(TOTAL_IDEAS / 2);
+            let valid = validas(await requestIdeas(primera, tema, previas));
+            valid = sinRepetir([...valid, ...validas(await requestIdeas(TOTAL_IDEAS - primera, tema, [...previas, ...valid.map((item) => item.titulo)]))]);
             // Si alguna no respetó el formulario, se piden de nuevo solo las que faltan.
-            if (valid.length < 5) {
-                const retry = await requestIdeas(5 - valid.length, tema, valid.map((item) => item.titulo));
-                valid = [...valid, ...retry.filter((item) => item.ok).map((item) => item.idea)].slice(0, 5);
-                results = [...results, ...retry];
+            if (valid.length > 0 && valid.length < TOTAL_IDEAS) {
+                const retry = await requestIdeas(TOTAL_IDEAS - valid.length, tema, [...previas, ...valid.map((item) => item.titulo)]);
+                valid = sinRepetir([...valid, ...validas(retry)]).slice(0, TOTAL_IDEAS);
             }
             if (valid.length === 0) {
                 setError('La IA no generó ideas que respeten tus datos. Revisa el formulario e inténtalo de nuevo.');
@@ -899,7 +908,7 @@ Para cada idea usa ESTRICTAMENTE este formato, una línea por campo:
                 <button type="submit" className="ide-btn ide-btn--primary" disabled={isGenerating} style={{ justifyContent: 'center', padding: '0.8rem 1rem' }}>
                     {isGenerating
                         ? <><span className="ide-spinner" aria-hidden="true" /> Generando ideas…</>
-                        : <><Cpu size={17} /> {ideas.length > 0 ? 'Generar otras 5 ideas' : '¿Te falta inspiración? Sugerir 5 ideas'}</>}
+                        : <><Cpu size={17} /> {ideas.length > 0 ? `Generar otras ${TOTAL_IDEAS} ideas` : `¿Te falta inspiración? Sugerir ${TOTAL_IDEAS} ideas`}</>}
                 </button>
             </form>
 
@@ -1299,7 +1308,7 @@ const Ideacion = ({ onNavigate }) => {
                 intro={(
                     <>
                         {heading}
-                        <p>Completa los datos y verás tu idea armarse en una frase. Si te falta inspiración, la IA te propone 5 ideas con esos mismos datos.</p>
+                        <p>Completa los datos y verás tu idea armarse en una frase. Si te falta inspiración, la IA te propone 15 ideas con esos mismos datos.</p>
                     </>
                 )}
             />

@@ -4,6 +4,7 @@ import { api } from '../services/api';
 import { buildDocument } from '../services/projectDoc';
 import { DocumentPaper } from './ProjectDocument';
 import Coherencia from './Coherencia';
+import AdminEstado from './AdminEstado';
 
 // Insignia con el porcentaje de coherencia entre secciones.
 const CoherenciaBadge = ({ value }) => (value
@@ -34,6 +35,19 @@ const formatDate = (value) => {
 };
 
 const StatusBadge = ({ status }) => <span className="adm-badge" data-status={status}>{STATUS[status] || status}</span>;
+
+// Cuántos proyectos puede crear la cuenta. 0 = todavía sin permiso.
+const Cupo = ({ user, onChange, busy }) => {
+    if (user.role === 'admin') return <span className="adm-muted">—</span>;
+    const limit = user.projectLimit || 0;
+    return (
+        <span className="adm-cupo" data-cero={limit === 0}>
+            <button type="button" disabled={busy || limit <= 0} onClick={() => onChange(user, limit - 1)} aria-label={`Quitar un proyecto a ${user.name}`}>−</button>
+            <b title={limit === 0 ? 'Sin permiso para crear proyectos' : `Puede crear hasta ${limit}`}>{limit}</b>
+            <button type="button" disabled={busy || limit >= 20} onClick={() => onChange(user, limit + 1)} aria-label={`Autorizar un proyecto más a ${user.name}`}>+</button>
+        </span>
+    );
+};
 
 const StatusActions = ({ user, onChange, onResend, busy }) => {
     const [confirm, setConfirm] = useState(false);
@@ -121,6 +135,21 @@ const Admin = () => {
         });
     };
 
+    const changeLimit = async (user, limit) => {
+        setBusy(true);
+        setError('');
+        setNotice('');
+        try {
+            const { user: updated } = await api.admin.setLimit(user.id, limit);
+            replaceUser(updated);
+            setNotice(limit === 0 ? `${updated.name} ya no puede crear proyectos nuevos.` : `${updated.name} puede crear hasta ${limit} ${limit === 1 ? 'proyecto' : 'proyectos'}.`);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setBusy(false);
+        }
+    };
+
     const changeStatus = async (user, status) => {
         setBusy(true);
         setError('');
@@ -180,7 +209,8 @@ const Admin = () => {
 
     if (openProject) {
         const sections = buildDocument(openProject.project.data);
-        const filled = sections.filter((section) => section.content.length > 0).length;
+        const pasos = sections.filter((section) => !section.extra);
+        const filled = pasos.filter((section) => section.content.length > 0).length;
         return (
             <div className="pro-page">
                 <div className="adm-crumbs">
@@ -195,14 +225,14 @@ const Admin = () => {
                         <div>
                             <h2>{openProject.project.name}</h2>
                             <p className="adm-muted">
-                                {openProject.owner?.name} · {openProject.owner?.email} · {filled} de {sections.length} secciones · Actualizado {formatDate(openProject.project.updatedAt)}
+                                {openProject.owner?.name} · {openProject.owner?.email} · {filled} de {pasos.length} secciones · Actualizado {formatDate(openProject.project.updatedAt)}
                             </p>
                         </div>
                         <span className="adm-readonly">Solo lectura</span>
                     </div>
                     {filled === 0
                         ? <p className="adm-muted">Este proyecto todavía está vacío.</p>
-                        : <DocumentPaper sections={sections} fallbackTitle={openProject.project.name} author={openProject.owner?.name} />}
+                        : <DocumentPaper sections={sections} fallbackTitle={openProject.project.name} author={String(openProject.project.data?.integrantes || '').trim() || openProject.owner?.name} fileUrl={(fid) => `/api/projects/${openProject.project.id}/files/${fid}`} />}
                 </section>
             </div>
         );
@@ -259,6 +289,8 @@ const Admin = () => {
             )}
             {messages}
 
+            <AdminEstado />
+
             <section className="pro-card">
                 <div className="adm-toolbar">
                     <div className="pro-modes adm-filters" role="tablist" aria-label="Filtrar por estado">
@@ -291,6 +323,7 @@ const Admin = () => {
                                 <th scope="col">Usuario</th>
                                 <th scope="col">Estado</th>
                                 <th scope="col" className="adm-num">Proyectos</th>
+                                <th scope="col" title="Cuántos proyectos puede crear. 0 = sin permiso todavía">Cupo</th>
                                 <th scope="col" title="Coherencia entre secciones del proyecto más reciente">Coherencia</th>
                                 <th scope="col">Última actividad</th>
                                 <th scope="col">Registro</th>
@@ -299,10 +332,10 @@ const Admin = () => {
                         </thead>
                         <tbody>
                             {loading && users.length === 0 && (
-                                <tr><td colSpan={7} className="adm-empty">Cargando usuarios…</td></tr>
+                                <tr><td colSpan={8} className="adm-empty">Cargando usuarios…</td></tr>
                             )}
                             {!loading && visible.length === 0 && (
-                                <tr><td colSpan={7} className="adm-empty">{users.length === 0 ? 'Todavía no hay usuarios registrados.' : 'Ningún usuario coincide con el filtro.'}</td></tr>
+                                <tr><td colSpan={8} className="adm-empty">{users.length === 0 ? 'Todavía no hay usuarios registrados.' : 'Ningún usuario coincide con el filtro.'}</td></tr>
                             )}
                             {visible.map((user) => (
                                 <tr key={user.id}>
@@ -314,6 +347,7 @@ const Admin = () => {
                                     </td>
                                     <td><StatusBadge status={user.status} /></td>
                                     <td className="adm-num">{user.projectCount}</td>
+                                    <td><Cupo user={user} onChange={changeLimit} busy={busy} /></td>
                                     <td><CoherenciaBadge value={user.coherencia} /></td>
                                     <td>{formatDate(user.lastActivity || user.lastLoginAt)}</td>
                                     <td>{formatDate(user.createdAt)}</td>

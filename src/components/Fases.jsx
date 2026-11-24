@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import EditorRico from './EditorRico';
 import { AlertTriangle, ArrowDown, ArrowUp, CalendarDays, CheckCircle2, Plus, Target, Trash2 } from 'lucide-react';
 import SlideDeck from './deck/SlideDeck';
 import { Generica } from './deck/Contenido';
@@ -220,7 +221,7 @@ const Constructor = ({ intro, onNavigate }) => {
                             </label>
                             <label className="mar-campo mar-wide">
                                 <span>Descripción breve (opcional)</span>
-                                <textarea className="textarea-field" rows={2} value={fase.descripcion} onChange={(e) => setFase(ai, { descripcion: e.target.value })} placeholder="Ej: En esta fase se describe la situación actual de la inasistencia a partir de los registros del hospital" />
+                                <EditorRico className="textarea-field" rows={2} value={fase.descripcion} onChange={(e) => setFase(ai, { descripcion: e.target.value })} placeholder="Ej: En esta fase se describe la situación actual de la inasistencia a partir de los registros del hospital" />
                             </label>
 
                             <div className="mar-campo mar-wide">

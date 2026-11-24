@@ -95,12 +95,61 @@ const BenefitsAside = () => (
                 ))}
             </ul>
         </div>
-        <p className="acc-aside-foot">Sin cuenta también puedes usar las herramientas: tu borrador queda en este navegador.</p>
+        <p className="acc-aside-foot">Para usar las herramientas necesitas una cuenta: así tu proyecto queda guardado y tu docente puede acompañarlo.</p>
     </>
 );
 
-const Cuenta = ({ onNavigate, activation }) => {
+// Crear la contraseña nueva desde el enlace del correo.
+const Restablecer = ({ token, onDone, onNavigate }) => {
+    const { resetPassword } = useProject();
+    const [clave, setClave] = useState('');
+    const [repite, setRepite] = useState('');
+    const [error, setError] = useState('');
+    const [busy, setBusy] = useState(false);
+    const submit = async (event) => {
+        event.preventDefault();
+        setError('');
+        if (clave.length < 8) return setError('La contraseña debe tener al menos 8 caracteres.');
+        if (clave !== repite) return setError('Las dos contraseñas no coinciden.');
+        setBusy(true);
+        try {
+            await resetPassword({ token, password: clave });
+            onDone();
+            onNavigate('proyecto');
+        } catch (err) {
+            setError(err.message || 'No se pudo cambiar la contraseña.');
+        } finally {
+            setBusy(false);
+        }
+        return undefined;
+    };
+    return (
+        <AccountShell aside={<BenefitsAside />}>
+            <section className="acc-card">
+                <h2>Crea tu contraseña nueva</h2>
+                <p className="acc-lead">Al guardarla entras de una vez y se cierran las sesiones que tuvieras abiertas en otros equipos.</p>
+                <form className="pro-form" onSubmit={submit} noValidate>
+                    <div className="input-group">
+                        <label htmlFor="reset-clave">Contraseña nueva</label>
+                        <input id="reset-clave" className="input-field" type="password" autoComplete="new-password" value={clave} onChange={(e) => setClave(e.target.value)} />
+                        <small>Mínimo 8 caracteres.</small>
+                    </div>
+                    <div className="input-group">
+                        <label htmlFor="reset-repite">Repite la contraseña</label>
+                        <input id="reset-repite" className="input-field" type="password" autoComplete="new-password" value={repite} onChange={(e) => setRepite(e.target.value)} />
+                    </div>
+                    {error && <p className="pro-alert" role="alert">{error}</p>}
+                    <button type="submit" className="pro-btn pro-btn--primary pro-btn--block" disabled={busy}>{busy ? 'Un momento…' : 'Guardar y entrar'}</button>
+                    <button type="button" className="pro-link" onClick={onDone}>Volver a iniciar sesión</button>
+                </form>
+            </section>
+        </AccountShell>
+    );
+};
+
+const Cuenta = ({ onNavigate, activation, resetToken, onResetDone }) => {
     const { user, login, register, logout, hasContent, projects } = useProject();
+    const [olvido, setOlvido] = useState(null); // null | 'form' | 'sent' | 'nomail'
     const [mode, setMode] = useState('login');
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -226,6 +275,49 @@ const Cuenta = ({ onNavigate, activation }) => {
         );
     }
 
+    if (resetToken && !user) return <Restablecer token={resetToken} onDone={onResetDone} onNavigate={onNavigate} />;
+
+    if (olvido) {
+        const pedir = async (event) => {
+            event.preventDefault();
+            setError(null);
+            if (!email.trim()) return setError({ message: 'Escribe el correo de tu cuenta.' });
+            setBusy(true);
+            try {
+                const r = await api.forgot(email.trim());
+                setOlvido(r.mail ? 'sent' : 'nomail');
+            } catch (err) {
+                setError({ message: err.message });
+            } finally {
+                setBusy(false);
+            }
+            return undefined;
+        };
+        return (
+            <AccountShell aside={<BenefitsAside />}>
+                <section className="acc-card">
+                    <h2>Recupera tu contraseña</h2>
+                    {olvido === 'form' && (
+                        <>
+                            <p className="acc-lead">Escribe el correo con el que creaste tu cuenta y te enviaremos un enlace para crear una contraseña nueva.</p>
+                            <form className="pro-form" onSubmit={pedir} noValidate>
+                                <div className="input-group">
+                                    <label htmlFor="olvido-correo">Correo electrónico</label>
+                                    <input id="olvido-correo" className="input-field" type="email" autoComplete="email" autoCapitalize="none" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={160} />
+                                </div>
+                                {error && <p className="pro-alert" role="alert">{error.message}</p>}
+                                <button type="submit" className="pro-btn pro-btn--primary pro-btn--block" disabled={busy}>{busy ? 'Un momento…' : 'Enviarme el enlace'}</button>
+                            </form>
+                        </>
+                    )}
+                    {olvido === 'sent' && <p className="acc-lead">Si <strong>{email.trim()}</strong> tiene una cuenta, acabamos de enviarle un enlace para crear una contraseña nueva. Vence en 60 minutos. Si no lo ves, revisa el correo no deseado.</p>}
+                    {olvido === 'nomail' && <p className="pro-alert" role="alert">El envío de correos no está disponible en este momento. Pide ayuda al administrador de la plataforma.</p>}
+                    <button type="button" className="pro-link" onClick={() => { setOlvido(null); setError(null); }}>Volver a iniciar sesión</button>
+                </section>
+            </AccountShell>
+        );
+    }
+
     const isRegister = mode === 'register';
 
     return (
@@ -278,7 +370,8 @@ const Cuenta = ({ onNavigate, activation }) => {
                             onChange={(event) => setPassword(event.target.value)}
                             aria-describedby={isRegister ? 'cuenta-clave-ayuda' : undefined}
                         />
-                        {isRegister && <small id="cuenta-clave-ayuda">Mínimo 8 caracteres. Por ahora no hay recuperación de contraseña por correo.</small>}
+                        {isRegister && <small id="cuenta-clave-ayuda">Mínimo 8 caracteres.</small>}
+                        {!isRegister && <button type="button" className="pro-link acc-olvido" onClick={() => { setOlvido('form'); setError(null); }}>¿Olvidaste tu contraseña?</button>}
                     </div>
 
                     {error && (

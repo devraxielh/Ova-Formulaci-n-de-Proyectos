@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
-import { AlertTriangle, CheckCircle2, Plus, Tags, Wand2, X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { AlertTriangle, CheckCircle2, FileSignature, Languages, Loader2, Plus, RefreshCw, Tags, Wand2, X } from 'lucide-react';
 import SlideDeck from './deck/SlideDeck';
 import { Generica } from './deck/Contenido';
 import { useProject, useProjectField } from '../context/ProjectContext';
 import { useAutoGuardar } from '../hooks/useAutoGuardar';
+import { DECLARACION_EXONERACION, DECLARACION_ORIGINALIDAD } from '../services/projectDoc';
+import { groq } from '../services/api';
 import { partesObjetivos } from '../services/coherencia';
 import { MUESTREOS, tamanoMuestra } from '../data/metodologia';
 import { MAX_PALABRAS, MIN_PALABRAS, SECTIONS, SLIDES } from '../data/resumenClase';
@@ -185,6 +187,131 @@ const Constructor = ({ intro }) => {
                     </div>
                 </aside>
             </div>
+            <Preliminares />
+        </div>
+    );
+};
+
+/* ---------- Abstract, portada y preliminares (van al Word según la plantilla) ---------- */
+
+const Campo = ({ id, label, hint, rows = 0, placeholder, onEdit }) => {
+    const [stored, setStored] = useProjectField(id, '');
+    const value = stored;
+    const setValue = (v) => { setStored(v); if (onEdit) onEdit(v); };
+    return (
+        <div className="input-group">
+            <label htmlFor={`pre-${id}`}>{label}</label>
+            {rows
+                ? <textarea id={`pre-${id}`} className="textarea-field" rows={rows} value={value} onChange={(e) => setValue(e.target.value)} placeholder={placeholder} />
+                : <input id={`pre-${id}`} className="input-field" value={value} onChange={(e) => setValue(e.target.value)} placeholder={placeholder} />}
+            {hint && <small className="ide-field-hint">{hint}</small>}
+        </div>
+    );
+};
+
+// Traduce el resumen y las palabras clave al inglés con la IA del servidor (la clave nunca llega al navegador).
+const traducirResumen = async (resumen, claves) => {
+    const r = await groq.chat.completions.create({
+        messages: [
+            { role: 'system', content: 'Eres traductor académico español→inglés. Traduces resúmenes de proyectos de investigación con terminología científica precisa, sin agregar ni quitar información. Respondes solo JSON.' },
+            { role: 'user', content: `Traduce al inglés académico este resumen y sus palabras clave. Conserva la extensión y el orden de las ideas. Las palabras clave en minúscula, separadas por comas.\n\nRESUMEN:\n${resumen}\n\nPALABRAS CLAVE:\n${claves || '(ninguna)'}\n\nResponde exactamente: {"abstract": "...", "keywords": "..."}` },
+        ],
+        temperature: 0.2,
+        max_tokens: 2000,
+        response_format: { type: 'json_object' },
+    });
+    const content = r.choices?.[0]?.message?.content || '';
+    const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+    // Guiones y espacios especiales de la IA → caracteres comunes (Word los muestra mejor).
+    const limpiar = (v) => String(v || '').replace(/[\u2010\u2011\u2012]/g, '-').replace(/[\u00a0\u202f]/g, ' ').trim();
+    const abstract = limpiar(json.abstract);
+    if (!abstract) throw new Error('La IA no devolvió el abstract.');
+    return { abstract, keywords: limpiar(json.keywords).replace(/[.\s]+$/, '') };
+};
+
+const Preliminares = () => {
+    const { data } = useProject();
+    const [, setAbstract] = useProjectField('abstract', '');
+    const [, setKeywords] = useProjectField('keywords', '');
+    // Texto del resumen del que salió el abstract; si el estudiante edita el abstract a mano, deja de actualizarse solo.
+    const [fuente, setFuente] = useProjectField('abstractFuente', '');
+    const [manual, setManual] = useProjectField('abstractManual', false);
+    const [estado, setEstado] = useState('');
+    const [error, setError] = useState('');
+    const enCurso = useRef(false);
+    const resumen = String(data.resumen || '').trim();
+    const claves = String(data.palabrasClave || '').trim();
+    const firma = `${resumen}|${claves}`;
+    const desactualizado = Boolean(resumen) && fuente !== firma;
+
+    const generar = async () => {
+        if (enCurso.current || !resumen) return;
+        enCurso.current = true;
+        setEstado('generando');
+        setError('');
+        try {
+            const t = await traducirResumen(resumen, claves);
+            setAbstract(t.abstract);
+            if (t.keywords) setKeywords(t.keywords);
+            setFuente(firma);
+            setManual(false);
+            setEstado('listo');
+        } catch (err) {
+            setError(err.message || 'No se pudo generar el abstract.');
+            setEstado('');
+        } finally {
+            enCurso.current = false;
+        }
+    };
+
+    // Se genera solo cuando el resumen guardado cambia (con una pausa para no traducir mientras se escribe).
+    useEffect(() => {
+        if (!desactualizado || manual || countWords(resumen) < 40 || error) return undefined;
+        const t = setTimeout(generar, 2500);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [firma, manual, error]);
+
+    const palabras = countWords(data.abstract);
+    const marcarManual = () => { if (!manual) setManual(true); };
+    return (
+        <div className="res-prelim">
+            <section className="ide-panel">
+                <h3><Languages size={18} aria-hidden="true" /> Abstract</h3>
+                <p className="ide-field-hint">Se genera solo a partir de tu resumen y tus palabras clave, y se actualiza cuando los cambias. Revísalo: si lo editas a mano, deja de actualizarse solo.</p>
+                <div className="res-auto">
+                    {estado === 'generando'
+                        ? <span className="res-auto-msg"><Loader2 size={15} className="res-spin" aria-hidden="true" /> Traduciendo tu resumen…</span>
+                        : !resumen
+                            ? <span className="res-auto-msg">Escribe y guarda tu resumen arriba para generar el abstract.</span>
+                            : manual
+                                ? <span className="res-auto-msg">Editado a mano{desactualizado ? ' · tu resumen cambió después' : ''}.</span>
+                                : !desactualizado && data.abstract
+                                    ? <span className="res-auto-msg res-auto-ok"><CheckCircle2 size={15} aria-hidden="true" /> Generado de tu resumen.</span>
+                                    : null}
+                    {resumen && estado !== 'generando' && (
+                        <button type="button" className="ide-btn ide-btn--ghost" onClick={generar}><RefreshCw size={14} /> {data.abstract ? 'Volver a generar del resumen' : 'Generar ahora'}</button>
+                    )}
+                </div>
+                {error && <p className="ide-feedback ide-feedback--bad" role="alert"><AlertTriangle size={16} /><span>{error}</span></p>}
+                <Campo id="abstract" label={`Abstract (${palabras} words)`} rows={6} placeholder="This study analyzes…" onEdit={marcarManual} />
+                <Campo id="keywords" label="Keywords" placeholder="missed appointments, outpatient care, …" hint="Las palabras clave en inglés, separadas por comas." onEdit={marcarManual} />
+            </section>
+            <section className="ide-panel">
+                <h3><FileSignature size={18} aria-hidden="true" /> Portada y preliminares</h3>
+                <p className="ide-field-hint">Con estos datos el Word arma la portada, la portada interna y las declaraciones con firma. Si dejas una declaración vacía se usa el texto modelo; revisa que coincida con el que exige tu programa.</p>
+                <div className="res-prelim-grid">
+                    <Campo id="integrantes" label="Integrantes (uno por línea)" rows={2} placeholder="Nombres y apellidos completos" hint="Si lo dejas vacío se usa el nombre de tu cuenta." />
+                    <Campo id="director" label="Bajo la dirección de (uno por línea)" rows={2} placeholder="Nombre del mentor e incluir sus títulos" />
+                    <Campo id="ciudad" label="Ciudad y departamento" placeholder="Sincelejo, Sucre" />
+                </div>
+                <Campo id="dedicatoria" label="Dedicatoria (opcional)" rows={2} />
+                <Campo id="agradecimientos" label="Agradecimientos (opcional)" rows={2} />
+                <Campo id="declaracionOriginalidad" label="Declaración de originalidad y autonomía" rows={4} placeholder={DECLARACION_ORIGINALIDAD(String(data.titulo || '').trim())} />
+                {!String(data.declaracionOriginalidad || '').trim() && <button type="button" className="ide-btn ide-btn--ghost" onClick={() => setOriginalidad(DECLARACION_ORIGINALIDAD(String(data.titulo || '').trim()))}>Usar el texto modelo para editarlo</button>}
+                <Campo id="declaracionExoneracion" label="Declaración de exoneración de responsabilidad" rows={3} placeholder={DECLARACION_EXONERACION()} />
+                {!String(data.declaracionExoneracion || '').trim() && <button type="button" className="ide-btn ide-btn--ghost" onClick={() => setExoneracion(DECLARACION_EXONERACION())}>Usar el texto modelo para editarlo</button>}
+            </section>
         </div>
     );
 };

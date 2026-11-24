@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import EditorRico from './EditorRico';
 import { AlertTriangle, BarChart3, CheckCircle2, MessageSquareText } from 'lucide-react';
 import SlideDeck from './deck/SlideDeck';
 import { Generica } from './deck/Contenido';
@@ -10,6 +11,8 @@ import './Titulo.css';
 import './Planteamiento.css';
 import './Objetivos.css';
 import './Justificacion.css';
+import Elementos from './Elementos';
+import AnalisisDatos from './AnalisisDatos';
 import './Marco.css';
 import './Alcances.css';
 import './Fases.css';
@@ -90,12 +93,25 @@ const Campo = ({ id, label, value, onChange, placeholder, rows = 1, className = 
     <label className={`mar-campo ${className}`} htmlFor={id}>
         <span>{label}</span>
         {rows > 1
-            ? <textarea id={id} className="textarea-field" rows={rows} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+            ? <EditorRico id={id} className="textarea-field" rows={rows} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
             : <input id={id} className="input-field" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />}
     </label>
 );
 
 const Constructor = ({ intro, onNavigate }) => {
+    // El análisis se despliega solo si se llegó pidiéndolo; si no, queda recogido para no alargar la página.
+    const [analisisAbierto, setAnalisisAbierto] = useState(() => {
+        try { return Boolean(window.sessionStorage.getItem('projectsia:resultados:analisis')); } catch { return false; }
+    });
+    const analisisRef = useRef(null);
+    useEffect(() => {
+        try {
+            if (window.sessionStorage.getItem('projectsia:resultados:analisis')) {
+                window.sessionStorage.removeItem('projectsia:resultados:analisis');
+                analisisRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        } catch { /* noop */ }
+    }, []);
     const { f, update, setResultados, setDiscusion, especificos, antecedentes, teorias, limitacionesAlcances } = useResState();
     const [tab, setTab] = useState(0);
     const [saved, setSaved] = useState(false);
@@ -231,6 +247,12 @@ const Constructor = ({ intro, onNavigate }) => {
                     </div>
                 </aside>
             </div>
+            {/* El análisis de los datos (encuestas, archivos o entrevistas) vive aquí: sus tablas y gráficos caen en «Tablas y figuras». */}
+            <details ref={analisisRef} className="res-analisis" open={analisisAbierto} onToggle={(e) => setAnalisisAbierto(e.currentTarget.open)}>
+                <summary><BarChart3 size={18} aria-hidden="true" /> Analiza tus datos <small>encuestas, archivos de Excel o CSV y entrevistas</small></summary>
+                {analisisAbierto && <AnalisisDatos embebido onNavigate={onNavigate} />}
+            </details>
+            <Elementos seccion="resultados" />
         </div>
     );
 };
@@ -294,6 +316,15 @@ const Revision = ({ intro }) => {
 /* ---------- Clase ---------- */
 
 const Resultados = ({ onNavigate }) => {
+    // Si piden el análisis de datos (desde los instrumentos), la clase abre en la diapositiva de construcción.
+    useState(() => {
+        try {
+            if (window.sessionStorage.getItem('projectsia:resultados:analisis')) {
+                window.localStorage.setItem(SLIDE_KEY, String(SLIDES.findIndex((slide) => slide.id === 'construye')));
+            }
+        } catch { /* noop */ }
+        return null;
+    });
     const { data } = useProject();
     const { especificos } = partesObjetivos(data.objetivos);
     const [guardados] = useProjectField('resultados', '');

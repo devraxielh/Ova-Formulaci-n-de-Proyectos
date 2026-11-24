@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import EditorRico from './EditorRico';
 import {
     AlertTriangle, CalendarDays, CheckCircle2, MapPin, Package, Plus, Shapes, ShieldCheck, Target, Trash2, Users, XCircle,
 } from 'lucide-react';
@@ -377,7 +378,7 @@ const Constructor = ({ intro }) => {
                         {CAMPOS.map((campo, index) => (
                             <div className="input-group pla-part" data-active={active === campo.key} key={campo.key}>
                                 <label htmlFor={`alc-${campo.key}`}><mark data-part={campo.color} data-active="true">{index + 2}</mark> {campo.label}</label>
-                                <textarea
+                                <EditorRico
                                     id={`alc-${campo.key}`}
                                     className="textarea-field"
                                     rows={2}
@@ -407,7 +408,7 @@ const Constructor = ({ intro }) => {
                                 )}
                             </div>
                             <label className="sr-only" htmlFor={`alc-lim-${index}`}>Limitación {index + 1}</label>
-                            <textarea
+                            <EditorRico
                                 id={`alc-lim-${index}`}
                                 className="textarea-field"
                                 rows={2}
@@ -417,7 +418,7 @@ const Constructor = ({ intro }) => {
                                 placeholder={`Ej: ${index === 0 ? ejemplos.limitacion || LIMITES_TIPO[1].limitacion : LIMITES_TIPO[(index + 1) % LIMITES_TIPO.length].limitacion}`}
                             />
                             <label className="alc-sub" htmlFor={`alc-mit-${index}`}>Para reducir su efecto…</label>
-                            <textarea
+                            <EditorRico
                                 id={`alc-mit-${index}`}
                                 className="textarea-field"
                                 rows={2}

@@ -12,3 +12,14 @@
 .res-preview p { margin: 0 0 0.6rem; line-height: 1.6; }
 .res-parte[data-active='true'] { background: #e0e7ff; border-radius: 0.25rem; }
 .res-pc i { font-style: italic; }
+
+/* Abstract, portada y preliminares */
+.res-prelim { display: grid; gap: 1rem; margin-top: 1.25rem; }
+.res-prelim .ide-panel h3 { display: flex; align-items: center; gap: 0.5rem; }
+.res-prelim .input-group { margin-top: 0.75rem; }
+.res-prelim-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 1rem; }
+.res-auto { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-top: 0.5rem; }
+.res-auto-msg { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; color: #475569; }
+.res-auto-ok { color: #15803d; }
+.res-spin { animation: res-spin 1s linear infinite; }
+@keyframes res-spin { to { transform: rotate(360deg); } }

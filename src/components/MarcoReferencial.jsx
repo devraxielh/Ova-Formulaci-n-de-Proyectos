@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import EditorRico from './EditorRico';
 import {
     AlertTriangle, ArrowRight, BookOpen, CheckCircle2, Layers, Library, MapPin, Plus, Quote, Scale, Search, Target, Trash2,
 } from 'lucide-react';
@@ -11,6 +12,8 @@ import './Titulo.css';
 import './Planteamiento.css';
 import './Objetivos.css';
 import './Justificacion.css';
+import BuscarAntecedentes from './BuscarAntecedentes';
+import { autorCita } from '../services/apa';
 import './Marco.css';
 import './Alcances.css';
 
@@ -223,7 +226,7 @@ const Campo = ({ id, label, value, onChange, placeholder, rows = 1, className = 
     <label className={`mar-campo ${className}`} htmlFor={id}>
         <span>{label}</span>
         {rows > 1
-            ? <textarea id={id} className="textarea-field" rows={rows} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+            ? <EditorRico id={id} className="textarea-field" rows={rows} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
             : <input id={id} className="input-field" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />}
     </label>
 );
@@ -279,6 +282,17 @@ const Constructor = ({ intro, onNavigate }) => {
                     </div>
                     <p className="ide-field-hint mar-pregunta">{APARTADOS.find((a) => a.key === tab).pregunta}</p>
 
+                    {tab === 'antecedentes' && (
+                        <BuscarAntecedentes
+                            sugerencia={problema}
+                            onUsar={(ref) => {
+                                // La ficha queda con autor, año y título; el hallazgo lo escribe el estudiante después de leer el artículo.
+                                const ficha = { ...VACIO.antecedente, autor: autorCita(ref), anio: ref.anio, titulo: ref.titulo, ambito: 'Internacional' };
+                                const libre = f.antecedentes.findIndex((a) => !clean(a.autor) && !clean(a.titulo) && !clean(a.hallazgo));
+                                set('antecedentes')(libre >= 0 ? f.antecedentes.map((a, i) => (i === libre ? ficha : a)) : [...f.antecedentes, ficha].slice(0, 10));
+                            }}
+                        />
+                    )}
                     {tab === 'antecedentes' && (
                         <Fichas
                             items={f.antecedentes}

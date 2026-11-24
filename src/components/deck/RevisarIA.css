@@ -1,0 +1,39 @@
+.ria-btn { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.75rem; border-radius: 999px; border: 1px solid #c7d2fe; background: #eef2ff; color: #3730a3; font: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.ria-btn:hover { background: #e0e7ff; }
+.ria-btn:focus-visible { outline: 3px solid #a5b4fc; outline-offset: 2px; }
+.ria-btn b { display: inline-grid; place-items: center; min-width: 1.25rem; height: 1.25rem; padding: 0 0.3rem; border-radius: 999px; background: #dc2626; color: #fff; font-size: 0.72rem; }
+@media (max-width: 900px) { .ria-btn span { display: none; } }
+/* La app quita los márgenes por defecto (* { margin: 0 }), así que la ventana se centra de forma explícita. */
+.ria-modal { position: fixed; inset: 0; margin: auto; width: min(760px, calc(100vw - 2rem)); max-height: min(86vh, 900px); padding: 0; border: 0; border-radius: 1rem; background: #fff; color: #0f172a; box-shadow: 0 30px 80px rgb(15 23 42 / 0.35); }
+.ria-modal::backdrop { background: rgb(15 23 42 / 0.55); }
+.ria-box { display: flex; flex-direction: column; max-height: min(86vh, 900px); }
+.ria-head { display: flex; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.5rem 0.75rem; border-bottom: 1px solid #e2e8f0; }
+.ria-kicker { margin: 0; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #4f46e5; }
+.ria-head h2 { margin: 0.15rem 0 0; font-size: 1.3rem; }
+.ria-close { flex: none; display: grid; place-items: center; width: 2.4rem; height: 2.4rem; border: 1px solid #e2e8f0; border-radius: 0.6rem; background: #fff; cursor: pointer; color: #475569; }
+.ria-body { padding: 1rem 1.5rem; overflow-y: auto; display: grid; gap: 1rem; }
+.ria-body h3 { display: flex; align-items: center; gap: 0.4rem; margin: 0 0 0.5rem; font-size: 1rem; }
+.ria-body p { margin: 0; line-height: 1.55; font-size: 0.95rem; }
+.ria-vacio, .ria-cargando { color: #475569; display: flex; gap: 0.5rem; align-items: center; }
+.ria-error { color: #b91c1c; background: #fef2f2; padding: 0.6rem 0.8rem; border-radius: 0.6rem; display: flex; gap: 0.4rem; align-items: center; }
+.ria-aviso { background: #fef3c7; color: #92400e; padding: 0.5rem 0.8rem; border-radius: 0.6rem; font-size: 0.88rem !important; }
+.ria-nivel { padding: 0.75rem 0.9rem; border-radius: 0.75rem; background: #fef3c7; color: #78350f; }
+.ria-nivel b { display: block; }
+.ria-nivel[data-nivel='lista'] { background: #dcfce7; color: #14532d; }
+.ria-nivel[data-nivel='falta'] { background: #fee2e2; color: #7f1d1d; }
+.ria-bien { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.25rem; font-size: 0.93rem; color: #166534; }
+.ria-obs { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; counter-reset: obs; }
+.ria-obs li { border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 0.75rem 0.9rem; display: grid; gap: 0.35rem; }
+.ria-obs li[data-hecho='true'] { opacity: 0.55; }
+.ria-obs li[data-hecho='true'] p b { text-decoration: line-through; }
+.ria-tipo { justify-self: start; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; padding: 0.1rem 0.5rem; border-radius: 999px; background: #e0e7ff; color: #3730a3; }
+.ria-tipo[data-tipo='incoherencia'] { background: #fee2e2; color: #991b1b; }
+.ria-tipo[data-tipo='falta'] { background: #fef3c7; color: #92400e; }
+.ria-obs blockquote { margin: 0; padding-left: 0.6rem; border-left: 3px solid #cbd5e1; color: #475569; font-size: 0.88rem; }
+.ria-obs label { display: inline-flex; gap: 0.4rem; align-items: center; font-size: 0.85rem; color: #475569; cursor: pointer; }
+.ria-foot { display: flex; gap: 1rem; align-items: center; justify-content: space-between; padding: 0.85rem 1.5rem; border-top: 1px solid #e2e8f0; }
+.ria-foot small { color: #64748b; font-size: 0.78rem; line-height: 1.4; }
+.ria-accion { flex: none; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.55rem 1rem; border: 0; border-radius: 0.6rem; background: #4f46e5; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.ria-accion:disabled { opacity: 0.5; cursor: not-allowed; }
+.ria-spin { animation: ria-spin 1s linear infinite; }
+@keyframes ria-spin { to { transform: rotate(360deg); } }

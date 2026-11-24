@@ -1,0 +1,11 @@
+.red-acciones { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.red-accion { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.45rem 0.85rem; border-radius: 999px; border: 1px solid #c7d2fe; background: #fff; color: #3730a3; font: inherit; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
+.red-accion:hover:not(:disabled), .red-accion[data-activa='true'] { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+.red-accion:disabled { opacity: 0.55; cursor: default; }
+.ria-body h3 small { font-weight: 400; color: #64748b; font-size: 0.8rem; }
+.red-texto { padding: 0.7rem 0.85rem; border-radius: 0.6rem; background: #f8fafc; border: 1px solid #e2e8f0; max-height: 220px; overflow-y: auto; }
+.red-propuesta { background: #f0fdf4; border-color: #bbf7d0; }
+.red-decidir { display: inline-flex; gap: 0.5rem; flex: none; }
+.red-rechazar { padding: 0.55rem 1rem; border: 1px solid #cbd5e1; border-radius: 0.6rem; background: #fff; color: #334155; font: inherit; font-weight: 600; cursor: pointer; }
+.red-texto p { margin: 0 0 0.35rem; }
+.red-texto ul, .red-texto ol { margin: 0.2rem 0; padding-left: 1.4rem; }

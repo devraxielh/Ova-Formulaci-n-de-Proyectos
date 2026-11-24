@@ -1,12 +1,13 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
-    AlertTriangle, BookMarked, CheckCircle2, Clipboard, Download, Link2, Pencil, Plus, Quote, Search, Trash2, Wand2, X,
-} from 'lucide-react';
+    AlertTriangle, BookMarked, CheckCircle2, Clipboard, Download, Link2, Pencil, Plus, Quote, Search, Trash2, Wand2, X, ShieldCheck, Loader2 } from 'lucide-react';
 import { useProject, useProjectField } from '../context/ProjectContext';
 import {
     CAMPOS, TIPOS_REF, aBibtex, citaNarrativa, citaParentetica, claveRef, desdeCrossref, faltantes, ordenarReferencias, referenciaAPA, revisarCitas,
 } from '../services/apa';
 import { REFERENCIAS_CONOCIDAS } from '../data/referenciasConocidas';
+import BuscarAntecedentes from './BuscarAntecedentes';
+import { alertasRef, verificarRef } from '../services/verificarRefs';
 import './Proyecto.css';
 import './Referencias.css';
 
@@ -45,6 +46,27 @@ const Referencias = ({ onNavigate }) => {
     const [error, setError] = useState('');
     const [filtro, setFiltro] = useState('');
     const [copiado, copiar] = useCopiar();
+    // Verificación contra CrossRef: { [id]: resultado }. No se guarda en el proyecto; se vuelve a pedir cuando haga falta.
+    const [verificadas, setVerificadas] = useState({});
+    const [verificando, setVerificando] = useState(false);
+    const verificarTodas = async () => {
+        setVerificando(true);
+        const pendientes = (Array.isArray(refs) ? refs : []);
+        // De a tres para no saturar a CrossRef.
+        for (let i = 0; i < pendientes.length; i += 3) {
+            const grupo = pendientes.slice(i, i + 3);
+            // eslint-disable-next-line no-await-in-loop
+            const resultados = await Promise.all(grupo.map((r) => verificarRef(r)));
+            setVerificadas((prev) => ({ ...prev, ...Object.fromEntries(grupo.map((r, k) => [r.id, resultados[k]])) }));
+        }
+        setVerificando(false);
+    };
+    // Reemplaza los datos que no coinciden (o que faltan) por los del registro oficial.
+    const corregir = (ref, v) => {
+        const real = Object.fromEntries(Object.entries(v.real || {}).filter(([, valor]) => valor));
+        setRefs((prev) => (Array.isArray(prev) ? prev : []).map((r) => (r.id === ref.id ? { ...r, ...real, id: r.id } : r)));
+        setVerificadas((prev) => ({ ...prev, [ref.id]: { ...v, estado: 'ok', mensaje: 'Datos actualizados con el registro de CrossRef.', difs: [] } }));
+    };
     const formRef = useRef(null);
 
     const tipo = TIPOS_REF.find((x) => x.id === form.tipo) || TIPOS_REF[0];
@@ -162,6 +184,8 @@ const Referencias = ({ onNavigate }) => {
                 </ul>
             </section>
 
+            <BuscarAntecedentes />
+
             <div className="ref-grid">
                 {/* ---------- Formulario ---------- */}
                 <section className="pro-card ref-form" ref={formRef} aria-labelledby="ref-form-title">
@@ -243,6 +267,20 @@ const Referencias = ({ onNavigate }) => {
                         </button>
                     )}
 
+                    {lista.length > 0 && (
+                        <div className="ref-verificar">
+                            <button type="button" className="pro-btn pro-btn--ghost" onClick={verificarTodas} disabled={verificando}>
+                                {verificando ? <Loader2 size={15} className="ref-spin" /> : <ShieldCheck size={15} />} {verificando ? `Verificando… ${Object.keys(verificadas).length} de ${lista.length}` : 'Verificar que mis fuentes existen'}
+                            </button>
+                            {Object.keys(verificadas).length > 0 && !verificando && (() => {
+                                const vs = Object.values(verificadas);
+                                const n = (e) => vs.filter((x) => x.estado === e).length;
+                                return <small>{n('ok')} verificadas · {n('difiere') + n('sugerida')} con datos por corregir · {n('no-doi')} con DOI inexistente · {n('sin-verificar') + n('error')} sin verificar</small>;
+                            })()}
+                            <small className="ref-nota">Consulta cada fuente en CrossRef por su DOI o su título y compara año, autor y título. Una fuente «sin verificar» no es falsa: muchas publicaciones en español no están en CrossRef.</small>
+                        </div>
+                    )}
+
                     {lista.length === 0 ? (
                         <div className="pro-empty">
                             <p><strong>Todavía no tienes referencias.</strong></p>
@@ -251,6 +289,8 @@ const Referencias = ({ onNavigate }) => {
                     ) : (
                         <ol className="ref-items">
                             {visibles.map((ref) => {
+                                const v = verificadas[ref.id];
+                                const avisos = v ? v.avisos : alertasRef(ref);
                                 const faltan = faltantes(ref);
                                 const veces = revision.vecesDe(ref);
                                 return (
@@ -261,6 +301,14 @@ const Referencias = ({ onNavigate }) => {
                                             {faltan.length ? <span className="ref-tag ref-tag--mal"><AlertTriangle size={12} aria-hidden="true" /> Faltan: {faltan.join(', ')}</span> : <span className="ref-tag ref-tag--bien"><CheckCircle2 size={12} aria-hidden="true" /> Completa</span>}
                                             <span className={`ref-tag ${veces ? 'ref-tag--bien' : 'ref-tag--gris'}`}>{veces ? `Citada ${veces} ${veces === 1 ? 'vez' : 'veces'}` : 'Sin citar'}</span>
                                         </div>
+                                        {(v || avisos.length > 0) && (
+                                            <div className="ref-verif" data-estado={v?.estado || 'aviso'}>
+                                                {v && <p><b>{({ ok: 'Verificada', difiere: 'Revisa los datos', 'no-doi': 'DOI inexistente', sugerida: 'Encontrada en CrossRef', 'sin-verificar': 'Sin verificar', error: 'No se pudo consultar' })[v.estado]}.</b> {v.mensaje}</p>}
+                                                {v?.difs?.length > 0 && <ul>{v.difs.map((d) => <li key={d.campo}><b>{d.etiqueta}:</b> escribiste «{d.tuyo}»; el registro dice «{d.real}».</li>)}</ul>}
+                                                {avisos.map((a) => <p key={a.tipo}><AlertTriangle size={13} aria-hidden="true" /> {a.texto}</p>)}
+                                                {v && ['difiere', 'sugerida'].includes(v.estado) && <button type="button" className="pro-link" onClick={() => corregir(ref, v)}><Wand2 size={13} /> {v.estado === 'sugerida' ? `Completar con CrossRef (DOI ${v.doi})` : 'Corregir con los datos de CrossRef'}</button>}
+                                            </div>
+                                        )}
                                         <div className="ref-botones">
                                             <button type="button" className="pro-link" onClick={() => copiar(`p-${ref.id}`, citaParentetica(ref))}><Quote size={13} /> {copiado === `p-${ref.id}` ? 'Copiada' : citaParentetica(ref)}</button>
                                             <button type="button" className="pro-link" onClick={() => copiar(`n-${ref.id}`, citaNarrativa(ref))}><Quote size={13} /> {copiado === `n-${ref.id}` ? 'Copiada' : citaNarrativa(ref)}</button>

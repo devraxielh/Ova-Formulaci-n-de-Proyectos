@@ -1,8 +1,9 @@
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import { Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, Scale, LayoutGrid, Link, Compass, Library, PanelLeftClose, PanelLeftOpen, FolderOpen, UserRound, ShieldCheck, LogOut, CheckCircle2, ListOrdered, BarChart3, Flag, BookMarked, AlignLeft } from 'lucide-react';
-import Herramientas from './components/Herramientas';
+import { Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, Scale, Link, Compass, Library, PanelLeftClose, PanelLeftOpen, FolderOpen, UserRound, ShieldCheck, LogOut, CheckCircle2, ListOrdered, BarChart3, Flag, BookMarked, AlignLeft, FileSpreadsheet } from 'lucide-react';
 import { useProject } from './context/ProjectContext';
-import { buildDocument } from './services/projectDoc';
+import { CAMPOS_SECCION, SECTIONS, buildDocument } from './services/projectDoc';
+import { api } from './services/api';
+import './components/Proyecto.css';
 
 // Cada página se descarga solo cuando se abre: la primera carga del sitio es mucho más liviana.
 const Ideacion = lazy(() => import('./components/Ideacion'));
@@ -20,31 +21,62 @@ const Resultados = lazy(() => import('./components/Resultados'));
 const Conclusiones = lazy(() => import('./components/Conclusiones'));
 const Referencias = lazy(() => import('./components/Referencias'));
 const Resumen = lazy(() => import('./components/Resumen'));
+const EncuestaPublica = lazy(() => import('./components/EncuestaPublica'));
 const MiProyecto = lazy(() => import('./components/MiProyecto'));
 const Cuenta = lazy(() => import('./components/Cuenta'));
 const Admin = lazy(() => import('./components/Admin'));
 
-const TAB_ALIAS = { doi: 'referencias', poblacion: 'metodologia', 'plan-analisis': 'metodologia', cronograma: 'metodologia', presupuesto: 'metodologia' };
+const TAB_ALIAS = { instrumentos: 'metodologia', analisis: 'resultados', doi: 'referencias', poblacion: 'metodologia', 'plan-analisis': 'metodologia', cronograma: 'metodologia', presupuesto: 'metodologia' };
 
 // Herramientas que son clases en diapositivas: usan todo el espacio y recogen el menú.
 const DECK_TABS = ['ideacion', 'titulo', 'pregunta', 'planteamiento', 'objetivos', 'justificacion', 'alcances', 'introduccion', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'resumen'];
 
-const SAVE_LABEL = { local: 'Borrador en este navegador', saved: 'Guardado', saving: 'Guardando…', error: 'Sin guardar' };
+const SAVE_LABEL = { local: 'Borrador en este navegador', saved: 'Guardado', saving: 'Guardando…', offline: 'Sin conexión · se sube al volver', error: 'Sin guardar' };
+
+// Sección a la que pertenece cada campo del proyecto, para decir en qué parte hubo un choque.
+const seccionDe = (key) => {
+    const id = Object.keys(CAMPOS_SECCION).find((s) => CAMPOS_SECCION[s].includes(key));
+    return SECTIONS.find((s) => s.id === id)?.label || 'Otros datos del proyecto';
+};
+// Nombre visible de la pestaña donde está un compañero.
+const TAB_LABEL = { proyecto: 'Mi proyecto', ideacion: 'Ideación', titulo: 'Título', pregunta: 'Pregunta de investigación', planteamiento: 'Planteamiento', objetivos: 'Objetivos', introduccion: 'Introducción', justificacion: 'Justificación', alcances: 'Alcances y limitaciones', marco: 'Marco Referencial', metodologia: 'Metodología', fases: 'Desarrollo de las fases', resultados: 'Resultados y discusión', conclusiones: 'Conclusiones', resumen: 'Resumen', referencias: 'Referencias', cuenta: 'Mi cuenta' };
+
+// Errores del navegador → registro del servidor (se ven en Administración). Como mucho 5 por visita.
+let erroresEnviados = 0;
+const reportar = (message, stack) => {
+    if (erroresEnviados >= 5 || !message) return;
+    erroresEnviados += 1;
+    api.log({ message: String(message).slice(0, 300), stack: String(stack || '').slice(0, 1500), where: window.location.pathname + window.location.hash }).catch(() => {});
+};
+if (typeof window !== 'undefined' && !window.__psiaErrores) {
+    window.__psiaErrores = true;
+    window.addEventListener('error', (event) => reportar(event.message, event.error?.stack));
+    window.addEventListener('unhandledrejection', (event) => {
+        const reason = event.reason;
+        // Los errores de red o del servidor ya se muestran al usuario: no son fallos de la app.
+        if (reason?.name === 'ApiError') return;
+        reportar(reason?.message || String(reason), reason?.stack);
+    });
+}
 
 function App() {
-    const [selectedTab, setActiveTab] = useState('herramientas');
+    const [selectedTab, setActiveTab] = useState('proyecto');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-    const { user, project, saveState, verify, logout, data } = useProject();
+    const { user, authReady, project, saveState, verify, logout, data, conflict, others, setSection, resolveConflict, sinCupo, recheck } = useProject();
+    const [comprobando, setComprobando] = useState(false);
+    const [resetToken, setResetToken] = useState('');
+    const [encuestaToken] = useState(() => new URLSearchParams(window.location.search).get('encuesta') || '');
+    const [resolviendo, setResolviendo] = useState(false);
     // Herramientas que ya tienen contenido guardado en el proyecto: su ícono se muestra en verde.
-    const doneTabs = useMemo(() => new Set(buildDocument(data).filter((section) => section.content.length > 0).map((section) => section.tab)), [data]);
+    const doneTabs = useMemo(() => new Set(buildDocument(data).filter((section) => section.content.length > 0 && !section.extra).map((section) => section.tab)), [data]);
     const [signingOut, setSigningOut] = useState(false);
 
     const handleLogout = async () => {
         setSigningOut(true);
         try {
             await logout();
-            setActiveTab('herramientas');
+            setActiveTab('proyecto');
             closeSidebar();
         } catch {
             /* si falla, la sesión sigue abierta y el botón vuelve a estar disponible */
@@ -57,6 +89,27 @@ function App() {
     const isAdmin = user?.role === 'admin';
     // Con la contraseña inicial solo se puede estar en la cuenta, la cambie o no la pestaña elegida.
     const activeTab = user?.mustChangePassword ? 'cuenta' : selectedTab;
+
+    // Enlace para restablecer la contraseña: /?restablecer=TOKEN
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('restablecer');
+        if (!token) return;
+        params.delete('restablecer');
+        const rest = params.toString();
+        window.history.replaceState(null, '', `${window.location.pathname}${rest ? `?${rest}` : ''}${window.location.hash}`);
+        setResetToken(token);
+    }, []);
+
+    // Los compañeros ven en qué sección está cada uno.
+    useEffect(() => { setSection(activeTab); }, [activeTab, setSection]);
+
+    const resolver = async (choice) => {
+        setResolviendo(true);
+        try { await resolveConflict(choice); } catch { /* sigue abierto para reintentar */ } finally { setResolviendo(false); }
+    };
+    const aqui = others.filter((o) => o.tab === activeTab && DECK_TABS.includes(activeTab));
+    const enOtra = others.filter((o) => !aqui.includes(o));
 
     // Enlace de activación del correo: /?activar=TOKEN
     useEffect(() => {
@@ -74,12 +127,27 @@ function App() {
             .catch((error) => setActivation({ status: 'error', message: error.message }));
     }, [verify]);
 
+    // Mientras espera la autorización, la app consulta sola cada 30 segundos.
+    useEffect(() => {
+        if (!sinCupo) return undefined;
+        const timer = window.setInterval(() => { recheck().catch(() => {}); }, 30000);
+        return () => window.clearInterval(timer);
+    }, [sinCupo, recheck]);
+
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
     const closeSidebar = () => setIsSidebarOpen(false);
 
     const handleTabChange = (requested) => {
         // Población, plan de análisis, cronograma y presupuesto ahora son parte de la clase de Metodología.
         const tabId = TAB_ALIAS[requested] || requested;
+        // Los instrumentos viven dentro de Metodología › Construcción › pestaña «Instrumentos».
+        if (requested === 'instrumentos') {
+            try { window.sessionStorage.setItem('projectsia:metodologia:tab', 'instrumentos'); } catch { /* noop */ }
+        }
+        // El análisis de datos vive dentro de Resultados y discusión › Construcción.
+        if (requested === 'analisis') {
+            try { window.sessionStorage.setItem('projectsia:resultados:analisis', '1'); } catch { /* noop */ }
+        }
         setActiveTab(tabId);
         closeSidebar(); // Close sidebar on selection (mobile)
         // La presentación de Ideación necesita todo el ancho: se recoge el menú al abrirla
@@ -98,8 +166,6 @@ function App() {
 
     const renderContent = () => {
         switch (activeTab) {
-            case 'herramientas':
-                return <Herramientas onNavigate={handleTabChange} />;
             case 'ideacion':
                 return <Ideacion onNavigate={handleTabChange} />;
             case 'titulo':
@@ -147,7 +213,6 @@ function App() {
 
     const getTitle = () => {
         switch (activeTab) {
-            case 'herramientas': return 'Herramientas';
             case 'ideacion': return 'Fase de Ideación';
             case 'titulo': return 'Construcción del Título';
             case 'pregunta': return 'Pregunta de Investigación';
@@ -173,6 +238,43 @@ function App() {
             default: return '';
         }
     };
+
+    // Enlace público de una encuesta: /?encuesta=TOKEN (los participantes responden sin cuenta).
+    if (encuestaToken) {
+        return <Suspense fallback={<p className="app-cargando" role="status">Cargando…</p>}><EncuestaPublica token={encuestaToken} /></Suspense>;
+    }
+
+    // La app solo se usa con sesión iniciada: sin cuenta se muestra únicamente el ingreso o el registro.
+    if (!authReady) return <p className="app-cargando" role="status">Cargando…</p>;
+    if (!user) {
+        return (
+            <div className="app-acceso">
+                <Suspense fallback={<p className="app-cargando" role="status">Cargando…</p>}>
+                    <Cuenta onNavigate={handleTabChange} activation={activation} resetToken={resetToken} onResetDone={() => setResetToken('')} />
+                </Suspense>
+                <p className="app-acceso-pie">© Rodrigo García,PhD</p>
+            </div>
+        );
+    }
+
+    // Cuenta activa sin cupo: no puede crear proyectos hasta que el administrador lo autorice.
+    if (sinCupo && !isAdmin && !user.mustChangePassword) {
+        return (
+            <div className="app-acceso">
+                <section className="app-espera" role="status">
+                    <Layers size={30} color="#4f46e5" aria-hidden="true" />
+                    <h1>Tu cuenta está activa</h1>
+                    <p><b>Falta un paso:</b> el administrador debe autorizarte para crear tu proyecto. Ya le avisamos que estás esperando.</p>
+                    <p>Cuando lo haga te llegará un correo a <b>{user.email}</b> y esta página se actualizará sola. Si un compañero te invita a su proyecto, también lo verás aquí.</p>
+                    <div>
+                        <button type="button" className="pro-btn pro-btn--primary" disabled={comprobando} onClick={async () => { setComprobando(true); try { await recheck(); } catch { /* se reintenta solo */ } finally { setComprobando(false); } }}>{comprobando ? 'Comprobando…' : 'Comprobar ahora'}</button>
+                        <button type="button" className="pro-btn pro-btn--ghost" onClick={handleLogout} disabled={signingOut}>Cerrar sesión</button>
+                    </div>
+                </section>
+                <p className="app-acceso-pie">© Rodrigo García,PhD</p>
+            </div>
+        );
+    }
 
     return (
         <div className="app-container">
@@ -212,16 +314,7 @@ function App() {
                     </button>
                 </div>
 
-                <nav style={{ flex: 1, overflowY: 'auto', margin: '1rem -0.5rem', padding: '0 0.5rem' }}>
-                    <button
-                        className={`nav-button ${activeTab === 'herramientas' ? 'active' : ''}`}
-                        onClick={() => handleTabChange('herramientas')}
-                        title="Herramientas"
-                    >
-                        <LayoutGrid size={20} />
-                        <span>Herramientas</span>
-                    </button>
-
+                <nav style={{ flex: 1, overflowY: 'auto', margin: '0.4rem -0.5rem', padding: '0 0.5rem' }}>
                     {isAdmin && (
                         <button
                             className={`nav-button ${activeTab === 'admin' ? 'active' : ''}`}
@@ -416,7 +509,7 @@ function App() {
                     </button>
                 )}
 
-                <div className="sidebar-footer" style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid #e2e8f0' }}>
+                <div className="sidebar-footer" style={{ marginTop: 'auto', paddingTop: '0.6rem', borderTop: '1px solid #e2e8f0' }}>
                     <button type="button" className="sidebar-account" onClick={() => handleTabChange(user ? 'proyecto' : 'cuenta')}>
                         <b>{user ? project.name : 'Iniciar sesión'}</b>
                         <small data-state={saveState}>{user ? SAVE_LABEL[saveState] : 'Guarda tu proyecto en tu cuenta'}</small>
@@ -447,6 +540,25 @@ function App() {
                                     : 'Explora las herramientas interactivas para definir y estructurar tu proyecto de investigación de manera efectiva.'}
                         </p>
                     </header>
+                )}
+
+                {others.length > 0 && (
+                    <div className="app-presencia" data-aqui={aqui.length > 0} role="status">
+                        {aqui.length > 0
+                            ? <span><b>{aqui.map((o) => o.name).join(', ')}</b> {aqui.length > 1 ? 'están' : 'está'} en esta misma sección ahora. Para no pisarse, pónganse de acuerdo antes de editarla.</span>
+                            : <span>Conectados ahora: {enOtra.map((o) => `${o.name} (${TAB_LABEL[o.tab] || 'otra sección'})`).join(', ')}.</span>}
+                    </div>
+                )}
+
+                {conflict && (
+                    <div className="app-choque" role="alertdialog" aria-label="Cambios al mismo tiempo">
+                        <p><b>Dos personas editaron lo mismo a la vez.</b> {[...new Set(conflict.keys.map((c) => c.by))].join(' y ')} guardó cambios en {[...new Set(conflict.keys.map((c) => `«${seccionDe(c.key)}»`))].join(', ')} mientras tú escribías. Tu versión todavía no se ha guardado.</p>
+                        <div>
+                            <button type="button" className="pro-btn pro-btn--primary" disabled={resolviendo} onClick={() => resolver('mine')}>Guardar la mía</button>
+                            <button type="button" className="pro-btn pro-btn--ghost" disabled={resolviendo} onClick={() => resolver('theirs')}>Quedarme con la de {conflict.keys[0].by}</button>
+                        </div>
+                        <small>Si guardas la tuya, la del compañero queda en Mi proyecto › Historial de versiones.</small>
+                    </div>
                 )}
 
                 <div className="fade-in">

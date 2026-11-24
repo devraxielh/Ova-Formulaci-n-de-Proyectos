@@ -1,0 +1,51 @@
+.ins-page { display: grid; gap: 1rem; }
+.ins-page h2, .ins-page h3 { display: flex; align-items: center; gap: 0.45rem; margin: 0 0 0.5rem; }
+.ins-page h3 { font-size: 1rem; }
+.ins-nuevo-form { display: grid; grid-template-columns: 1fr 2fr 110px; gap: 0.75rem; margin: 0.75rem 0; }
+.ins-nuevo-form label, .ins-campo { display: grid; gap: 0.25rem; font-size: 0.85rem; font-weight: 600; color: #334155; }
+.ins-acciones { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+.ins-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.ins-tabs button { padding: 0.45rem 0.9rem; border-radius: 999px; border: 1px solid #e2e8f0; background: #fff; font: inherit; font-size: 0.88rem; font-weight: 600; cursor: pointer; color: #334155; }
+.ins-tabs button[aria-selected='true'] { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+.ins-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 1rem; align-items: start; }
+.ins-lado { display: grid; gap: 1rem; position: sticky; top: 1rem; }
+.ins-head { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 0.75rem; }
+.ins-titulo { flex: 1; font-weight: 700; font-size: 1.05rem; }
+.ins-preguntas { list-style: none; margin: 1rem 0; padding: 0; display: grid; gap: 0.6rem; }
+.ins-pregunta { border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.7rem; display: grid; gap: 0.45rem; background: #fff; }
+.ins-pregunta-top { display: grid; grid-template-columns: 1.6rem 1fr auto; gap: 0.5rem; align-items: start; }
+.ins-pregunta-top > b { display: grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 999px; background: #eef2ff; color: #3730a3; font-size: 0.8rem; margin-top: 0.3rem; }
+.ins-mover { display: grid; gap: 0.2rem; }
+.ins-mover button { display: grid; place-items: center; width: 1.7rem; height: 1.7rem; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; color: #475569; cursor: pointer; }
+.ins-mover button:disabled { opacity: 0.35; cursor: default; }
+.ins-pregunta-opts { display: flex; flex-wrap: wrap; gap: 0.5rem; padding-left: 2.1rem; }
+.ins-pregunta-opts select { width: auto; }
+.ins-pregunta > input, .ins-escala { margin-left: 2.1rem; }
+.ins-pregunta > input { width: calc(100% - 2.1rem); }
+.ins-escala { color: #64748b; font-size: 0.78rem; }
+.ins-cobertura { list-style: none; padding: 0; margin: 0.6rem 0 0; display: grid; gap: 0.25rem; font-size: 0.86rem; }
+.ins-cobertura li { display: flex; align-items: center; gap: 0.35rem; color: #b45309; }
+.ins-cobertura li[data-ok='true'] { color: #15803d; }
+.ins-estado { font-size: 0.9rem; color: #b45309; margin: 0 0 0.5rem; }
+.ins-estado[data-open='true'] { color: #15803d; }
+.ins-enlace { display: flex; gap: 0.4rem; }
+.ins-enlace input { flex: 1; font-size: 0.8rem; }
+.ins-spin { animation: ins-spin 1s linear infinite; }
+@keyframes ins-spin { to { transform: rotate(360deg); } }
+@media (max-width: 980px) { .ins-grid { grid-template-columns: 1fr; } .ins-lado { position: static; } .ins-nuevo-form { grid-template-columns: 1fr; } }
+
+/* Formulario público de la encuesta */
+.enc-page { min-height: 100vh; background: #f1f5f9; padding: 1.25rem 1rem 3rem; }
+.enc-card { max-width: 720px; margin: 0 auto; background: #fff; border-radius: 16px; padding: clamp(1.1rem, 4vw, 2rem); box-shadow: 0 10px 30px rgb(15 23 42 / 0.08); display: grid; gap: 1.1rem; }
+.enc-card h1 { font-size: 1.4rem; margin: 0; }
+.enc-intro { color: #475569; line-height: 1.6; margin: 0; white-space: pre-wrap; }
+.enc-pregunta { border: 0; padding: 0; margin: 0; display: grid; gap: 0.5rem; }
+.enc-pregunta legend { font-weight: 600; line-height: 1.45; padding: 0; margin-bottom: 0.4rem; }
+.enc-pregunta legend small { color: #dc2626; }
+.enc-opciones { display: grid; gap: 0.35rem; }
+.enc-opciones label { display: flex; gap: 0.55rem; align-items: center; padding: 0.55rem 0.7rem; border: 1px solid #e2e8f0; border-radius: 10px; cursor: pointer; }
+.enc-opciones label:has(input:checked) { border-color: #4f46e5; background: #eef2ff; }
+.enc-pie { color: #64748b; font-size: 0.8rem; text-align: center; margin: 0; }
+.enc-gracias { text-align: center; padding: 2rem 0; display: grid; gap: 0.5rem; justify-items: center; color: #166534; }
+/* Dentro de Metodología › Instrumentos */
+.ins-embebido { margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px dashed #c7d2fe; }

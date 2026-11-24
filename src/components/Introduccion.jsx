@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import EditorRico from './EditorRico';
 import { AlertTriangle, BookOpen, CheckCircle2, Clock, Eye, Target, Wand2, XCircle } from 'lucide-react';
 import SlideDeck, { Opciones, Pestanas } from './deck/SlideDeck';
 import { useProject, useProjectField } from '../context/ProjectContext';
@@ -393,7 +394,7 @@ const Constructor = ({ intro }) => {
                                 <mark data-part={parte.color} data-active="true">{index + 1}</mark> {parte.label}
                             </label>
                             <small className="jus-what">{parte.what}</small>
-                            <textarea
+                            <EditorRico
                                 id={`int-${parte.key}`}
                                 className="textarea-field pla-textarea"
                                 rows={4}

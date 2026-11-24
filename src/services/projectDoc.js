@@ -1,4 +1,6 @@
 import { ordenarReferencias, referenciaAPA } from './apa.js';
+import { partesObjetivos } from './coherencia.js';
+import { bloquesInstrumento, preguntasDe, ubicacionDe } from './instrumentos.js';
 
 // Arma el documento del proyecto a partir de lo guardado en cada herramienta.
 // Cada sección produce "bloques" neutros que se pintan en pantalla o se exportan a Word.
@@ -10,9 +12,11 @@ const list = (value) => (Array.isArray(value) ? value : []);
 export const parseBlocks = (raw) => {
     const blocks = [];
     let items = null;
+    let nums = null; // números originales cuando la lista venía numerada (1., 2., …)
     const flush = () => {
-        if (items) blocks.push({ type: 'list', items });
+        if (items) blocks.push(nums ? { type: 'list', items, nums } : { type: 'list', items });
         items = null;
+        nums = null;
     };
 
     text(raw).split('\n').forEach((line) => {
@@ -27,10 +31,13 @@ export const parseBlocks = (raw) => {
             blocks.push({ type: 'heading', text: heading[1].replace(/\*\*/g, '') });
             return;
         }
-        const bullet = trimmed.match(/^(?:[-*•]|\d+[.)])\s+(.*)$/);
+        const bullet = trimmed.match(/^(?:[-*•]|(\d+)[.)])\s+(.*)$/);
         if (bullet) {
+            // Una lista es numerada o de viñetas, no mezcla: si cambia el tipo, empieza otra.
+            if (items && Boolean(nums) !== Boolean(bullet[1])) flush();
             items = items || [];
-            items.push(bullet[1]);
+            items.push(bullet[2]);
+            if (bullet[1]) { nums = nums || []; nums.push(bullet[1]); }
             return;
         }
         flush();
@@ -45,6 +52,13 @@ export const parseBlocks = (raw) => {
 export const splitBold = (value) => String(value).split(/(\*\*[^*]+\*\*)/g).filter(Boolean).map((part) => (
     part.startsWith('**') && part.endsWith('**') ? { bold: true, text: part.slice(2, -2) } : { bold: false, text: part }
 ));
+
+// Igual, pero también reconoce *cursiva* (lo que produce el editor visual).
+export const splitInline = (value) => String(value).split(/(\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/g).filter(Boolean).map((part) => {
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) return { bold: true, text: part.slice(2, -2) };
+    if (part.startsWith('*') && part.endsWith('*') && part.length > 2 && !part.startsWith('**')) return { italic: true, text: part.slice(1, -1) };
+    return { text: part };
+});
 
 const ideaSentence = (idea) => {
     if (!idea) return '';
@@ -71,9 +85,158 @@ const ideaBlocks = (idea) => {
     return blocks;
 };
 
-const titled = (label, raw) => (text(raw) ? [{ type: 'heading', text: label }, ...parseBlocks(raw)] : []);
+// Los títulos escritos dentro del texto (### o **Algo:**) quedan como subtítulos en negrita, fuera del índice.
+const cuerpo = (raw) => parseBlocks(raw).map((b) => (b.type === 'heading' ? { type: 'sub', text: b.text } : b));
+// Subsección del índice (nivel 2 o 3), p. ej. «6.1 Antecedentes».
+const titled = (label, raw, level = 2) => (text(raw) ? [{ type: 'heading', level, text: label }, ...cuerpo(raw)] : []);
+// Subtítulo en negrita que no va al índice.
+const conSub = (label, raw) => (text(raw) ? [{ type: 'sub', text: label }, ...cuerpo(raw)] : []);
+
+// En Objetivos solo «Objetivo general» y «Objetivos específicos» son subsecciones.
+const objetivosBlocks = (raw) => parseBlocks(raw).map((b) => {
+    if (b.type !== 'heading') return b;
+    if (/objetivo\s+general/i.test(b.text)) return { type: 'heading', level: 2, text: 'Objetivo general' };
+    if (/objetivos\s+espec/i.test(b.text)) return { type: 'heading', level: 2, text: 'Objetivos específicos' };
+    return { type: 'sub', text: b.text };
+});
+
+// Textos modelo de los preliminares; cada institución puede exigir su redacción oficial.
+export const DECLARACION_ORIGINALIDAD = (titulo) => `Declaro bajo la gravedad del juramento que he escrito el presente proyecto${titulo ? `, «${titulo}»,` : ''} por mi propia cuenta y que, por lo tanto, su contenido es original. Declaro que he indicado clara y precisamente todas las fuentes directas e indirectas de información y que este documento no ha sido entregado a otra institución con fines de calificación o publicación.`;
+export const DECLARACION_EXONERACION = () => 'Declaro que la responsabilidad intelectual del presente trabajo es exclusivamente de su autor o autores. La institución no se hace responsable de los contenidos, opiniones o ideologías expresadas total o parcialmente en él.';
 
 const money = (value) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number(value) || 0);
+
+/* ---------- Figuras y tablas propias, Gantt, matriz y anexos ---------- */
+
+// Secciones donde el estudiante puede ubicar una figura o una tabla propia.
+export const SECCIONES_ELEMENTOS = [
+    { id: 'resultados', label: 'Resultados y discusión' },
+    { id: 'marco', label: 'Marco Referencial' },
+    { id: 'metodologia', label: 'Metodología' },
+    { id: 'fases', label: 'Desarrollo de las fases' },
+];
+
+// Bloques de las figuras y tablas que el estudiante ubicó en una sección (data.elementos).
+const elementosDe = (d, seccion) => list(d.elementos)
+    .filter((e) => e && (e.seccion || 'resultados') === seccion)
+    .map((e) => {
+        if (e.tipo === 'figura') {
+            return e.fileId ? { type: 'figure', elementoId: e.id, despues: Number(e.despues) || 0, citar: e.citar !== false, caption: text(e.titulo) || 'Figura sin título', nota: text(e.nota), fileId: e.fileId, w: Number(e.w) || 0, h: Number(e.h) || 0 } : null;
+        }
+        const head = list(e.head).map((c) => text(String(c ?? '')));
+        const rows = list(e.rows).map((r) => list(r).map((c) => text(String(c ?? '')))).filter((r) => r.some(Boolean));
+        return head.some(Boolean) && rows.length ? { type: 'table', elementoId: e.id, despues: Number(e.despues) || 0, citar: e.citar !== false, caption: text(e.titulo) || 'Tabla sin título', nota: text(e.nota), head, rows } : null;
+    })
+    .filter(Boolean);
+
+// Ubica cada tabla o figura después del párrafo que eligió el estudiante (o al final del texto de la sección).
+// Solo se agregan a secciones que ya tienen texto (una figura sola no da la sección por hecha).
+const conElementos = (d, seccion, blocks) => {
+    if (!blocks.length) return blocks;
+    const elementos = elementosDe(d, seccion);
+    if (!elementos.length) return blocks;
+    const out = [];
+    let n = 0;
+    blocks.forEach((b) => {
+        if (b.type !== 'paragraph') { out.push(b); return; }
+        n += 1;
+        const aqui = elementos.filter((e) => e.despues === n);
+        // El párrafo recuerda qué elementos lo siguen, para citarlos solo si el estudiante no lo hizo.
+        out.push(aqui.some((e) => e.citar) ? { ...b, citaDe: aqui.filter((e) => e.citar).map((e) => e.elementoId) } : b);
+        out.push(...aqui);
+    });
+    return [...out, ...elementos.filter((e) => !e.despues || e.despues > n)];
+};
+
+// Texto de la sección donde se pueden ubicar tablas y figuras (lo usa el editor para listar los párrafos).
+const BASE_ELEMENTOS = {
+    resultados: (d) => conSub('Resultados', d.resultados),
+    marco: (d) => [
+        ...titled('Antecedentes', d.marcoAntecedentes), ...titled('Marco teórico', d.marcoTeorico), ...titled('Marco Conceptual', d.marcoConceptual),
+        ...titled('Marco Contextual', d.marcoContextual), ...titled('Marco legal', d.marcoLegal),
+    ],
+    metodologia: (d) => {
+        // Los instrumentos armados en «Instrumentos» van completos dentro de «Instrumentos de recolección de información».
+        const propios = list(d.instrumentosGen)
+            .filter((ins) => ins && ubicacionDe(ins) === 'plan' && preguntasDe(ins).length > 0)
+            .flatMap((ins) => [{ type: 'sub', text: text(ins.titulo) || 'Instrumento de recolección' }, ...bloquesInstrumento(ins)]);
+        const descripcion = titled('Instrumentos de recolección de información', d.instrumentos, 3);
+        const instrumentos = propios.length && !descripcion.length ? [{ type: 'heading', level: 3, text: 'Instrumentos de recolección de información' }] : descripcion;
+        return [...titled('Plan de análisis de la información', d.metPlanAnalisis), ...instrumentos, ...propios];
+    },
+    fases: (d) => cuerpo(d.fases),
+};
+export const parrafosDe = (d, seccion) => (BASE_ELEMENTOS[seccion]?.(d || {}) || []).filter((b) => b.type === 'paragraph').map((b) => b.text);
+
+// Marca que el estudiante puede escribir en cualquier texto para citar una tabla o figura: [[id]] → «Tabla 2».
+const MARCA = /\[\[([a-z0-9]{5,9})\]\]/g;
+
+// Diagrama de Gantt a partir del cronograma: una fila por actividad y una columna por periodo.
+const ganttBlock = (d) => {
+    const rows = list(d.cronogramaItems)
+        .map((item) => ({ fase: text(item.fase), actividad: text(item.actividad), inicio: Math.max(1, Number(item.inicio) || 1), fin: Number(item.fin) || 0 }))
+        .map((r) => ({ ...r, fin: Math.max(r.inicio, r.fin) }))
+        .filter((r) => r.actividad || r.fase);
+    if (!rows.length) return [];
+    const total = Math.min(24, Math.max(Number(d.ganttPeriodos) || 0, ...rows.map((r) => r.fin)));
+    return [{ type: 'gantt', caption: 'Diagrama de Gantt del proyecto', unidad: d.ganttUnidad === 'semanal' ? 'Semana' : 'Mes', total, rows }];
+};
+
+// Matriz de consistencia: pregunta, objetivos, método e instrumentos en una sola tabla.
+export const matrizConsistencia = (d) => {
+    const { general, especificos } = partesObjetivos(d.objetivos);
+    const pregunta = text(d.pregunta).split('\n')[0].replace(/[#*]/g, '').trim();
+    if (!especificos.length || (!pregunta && !general)) return null;
+    const f = d.metodologiaForm || {};
+    const corto = (v) => (typeof v === 'string' && v.trim().length <= 60 ? v.trim() : '');
+    const metodo = [['Enfoque', corto(d.enfoque)], ['Tipo', corto(d.tipoInvestigacion)], ['Diseño', corto(d.diseno)]]
+        .filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join('. ');
+    const instrumentos = list(f.instrumentos).filter((i) => i && text(i.instrumento));
+    const rows = especificos.map((objetivo, index) => {
+        const propios = instrumentos.filter((i) => i.objetivo === `el objetivo específico ${index + 1}` || i.objetivo === 'todos los objetivos específicos');
+        const tecnica = propios.map((i) => `${text(i.tecnica)}: ${text(i.instrumento)}${text(i.aplicaA) ? ` (${text(i.aplicaA)})` : ''}`).join('; ');
+        return [index === 0 ? pregunta : '', index === 0 ? (general || text(d.objetivoGeneral)) : '', objetivo, index === 0 ? metodo : '', tecnica];
+    });
+    return { type: 'table', compact: true, head: ['Pregunta de investigación', 'Objetivo general', 'Objetivos específicos', 'Metodología', 'Técnicas e instrumentos'], rows };
+};
+
+const LETRAS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+// Anexos: la matriz de consistencia (automática, se puede ocultar) y los que agregue el estudiante, p. ej. el instrumento completo.
+const anexosBlocks = (d) => {
+    const partes = [];
+    const matriz = d.matrizOculta ? null : matrizConsistencia(d);
+    if (matriz) partes.push({ titulo: 'Matriz de consistencia', blocks: [matriz] });
+    // Instrumentos que el estudiante prefirió dejar como anexo (por defecto van dentro del Plan de análisis).
+    list(d.instrumentosGen).forEach((ins) => {
+        if (ins && ubicacionDe(ins) === 'anexo' && preguntasDe(ins).length > 0) partes.push({ titulo: text(ins.titulo) || 'Instrumento de recolección', blocks: bloquesInstrumento(ins) });
+    });
+    list(d.anexos).forEach((a) => {
+        if (a && text(a.contenido)) partes.push({ titulo: text(a.titulo) || 'Anexo', blocks: cuerpo(a.contenido) });
+    });
+    return partes.flatMap((parte, i) => [{ type: 'heading', level: 2, text: `Anexo ${LETRAS[i] || i + 1}. ${parte.titulo}` }, ...parte.blocks]);
+};
+
+// Campos del proyecto que pertenecen a cada sección: sirven para restaurar una sección desde el historial.
+export const CAMPOS_SECCION = {
+    idea: ['idea', 'ideasIA'],
+    titulo: ['titulo', 'tituloForm', 'tituloIA', 'titulosIA'],
+    resumen: ['resumen', 'resumenForm', 'palabrasClave', 'abstract', 'keywords', 'abstractFuente', 'abstractManual'],
+    preliminares: ['integrantes', 'director', 'ciudad', 'dedicatoria', 'agradecimientos', 'declaracionOriginalidad', 'declaracionExoneracion'],
+    introduccion: ['introduccion', 'introduccionForm'],
+    planteamiento: ['planteamiento', 'planteamientoForm'],
+    pregunta: ['pregunta', 'preguntaForm', 'preguntaTipo'],
+    objetivos: ['objetivos', 'objetivosForm', 'objetivoGeneral'],
+    justificacion: ['justificacion', 'justificacionForm'],
+    alcances: ['alcances', 'alcancesForm', 'limitaciones'],
+    marco: ['marcoAntecedentes', 'marcoTeorico', 'marcoConceptual', 'marcoContextual', 'marcoLegal', 'marcoForm'],
+    metodologia: ['metodologia', 'metodologiaForm', 'metEnfoque', 'metTipo', 'metDiseno', 'metPlanAnalisis', 'poblacionSugerida', 'poblacionTamano', 'poblacionTipo', 'muestraConfianza', 'muestraError', 'instrumentos', 'presupuesto', 'cronogramaItems', 'ganttPeriodos', 'ganttUnidad', 'enfoque', 'tipoInvestigacion', 'diseno', 'instrumentosGen'],
+    fases: ['fases', 'fasesForm'],
+    resultados: ['resultados', 'discusion', 'resultadosForm', 'elementos', 'cualitativo'],
+    conclusiones: ['conclusiones', 'conclusionesForm', 'recomendaciones'],
+    referencias: ['referencias'],
+    anexos: ['anexos', 'matrizOculta'],
+};
 
 export const SECTIONS = [
     { id: 'titulo', label: 'Título', tab: 'titulo', blocks: (d) => (text(d.titulo) ? [{ type: 'paragraph', text: text(d.titulo) }] : []) },
@@ -87,28 +250,45 @@ export const SECTIONS = [
             ...(text(d.palabrasClave) ? [{ type: 'plain', text: `*Palabras clave:* ${text(d.palabrasClave)}.`, keywords: true }] : []),
         ] : []),
     },
-    { id: 'introduccion', label: 'Introducción', tab: 'introduccion', blocks: (d) => parseBlocks(d.introduccion) },
-    { id: 'planteamiento', label: 'Planteamiento del problema', tab: 'planteamiento', blocks: (d) => parseBlocks(d.planteamiento) },
-    { id: 'pregunta', label: 'Pregunta de investigación', tab: 'pregunta', blocks: (d) => parseBlocks(d.pregunta) },
-    { id: 'objetivos', label: 'Objetivos', tab: 'objetivos', blocks: (d) => parseBlocks(d.objetivos) },
-    { id: 'justificacion', label: 'Justificación', tab: 'justificacion', blocks: (d) => parseBlocks(d.justificacion) },
+    {
+        id: 'abstract',
+        label: 'Abstract',
+        tab: 'resumen',
+        extra: true,
+        blocks: (d) => (text(d.abstract) ? [
+            { type: 'plain', text: text(d.abstract) },
+            ...(text(d.keywords) ? [{ type: 'plain', text: `*Keywords:* ${text(d.keywords)}.`, keywords: true }] : []),
+        ] : []),
+    },
+    {
+        id: 'preliminares',
+        label: 'Preliminares',
+        tab: 'resumen',
+        extra: true,
+        // Aparecen en cuanto el proyecto tiene título; el estudiante puede reemplazar el texto modelo.
+        blocks: (d) => (text(d.titulo) ? [
+            { type: 'heading', level: 2, text: 'Declaración de originalidad y autonomía' },
+            ...cuerpo(text(d.declaracionOriginalidad) || DECLARACION_ORIGINALIDAD(text(d.titulo))),
+            { type: 'heading', level: 2, text: 'Declaración de exoneración de responsabilidad' },
+            ...cuerpo(text(d.declaracionExoneracion) || DECLARACION_EXONERACION()),
+        ] : []),
+    },
+    { id: 'introduccion', label: 'Introducción', tab: 'introduccion', blocks: (d) => cuerpo(d.introduccion) },
+    { id: 'planteamiento', label: 'Planteamiento del problema', tab: 'planteamiento', blocks: (d) => cuerpo(d.planteamiento) },
+    { id: 'pregunta', label: 'Pregunta de investigación', tab: 'pregunta', blocks: (d) => cuerpo(d.pregunta) },
+    { id: 'objetivos', label: 'Objetivos', tab: 'objetivos', blocks: (d) => objetivosBlocks(d.objetivos) },
+    { id: 'justificacion', label: 'Justificación', tab: 'justificacion', blocks: (d) => cuerpo(d.justificacion) },
     {
         id: 'alcances',
-        label: 'Alcances y limitaciones',
+        label: 'Alcances y Limitaciones del Proyecto',
         tab: 'alcances',
-        blocks: (d) => [...parseBlocks(d.alcances), ...titled('Limitaciones', d.limitaciones)],
+        blocks: (d) => [...cuerpo(d.alcances), ...conSub('Limitaciones', d.limitaciones)],
     },
     {
         id: 'marco',
-        label: 'Marco referencial',
+        label: 'Marco Referencial',
         tab: 'marco',
-        blocks: (d) => [
-            ...titled('Antecedentes', d.marcoAntecedentes),
-            ...titled('Marco Teórico', d.marcoTeorico),
-            ...titled('Marco Conceptual', d.marcoConceptual),
-            ...titled('Marco Contextual', d.marcoContextual),
-            ...titled('Marco Legal', d.marcoLegal),
-        ],
+        blocks: (d) => conElementos(d, 'marco', BASE_ELEMENTOS.marco(d)),
     },
     {
         id: 'metodologia',
@@ -121,12 +301,13 @@ export const SECTIONS = [
                     .filter(([, value]) => text(value))
                     .map(([label, value]) => `**${label}:** ${text(value)}`)
                     .reduce((acc, item) => { acc[0].items.push(item); return acc; }, [{ type: 'list', items: [] }])
-                    .filter((block) => block.items.length)), ...parseBlocks(d.metodologia)]
+                    .filter((block) => block.items.length)), ...cuerpo(d.metodologia)]
                 : [];
             const crono = list(d.cronogramaItems);
             const cronoBlocks = crono.length
-                ? [{ type: 'heading', text: 'Cronograma' }, {
+                ? [{ type: 'heading', level: 2, text: 'Cronograma' }, {
                     type: 'table',
+                    caption: 'Cronograma de actividades',
                     head: ['Fase', 'Actividad', `${d.ganttUnidad === 'semanal' ? 'Semana' : 'Mes'} de inicio`, `${d.ganttUnidad === 'semanal' ? 'Semana' : 'Mes'} de fin`],
                     rows: crono.map((item) => [text(item.fase), text(item.actividad), String(item.inicio ?? ''), String(item.fin ?? '')]),
                 }]
@@ -135,16 +316,17 @@ export const SECTIONS = [
                         const activities = list(group.activities)
                             .map((activity) => text(activity.actividad || activity.nombre || activity.name || activity.title || activity.activity))
                             .filter(Boolean);
-                        return [{ type: 'heading', text: text(group.title) || 'Objetivo' }, ...(activities.length ? [{ type: 'list', items: activities }] : [])];
+                        return [{ type: 'sub', text: text(group.title) || 'Objetivo' }, ...(activities.length ? [{ type: 'list', items: activities }] : [])];
                     }).flat();
-                    const body = [...parseBlocks(d.cronograma), ...groups];
-                    return body.length ? [{ type: 'heading', text: 'Cronograma' }, ...body] : [];
+                    const body = [...cuerpo(d.cronograma), ...groups];
+                    return body.length ? [{ type: 'heading', level: 2, text: 'Cronograma' }, ...body] : [];
                 })();
             const items = list(d.presupuesto);
             const total = items.reduce((sum, item) => sum + (Number(item.costo) || 0), 0);
             const presuBlocks = items.length
-                ? [{ type: 'heading', text: 'Presupuesto' }, {
+                ? [{ type: 'heading', level: 2, text: 'Presupuesto' }, {
                     type: 'table',
+                    caption: 'Presupuesto del proyecto',
                     head: ['Rubro', 'Descripción', 'Fuente', 'Costo'],
                     rows: items.map((item) => [text(item.categoria), text(item.descripcion), text(item.fuente), money(item.costo)]),
                     foot: ['Total', '', '', money(total)],
@@ -154,25 +336,26 @@ export const SECTIONS = [
                 ...legacy,
                 ...titled('Enfoque de investigación', d.metEnfoque),
                 ...titled('Tipos de investigación', d.metTipo),
-                ...titled('Diseños de investigación', d.metDiseno),
+                ...titled('Diseños de Investigación', d.metDiseno),
                 ...titled('Población y muestra', d.poblacionSugerida),
-                ...titled('Plan de análisis de la información', d.metPlanAnalisis),
-                ...titled('Instrumentos de recolección de información', d.instrumentos),
+                ...conElementos(d, 'metodologia', BASE_ELEMENTOS.metodologia(d)),
                 ...cronoBlocks,
+                ...(crono.length ? ganttBlock(d) : []),
                 ...presuBlocks,
             ];
         },
     },
-    { id: 'fases', label: 'Desarrollo de las fases del proyecto', tab: 'fases', blocks: (d) => parseBlocks(d.fases) },
-    { id: 'resultados', label: 'Resultados y discusión', tab: 'resultados', blocks: (d) => [...titled('Resultados', d.resultados), ...titled('Discusión', d.discusion)] },
-    { id: 'conclusiones', label: 'Conclusiones', tab: 'conclusiones', blocks: (d) => [...parseBlocks(d.conclusiones), ...titled('Recomendaciones', d.recomendaciones)] },
+    { id: 'fases', label: 'Desarrollo de las fases del proyecto', tab: 'fases', blocks: (d) => conElementos(d, 'fases', BASE_ELEMENTOS.fases(d)) },
+    { id: 'resultados', label: 'Resultados y discusión', tab: 'resultados', blocks: (d) => [...conElementos(d, 'resultados', BASE_ELEMENTOS.resultados(d)), ...conSub('Discusión', d.discusion)] },
+    { id: 'conclusiones', label: 'Conclusiones', tab: 'conclusiones', blocks: (d) => [...cuerpo(d.conclusiones), ...conSub('Recomendaciones', d.recomendaciones)] },
     {
         id: 'referencias',
-        label: 'Referencias',
+        label: 'Referencias bibliográficas',
         tab: 'referencias',
         // Lista final en APA 7, en orden alfabético y con sangría francesa.
         blocks: (d) => ordenarReferencias(list(d.referencias)).map((ref) => ({ type: 'reference', text: referenciaAPA(ref) })),
     },
+    { id: 'anexos', label: 'Anexos', tab: 'proyecto', extra: true, blocks: anexosBlocks },
     { id: 'idea', label: 'Idea de investigación', inDocument: false, tab: 'ideacion', blocks: (d) => ideaBlocks(d.idea) },
 ];
 
@@ -181,20 +364,94 @@ export const BUILD_ORDER = ['ideacion', 'titulo', 'pregunta', 'planteamiento', '
 
 export const buildDocument = (data) => SECTIONS.map((section) => ({ ...section, content: section.blocks(data || {}) }));
 
+/* ---------- Estructura numerada (como la plantilla institucional) ---------- */
+
+// Sin número: preliminares del documento y referencias.
+const SIN_NUMERO = new Set(['titulo', 'resumen', 'abstract', 'preliminares', 'referencias', 'anexos']);
+
+// Devuelve las secciones visibles con su número («6 Marco Referencial», «6.1 Antecedentes», «7.5.1 …»).
+// La pregunta de investigación pasa a ser «2.1 Formulación o Pregunta de Investigación» dentro del planteamiento.
+export const documentoNumerado = (sections) => {
+    const visibles = sections.filter((s) => s.content.length > 0 && s.inDocument !== false);
+    const pregunta = visibles.find((s) => s.id === 'pregunta');
+    const formulacion = pregunta ? [{ type: 'heading', level: 2, text: 'Formulación o Pregunta de Investigación' }, ...pregunta.content] : [];
+    const conPlanteamiento = visibles.some((s) => s.id === 'planteamiento');
+    const lista = visibles.flatMap((s) => {
+        if (s.id === 'planteamiento') return [{ ...s, content: [...s.content, ...formulacion] }];
+        if (s.id === 'pregunta') {
+            if (conPlanteamiento) return [];
+            const base = sections.find((x) => x.id === 'planteamiento') || {};
+            return [{ ...base, id: 'planteamiento', label: base.label || 'Planteamiento del problema', content: formulacion }];
+        }
+        return [s];
+    });
+    // Tablas y figuras se numeran de corrido en todo el documento (Tabla 1, Figura 1…).
+    let tablas = 0;
+    let figuras = 0;
+    const rotular = (b) => {
+        if (b.type === 'table' && b.caption) { tablas += 1; return { ...b, rotulo: `Tabla ${tablas}` }; }
+        if (b.type === 'figure' || b.type === 'gantt') { figuras += 1; return { ...b, rotulo: `Figura ${figuras}` }; }
+        return b;
+    };
+    const rotulada = lista.map((s) => ({ ...s, content: s.content.map(rotular) }));
+    // Citas a tablas y figuras: las marcas [[id]] se cambian por su número actual; si un elemento va después
+    // de un párrafo y nadie lo cita, ese párrafo lo cita solo («(ver Tabla 2)»).
+    const rotuloDe = new Map(rotulada.flatMap((s) => s.content).filter((b) => b.elementoId && b.rotulo).map((b) => [b.elementoId, b.rotulo]));
+    const textos = (b) => (b.type === 'list' ? b.items : typeof b.text === 'string' ? [b.text] : []);
+    const citados = new Set(rotulada.flatMap((s) => s.content).flatMap(textos).flatMap((t) => [...t.matchAll(MARCA)].map((m) => m[1])));
+    const marcas = (t) => t.replace(MARCA, (_, id) => rotuloDe.get(id) || '').replace(/ {2,}/g, ' ');
+    const citar = (b) => {
+        if (b.type === 'list') return { ...b, items: b.items.map(marcas) };
+        if (typeof b.text !== 'string' || b.type === 'heading') return b;
+        let text = marcas(b.text);
+        const faltan = (b.citaDe || []).filter((id) => !citados.has(id) && rotuloDe.has(id)).map((id) => rotuloDe.get(id));
+        if (faltan.length) text = `${text.replace(/[.\s]+$/, '')} (ver ${faltan.join(' y ')}).`;
+        return text === b.text ? b : { ...b, text };
+    };
+    let n = 0;
+    return rotulada.map((s) => ({ ...s, content: s.content.map(citar) })).map((s) => {
+        if (SIN_NUMERO.has(s.id)) {
+            return { ...s, numero: '', titulo: s.label, content: s.content.map((b) => (b.type === 'heading' ? { ...b, numero: '', titulo: b.text } : b)) };
+        }
+        n += 1;
+        let m = 0;
+        let k = 0;
+        const content = s.content.map((b) => {
+            if (b.type !== 'heading') return b;
+            if (b.level === 3 && m > 0) {
+                k += 1;
+                const numero = `${n}.${m}.${k}`;
+                return { ...b, numero, titulo: `${numero} ${b.text}` };
+            }
+            m += 1;
+            k = 0;
+            const numero = `${n}.${m}`;
+            return { ...b, level: 2, numero, titulo: `${numero} ${b.text}` };
+        });
+        return { ...s, numero: String(n), titulo: `${n} ${s.label}`, content };
+    });
+};
+
 /* ---------- Exportación ---------- */
 
 const escapeHtml = (value) => String(value)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-const inlineHtml = (value) => splitBold(value).map((part) => (part.bold ? `<b>${escapeHtml(part.text)}</b>` : escapeHtml(part.text))).join('');
+const inlineHtml = (value) => splitInline(value).map((part) => (part.bold ? `<b>${escapeHtml(part.text)}</b>` : part.italic ? `<i>${escapeHtml(part.text)}</i>` : escapeHtml(part.text))).join('');
 
 const blockHtml = (block) => {
-    if (block.type === 'heading') return `<h3>${escapeHtml(block.text)}</h3>`;
-    if (block.type === 'list') return `<ul>${block.items.map((item) => `<li>${inlineHtml(item)}</li>`).join('')}</ul>`;
+    if (block.type === 'heading') return block.level === 3 ? `<h4>${escapeHtml(block.titulo || block.text)}</h4>` : `<h3>${escapeHtml(block.titulo || block.text)}</h3>`;
+    if (block.type === 'sub') return `<p class="sub"><b>${escapeHtml(block.text)}</b></p>`;
+    if (block.type === 'list') return block.nums ? block.items.map((item, i) => `<p class="num">${block.nums[i]}. ${inlineHtml(item)}</p>`).join('') : `<ul>${block.items.map((item) => `<li>${inlineHtml(item)}</li>`).join('')}</ul>`;
     if (block.type === 'table') {
         const row = (cells, tag) => `<tr>${cells.map((cell) => `<${tag}>${escapeHtml(cell)}</${tag}>`).join('')}</tr>`;
-        return `<table>${row(block.head, 'th')}${block.rows.map((cells) => row(cells, 'td')).join('')}${block.foot ? row(block.foot, 'th') : ''}</table>`;
+        return `${block.caption ? `<p class="cap"><b>${block.rotulo || 'Tabla'}.</b> <i>${escapeHtml(block.caption)}</i></p>` : ''}<table>${row(block.head, 'th')}${block.rows.map((cells) => row(cells, 'td')).join('')}${block.foot ? row(block.foot, 'th') : ''}</table>${block.nota ? `<p class="cap"><i>Nota.</i> ${escapeHtml(block.nota)}</p>` : ''}`;
     }
+    if (block.type === 'gantt') {
+        const cols = Array.from({ length: block.total }, (_, i) => i + 1);
+        return `<p class="cap"><b>${block.rotulo || 'Figura'}.</b> <i>${escapeHtml(block.caption)}</i></p><table><tr><th>Actividad</th>${cols.map((c) => `<th>${c}</th>`).join('')}</tr>${block.rows.map((r) => `<tr><td>${escapeHtml(r.actividad || r.fase)}</td>${cols.map((c) => `<td${c >= r.inicio && c <= r.fin ? ' style="background:#4f46e5"' : ''}>&nbsp;</td>`).join('')}</tr>`).join('')}</table><p class="cap"><i>Nota.</i> Las columnas corresponden a cada ${block.unidad.toLowerCase()} del proyecto.</p>`;
+    }
+    if (block.type === 'figure') return `<p class="cap"><b>${block.rotulo || 'Figura'}.</b> <i>${escapeHtml(block.caption)}</i> (la imagen se incluye en la versión .docx)</p>${block.nota ? `<p class="cap"><i>Nota.</i> ${escapeHtml(block.nota)}</p>` : ''}`;
     if (block.type === 'plain') return `<p class="${block.keywords ? 'pc' : 'abs'}">${escapeHtml(block.text).replace(/\*([^*]+)\*/g, '<i>$1</i>')}</p>`;
     if (block.type === 'reference') return `<p class="ref">${escapeHtml(block.text).replace(/\*([^*]+)\*/g, '<i>$1</i>')}</p>`;
     return `<p>${inlineHtml(block.text)}</p>`;
@@ -202,9 +459,9 @@ const blockHtml = (block) => {
 
 // Word abre HTML con extensión .doc y conserva títulos, listas y tablas.
 export const documentHtml = (name, author, sections) => {
-    const body = sections
-        .filter((section) => section.content.length > 0 && section.id !== 'titulo' && section.inDocument !== false)
-        .map((section) => `<h2>${escapeHtml(section.label)}</h2>${section.content.map(blockHtml).join('')}`)
+    const body = documentoNumerado(sections)
+        .filter((section) => section.id !== 'titulo')
+        .map((section) => `<h2>${escapeHtml(section.titulo)}</h2>${section.content.map(blockHtml).join('')}`)
         .join('');
     const title = sections.find((section) => section.id === 'titulo')?.content[0]?.text || name;
     // HTML con los espacios de nombres de Word: márgenes de página reales (no del cuerpo), vista de impresión y formato APA 7.
@@ -212,20 +469,23 @@ export const documentHtml = (name, author, sections) => {
 <head><meta charset="utf-8"><title>${escapeHtml(name)}</title>
 <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->
 <style>
-@page WordSection1{size:21.59cm 27.94cm;margin:2.54cm 2.54cm 2.54cm 2.54cm;mso-header-margin:1.27cm;mso-footer-margin:1.27cm;mso-paper-source:0}
+@page WordSection1{size:21.59cm 27.94cm;margin:2.5cm 2.5cm 2.5cm 2.5cm;mso-header-margin:1.27cm;mso-footer-margin:1.27cm;mso-paper-source:0}
 div.WordSection1{page:WordSection1}
 body{font-family:"Times New Roman",serif;font-size:12pt;margin:0}
 p,li,td,th{font-family:"Times New Roman",serif;font-size:12pt}
-p{margin:0;line-height:200%;text-indent:1.27cm;text-align:left}
-p.ref{margin:0 0 0 1.27cm;text-indent:-1.27cm;line-height:200%}
+p{margin:0;line-height:150%;text-indent:1.25cm;text-align:justify}
+p.sub,p.cap{text-indent:0;text-align:left}
+p.num{text-indent:-0.6cm;margin-left:1.85cm}
+p.ref{margin:0 0 0 1.27cm;text-indent:-1.27cm;line-height:150%}
 p.abs{text-indent:0}
 p.pc{text-indent:1.27cm}
-h1{font-family:"Times New Roman",serif;font-size:12pt;font-weight:bold;text-align:center;line-height:200%;margin:0}
+h1{font-family:"Times New Roman",serif;font-size:12pt;font-weight:bold;text-align:center;line-height:150%;margin:0}
 .autor{text-align:center;text-indent:0;margin:0 0 12pt}
-h2{font-family:"Times New Roman",serif;font-size:12pt;font-weight:bold;text-align:center;line-height:200%;margin:12pt 0 0;page-break-after:avoid}
-h3{font-family:"Times New Roman",serif;font-size:12pt;font-weight:bold;text-align:left;line-height:200%;margin:6pt 0 0;page-break-after:avoid}
+h2{font-family:"Times New Roman",serif;font-size:12pt;font-weight:bold;text-align:center;line-height:150%;margin:12pt 0 0;page-break-after:avoid}
+h3{font-family:"Times New Roman",serif;font-size:12pt;font-weight:bold;text-align:left;line-height:150%;margin:6pt 0 0;page-break-after:avoid}
+h4{font-family:"Times New Roman",serif;font-size:12pt;font-weight:bold;font-style:italic;text-align:left;line-height:150%;margin:6pt 0 0;page-break-after:avoid}
 ul{margin:0 0 0 1.27cm}
-li{line-height:200%}
+li{line-height:150%}
 table{border-collapse:collapse;width:100%;margin:6pt 0}
 th,td{border:1px solid #000;padding:3pt 5pt;text-align:left;font-size:11pt;line-height:115%;text-indent:0}
 </style></head>
@@ -234,12 +494,16 @@ th,td{border:1px solid #000;padding:3pt 5pt;text-align:left;font-size:11pt;line-
 
 export const documentText = (name, sections) => {
     const lines = [name.toUpperCase(), ''];
-    sections.filter((section) => section.content.length > 0 && section.inDocument !== false).forEach((section) => {
-        lines.push(section.label.toUpperCase());
+    documentoNumerado(sections).forEach((section) => {
+        lines.push(section.titulo.toUpperCase());
         section.content.forEach((block) => {
-            if (block.type === 'heading') lines.push('', block.text);
-            else if (block.type === 'list') block.items.forEach((item) => lines.push(`- ${item.replace(/\*\*/g, '')}`));
+            if (block.type === 'heading') lines.push('', block.titulo || block.text);
+            else if (block.type === 'sub') lines.push('', block.text);
+            else if (block.type === 'list') block.items.forEach((item, i) => lines.push(`${block.nums ? `${block.nums[i]}.` : '-'} ${item.replace(/\*\*/g, '')}`));
+            else if (block.type === 'figure') lines.push(`[Figura: ${block.caption}]`);
+            else if (block.type === 'gantt') block.rows.forEach((r) => lines.push(`- ${r.actividad || r.fase}: ${block.unidad.toLowerCase()} ${r.inicio} a ${r.fin}`));
             else if (block.type === 'table') {
+                if (block.caption) lines.push(`Tabla: ${block.caption}`);
                 block.rows.forEach((cells) => lines.push(`- ${cells.filter(Boolean).join(' | ')}`));
                 if (block.foot) lines.push(block.foot.filter(Boolean).join(': '));
             } else lines.push(block.text.replace(/\*/g, ''));

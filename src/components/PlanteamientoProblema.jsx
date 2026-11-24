@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import EditorRico from './EditorRico';
 import {
     AlertTriangle, ArrowRight, BarChart3, CheckCircle2, Compass, FileText, Search, Target, XCircle,
 } from 'lucide-react';
@@ -410,7 +411,7 @@ const Constructor = ({ intro }) => {
                             <label htmlFor={`pla-${parte.key}`}>
                                 <mark data-part={parte.color} data-active="true">{index + 1}</mark> {parte.label}
                             </label>
-                            <textarea
+                            <EditorRico
                                 id={`pla-${parte.key}`}
                                 className="textarea-field pla-textarea"
                                 rows={5}

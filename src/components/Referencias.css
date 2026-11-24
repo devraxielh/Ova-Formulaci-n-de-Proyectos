@@ -69,3 +69,15 @@
 .ref-rev-grid li { display: grid; gap: 0.15rem; font-size: 0.88rem; color: #334155; }
 .ref-rev-grid li small { color: #94a3b8; }
 .ref-rev-grid .pro-link { justify-self: start; display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.83rem; }
+
+/* Verificación de fuentes */
+.ref-verificar { display: grid; gap: 0.35rem; justify-items: start; margin-bottom: 0.9rem; }
+.ref-verificar small { color: #475569; font-size: 0.82rem; }
+.ref-verif { display: grid; gap: 0.25rem; padding: 0.5rem 0.7rem; border-radius: 8px; background: #fef3c7; color: #78350f; font-size: 0.85rem; margin: 0.35rem 0; }
+.ref-verif p { margin: 0; display: block; }
+.ref-verif ul { margin: 0; padding-left: 1.1rem; }
+.ref-verif[data-estado='ok'] { background: #dcfce7; color: #14532d; }
+.ref-verif[data-estado='no-doi'] { background: #fee2e2; color: #7f1d1d; }
+.ref-verif[data-estado='sin-verificar'], .ref-verif[data-estado='error'] { background: #f1f5f9; color: #334155; }
+.ref-spin { animation: ref-spin 1s linear infinite; }
+@keyframes ref-spin { to { transform: rotate(360deg); } }
