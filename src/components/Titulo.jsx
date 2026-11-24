@@ -35,7 +35,6 @@ const SLIDES = construccionPrimero([
     { id: 'repaso', section: 'cierre', min: 2, title: 'Repaso' },
     { id: 'cierre', section: 'cierre', min: 1, title: 'Lo que te llevas' },
     { id: 'construye', section: 'construccion', min: 8, title: 'Construye tu título' },
-    { id: 'ia', section: 'construccion', min: 4, title: 'Mejóralo con IA' },
     { id: 'prueba', section: 'revision', min: 7, title: 'Qué hace bueno a un título' },
 ]);
 
