@@ -22,3 +22,8 @@
 .arb-estado { margin: 0; font-size: 0.9rem; color: #92400e; background: #fffbeb; padding: 0.55rem 0.75rem; border-radius: 0.5rem; }
 .arb-estado[data-ok='true'] { color: #065f46; background: #ecfdf5; }
 .arb-acciones { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+/* Dentro de la clase: ocupa todo el ancho de la página y sus tarjetas no heredan el estilo de los títulos y textos de diapositiva */
+.arb-page { grid-column: 1 / -1; display: grid; gap: 0.9rem; min-width: 0; }
+.ide-deck .arb-page .pro-card h2 { font-size: 1.1rem; line-height: 1.3; letter-spacing: 0; margin: 0; text-wrap: wrap; }
+.ide-deck .arb-page .pro-card p { max-width: none; font-size: 0.9rem; line-height: 1.5; margin-top: 0; }
+.ide-deck .arb-page .arb-estado { font-size: 0.9rem; }

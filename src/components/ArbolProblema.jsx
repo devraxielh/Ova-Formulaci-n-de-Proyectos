@@ -1,13 +1,18 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowRight, Download, Network, Plus, Trash2 } from 'lucide-react';
+import { Download, Network, Plus, Trash2 } from 'lucide-react';
 import { useProject, useProjectField } from '../context/ProjectContext';
 import { MAX_RAMAS, arbolCompleto, arbolDataUrl, arbolPng, leerArbol } from '../services/arbol';
+import SlideDeck from './deck/SlideDeck';
+import { Generica } from './deck/Contenido';
+import { SECTIONS, SLIDES } from '../data/arbolClase';
+import './Titulo.css';
 import './Proyecto.css';
 import './Arbol.css';
 
 /*
  * Árbol del problema: el estudiante escribe el problema central, sus causas (raíces) y sus efectos (ramas),
  * y la página dibuja la figura. Esa figura entra sola en el Planteamiento del problema del documento.
+ * Es una clase como las demás: «Construcción» en la página y la teoría (40 minutos) en «Presentación».
  */
 const Ramas = ({ titulo, pregunta, ayuda, items, onChange, ejemplo, tipo }) => {
     const filas = items.length ? items : [''];
@@ -44,7 +49,7 @@ const Ramas = ({ titulo, pregunta, ayuda, items, onChange, ejemplo, tipo }) => {
     );
 };
 
-const ArbolProblema = ({ onNavigate }) => {
+const Constructor = ({ heading }) => {
     const { data } = useProject();
     const [guardado, setArbol] = useProjectField('arbol', null);
     const [error, setError] = useState('');
@@ -73,7 +78,8 @@ const ArbolProblema = ({ onNavigate }) => {
     };
 
     return (
-        <div className="pro-page arb-page">
+        <div className="arb-page">
+            {heading}
             <div className="arb-cols">
                 <section className="pro-card arb-form">
                     <h2><Network size={20} aria-hidden="true" /> Arma tu árbol</h2>
@@ -121,11 +127,72 @@ const ArbolProblema = ({ onNavigate }) => {
                     {error && <p className="pro-alert" role="alert">{error}</p>}
                     <div className="arb-acciones">
                         <button type="button" className="pro-btn pro-btn--ghost" onClick={descargar} disabled={!completo}><Download size={15} /> Descargar imagen (PNG)</button>
-                        {onNavigate && <button type="button" className="pro-btn pro-btn--primary" onClick={() => onNavigate('planteamiento')}>Plantear el problema <ArrowRight size={15} /></button>}
                     </div>
                 </section>
             </div>
         </div>
+    );
+};
+
+const ArbolProblema = ({ onNavigate }) => {
+    const { data } = useProject();
+    const arbol = leerArbol(data);
+
+    const renderSlide = ({ slide, heading, goToSection, sectionMinutes, totalMinutes }) => ({
+        portada: (
+            <>
+                <div>
+                    {heading}
+                    <p>Antes de plantear un problema hay que entenderlo. El árbol del problema lo ordena en tres niveles y te muestra sobre qué parte puede actuar tu proyecto.</p>
+                    <p><strong>Al terminar esta clase podrás:</strong></p>
+                    <ul className="ide-bullets">
+                        <li>Redactar el problema central como una situación negativa.</li>
+                        <li>Distinguir causas de efectos con dos preguntas.</li>
+                        <li>Armar tu árbol y leerlo de abajo hacia arriba.</li>
+                        <li>Llevar cada nivel a un párrafo de tu planteamiento.</li>
+                    </ul>
+                </div>
+                <div className="ide-panel">
+                    <h3>Plan de la clase · {totalMinutes} minutos</h3>
+                    <ol className="ide-agenda">
+                        {SECTIONS.map((section) => (
+                            <li key={section.id}>
+                                <button type="button" onClick={() => goToSection(section.id)}>
+                                    <span>{section.label}</span>
+                                    <small>{SLIDES.filter((item) => item.section === section.id).map((item) => item.title).join(' · ')}</small>
+                                    <b>{sectionMinutes(section.id)} min</b>
+                                </button>
+                            </li>
+                        ))}
+                    </ol>
+                </div>
+            </>
+        ),
+        construye: <Constructor heading={heading} />,
+    })[slide.id] || (
+        <Generica
+            slide={slide}
+            heading={heading}
+            onNavigate={onNavigate}
+            aside={slide.status ? (
+                <div className="ide-panel">
+                    <h3>Siguiente paso</h3>
+                    {arbolCompleto(arbol)
+                        ? <div className="tit-saved"><span>Tu problema central</span><p>{arbol.problema}</p></div>
+                        : <p>En «Construcción» escribes el problema, sus causas y sus efectos, y el árbol se dibuja solo.</p>}
+                </div>
+            ) : null}
+        />
+    );
+
+    return (
+        <SlideDeck
+            sections={SECTIONS}
+            slides={SLIDES}
+            label="Árbol del problema"
+            renderSlide={renderSlide}
+            finish={onNavigate ? { label: 'Plantear el problema', onClick: () => onNavigate('planteamiento') } : null}
+        />
     );
 };
 

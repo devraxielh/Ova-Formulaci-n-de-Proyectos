@@ -31,7 +31,7 @@ const Admin = lazy(() => import('./components/Admin'));
 const TAB_ALIAS = { instrumentos: 'metodologia', analisis: 'resultados', doi: 'referencias', poblacion: 'metodologia', 'plan-analisis': 'metodologia', cronograma: 'metodologia', presupuesto: 'metodologia' };
 
 // Herramientas que son clases en diapositivas: usan todo el espacio y recogen el menú.
-const DECK_TABS = ['ideacion', 'titulo', 'pregunta', 'planteamiento', 'objetivos', 'justificacion', 'alcances', 'introduccion', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'resumen'];
+const DECK_TABS = ['ideacion', 'titulo', 'pregunta', 'arbol', 'planteamiento', 'objetivos', 'justificacion', 'alcances', 'introduccion', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'resumen'];
 
 const SAVE_LABEL = { local: 'Borrador en este navegador', saved: 'Guardado', saving: 'Guardando…', offline: 'Sin conexión · se sube al volver', error: 'Sin guardar' };
 
