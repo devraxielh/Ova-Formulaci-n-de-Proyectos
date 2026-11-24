@@ -595,6 +595,17 @@ const serializeData = (data) => {
     return Buffer.byteLength(text) > MAX_PROJECT_BYTES ? null : text;
 };
 
+// Resumen para las tarjetas de «Mi proyecto»: el título y un avance aproximado (secciones que ya tienen algo).
+const SECCIONES_AVANCE = ['idea', 'titulo', 'pregunta', 'arbol', 'planteamiento', 'arbolObjetivos', 'objetivos', 'introduccion', 'justificacion', 'alcances', 'marcoAntecedentes', 'metodologia', 'fases', 'resultados', 'conclusiones', 'resumen', 'referencias'];
+const conContenido = (v) => (typeof v === 'string' ? v.trim().length > 0 : Array.isArray(v) ? v.length > 0 : Boolean(v) && typeof v === 'object' && Object.values(v).some(conContenido));
+const resumenProyecto = (raw) => {
+    try {
+        const d = JSON.parse(raw) || {};
+        const hechas = SECCIONES_AVANCE.filter((k) => conContenido(d[k])).length;
+        return { titulo: String(d.titulo || '').slice(0, 220), avance: Math.round((hechas / SECCIONES_AVANCE.length) * 100) };
+    } catch { return { titulo: '', avance: 0 }; }
+};
+
 const projectRow = (row, withData = true) => ({
     id: row.id,
     name: row.name,
@@ -610,11 +621,11 @@ const emailOf = (user) => String(user.email || '').trim().toLowerCase();
 app.get('/api/projects', requireUser, (req, res) => {
     // Propios y compartidos conmigo (por el correo de mi cuenta).
     const rows = db.prepare(`
-        SELECT p.id, p.name, p.created_at, p.updated_at, p.version, u.name AS owner_name, (p.user_id <> @me) AS shared
+        SELECT p.id, p.name, p.data, p.created_at, p.updated_at, p.version, u.name AS owner_name, (p.user_id <> @me) AS shared
         FROM projects p JOIN users u ON u.id = p.user_id
         WHERE p.user_id = @me OR p.id IN (SELECT project_id FROM project_members WHERE email = @email)
         ORDER BY p.updated_at DESC, p.id DESC`).all({ me: req.user.id, email: emailOf(req.user) });
-    res.json({ projects: rows.map((row) => projectRow(row, false)) });
+    res.json({ projects: rows.map((row) => ({ ...projectRow(row, false), ...resumenProyecto(row.data) })) });
 });
 
 app.post('/api/projects', requireUser, (req, res) => {

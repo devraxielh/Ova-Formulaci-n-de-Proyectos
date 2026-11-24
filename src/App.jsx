@@ -1,6 +1,6 @@
 import Cargando from './components/Cargando';
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import { Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, Scale, Link, Compass, Library, PanelLeftClose, PanelLeftOpen, FolderOpen, UserRound, ShieldCheck, LogOut, CheckCircle2, ListOrdered, BarChart3, Flag, BookMarked, AlignLeft, FileSpreadsheet, Network } from 'lucide-react';
+import { Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, Scale, Link, Compass, Library, PanelLeftClose, PanelLeftOpen, FolderOpen, UserRound, ShieldCheck, LogOut, CheckCircle2, ListOrdered, BarChart3, Flag, BookMarked, AlignLeft, FileSpreadsheet, Network, GitFork } from 'lucide-react';
 import { useProject } from './context/ProjectContext';
 import { CAMPOS_SECCION, SECTIONS, buildDocument } from './services/projectDoc';
 import { api } from './services/api';
@@ -12,6 +12,7 @@ const Titulo = lazy(() => import('./components/Titulo'));
 const PreguntaInvestigacion = lazy(() => import('./components/PreguntaInvestigacion'));
 const PlanteamientoProblema = lazy(() => import('./components/PlanteamientoProblema'));
 const ArbolProblema = lazy(() => import('./components/ArbolProblema'));
+const ArbolObjetivos = lazy(() => import('./components/ArbolObjetivos'));
 const Justificacion = lazy(() => import('./components/Justificacion'));
 const AlcancesLimitaciones = lazy(() => import('./components/AlcancesLimitaciones'));
 const Objetivos = lazy(() => import('./components/Objetivos'));
@@ -31,7 +32,7 @@ const Admin = lazy(() => import('./components/Admin'));
 const TAB_ALIAS = { instrumentos: 'metodologia', analisis: 'resultados', doi: 'referencias', poblacion: 'metodologia', 'plan-analisis': 'metodologia', cronograma: 'metodologia', presupuesto: 'metodologia' };
 
 // Herramientas que son clases en diapositivas: usan todo el espacio y recogen el menú.
-const DECK_TABS = ['ideacion', 'titulo', 'pregunta', 'arbol', 'planteamiento', 'objetivos', 'justificacion', 'alcances', 'introduccion', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'resumen'];
+const DECK_TABS = ['ideacion', 'titulo', 'pregunta', 'arbol', 'planteamiento', 'arbolobjetivos', 'objetivos', 'justificacion', 'alcances', 'introduccion', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'resumen'];
 
 const SAVE_LABEL = { local: 'Borrador en este navegador', saved: 'Guardado', saving: 'Guardando…', offline: 'Sin conexión · se sube al volver', error: 'Sin guardar' };
 
@@ -41,7 +42,7 @@ const seccionDe = (key) => {
     return SECTIONS.find((s) => s.id === id)?.label || 'Otros datos del proyecto';
 };
 // Nombre visible de la pestaña donde está un compañero.
-const TAB_LABEL = { proyecto: 'Mi proyecto', ideacion: 'Ideación', titulo: 'Título', pregunta: 'Pregunta de investigación', arbol: 'Árbol del problema', planteamiento: 'Planteamiento', objetivos: 'Objetivos', introduccion: 'Introducción', justificacion: 'Justificación', alcances: 'Alcances y limitaciones', marco: 'Marco Referencial', metodologia: 'Metodología', fases: 'Desarrollo de las fases', resultados: 'Resultados y discusión', conclusiones: 'Conclusiones', resumen: 'Resumen', referencias: 'Referencias', cuenta: 'Mi cuenta' };
+const TAB_LABEL = { proyecto: 'Mi proyecto', ideacion: 'Ideación', titulo: 'Título', pregunta: 'Pregunta de investigación', arbol: 'Árbol del problema', planteamiento: 'Planteamiento', arbolobjetivos: 'Árbol de objetivos', objetivos: 'Objetivos', introduccion: 'Introducción', justificacion: 'Justificación', alcances: 'Alcances y limitaciones', marco: 'Marco Referencial', metodologia: 'Metodología', fases: 'Desarrollo de las fases', resultados: 'Resultados y discusión', conclusiones: 'Conclusiones', resumen: 'Resumen', referencias: 'Referencias', cuenta: 'Mi cuenta' };
 
 // Errores del navegador → registro del servidor (se ven en Administración). Como mucho 5 por visita.
 let erroresEnviados = 0;
@@ -195,6 +196,8 @@ function App() {
                 return <ArbolProblema onNavigate={handleTabChange} />;
             case 'planteamiento':
                 return <PlanteamientoProblema onNavigate={handleTabChange} />;
+            case 'arbolobjetivos':
+                return <ArbolObjetivos onNavigate={handleTabChange} />;
             case 'justificacion':
                 return <Justificacion onNavigate={handleTabChange} />;
             case 'alcances':
@@ -239,6 +242,7 @@ function App() {
             case 'pregunta': return 'Pregunta de Investigación';
             case 'arbol': return 'Árbol del problema';
             case 'planteamiento': return 'Planteamiento del Problema';
+            case 'arbolobjetivos': return 'Árbol de objetivos';
             case 'justificacion': return 'Justificación';
             case 'alcances': return 'Alcances y Limitaciones';
             case 'objetivos': return 'Objetivos de Investigación';
@@ -405,6 +409,16 @@ function App() {
                         <FileText size={20} />
                         <span>Planteamiento Problema</span>
                         {doneTabs.has('planteamiento') && <CheckCircle2 size={16} className="nav-done-check" aria-label="completado" />}
+                    </button>
+
+                    <button
+                        className={`nav-button ${activeTab === 'arbolobjetivos' ? 'active' : ''} ${doneTabs.has('arbolobjetivos') ? 'nav-button--done' : ''}`}
+                        onClick={() => handleTabChange('arbolobjetivos')}
+                        title="Árbol de objetivos"
+                    >
+                        <GitFork size={20} />
+                        <span>Árbol de objetivos</span>
+                        {doneTabs.has('arbolobjetivos') && <CheckCircle2 size={16} className="nav-done-check" aria-label="completado" />}
                     </button>
 
                     <button

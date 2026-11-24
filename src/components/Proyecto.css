@@ -1279,3 +1279,47 @@
 .pro-coh-cerrar:hover { background: #f1f5f9; color: #0f172a; }
 .pro-paneles-tabs .pro-paneles-extra .pro-btn--danger { background: #dc2626; border-color: #dc2626; color: #fff; }
 .pro-paneles-tabs .pro-paneles-extra .pro-btn--danger:hover { background: #b91c1c; border-color: #b91c1c; }
+
+/* ---------- Mi proyecto: tarjetas de proyectos ---------- */
+.pro-galeria { display: grid; gap: 0.75rem; }
+.pro-galeria-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.pro-galeria-head h2 { display: flex; align-items: center; gap: 0.45rem; margin: 0; font-size: 1.1rem; color: #1e293b; }
+.pro-galeria-head h2 svg { color: #4f46e5; }
+.pro-galeria-head small { color: #64748b; font-size: 0.85rem; }
+.pro-tarjetas { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.85rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15.5rem), 1fr)); }
+.pro-tarjetas li { display: grid; }
+.pro-tarjeta { display: grid; gap: 0.45rem; align-content: start; text-align: left; padding: 0.95rem 1rem 0.85rem; border: 1px solid var(--pro-line, #e2e8f0); border-radius: 1rem; background: #fff; font: inherit; color: #1e293b; cursor: pointer; transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease; }
+.pro-tarjeta:hover:not(:disabled):not([data-abierto='true']) { border-color: #a5b4fc; box-shadow: 0 10px 24px -16px rgb(79 70 229 / 0.55); transform: translateY(-2px); }
+.pro-tarjeta:focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; }
+.pro-tarjeta[data-abierto='true'] { border-color: #4f46e5; background: linear-gradient(180deg, #eef2ff 0%, #fff 55%); box-shadow: 0 0 0 1px #4f46e5; cursor: default; }
+.pro-tarjeta-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.pro-tarjeta-icono { display: grid; place-items: center; width: 2.2rem; height: 2.2rem; border-radius: 0.7rem; background: #e0e7ff; color: #4338ca; }
+.pro-tarjeta-chip { font-style: normal; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em; padding: 0.15rem 0.55rem; border-radius: 999px; background: #f1f5f9; color: #475569; }
+.pro-tarjeta-chip[data-tipo='abierto'] { background: #4f46e5; color: #fff; }
+.pro-tarjeta > b { font-size: 1rem; line-height: 1.3; overflow-wrap: anywhere; }
+.pro-tarjeta-titulo { font-size: 0.84rem; line-height: 1.4; color: #64748b; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.35rem; }
+.pro-tarjeta-barra { display: block; height: 0.4rem; border-radius: 999px; background: #e2e8f0; overflow: hidden; margin-top: 0.15rem; }
+.pro-tarjeta-barra i { display: block; height: 100%; border-radius: inherit; background: #4f46e5; }
+.pro-tarjeta-pie { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.78rem; color: #64748b; }
+.pro-tarjeta-pie span:first-child { font-weight: 600; color: #334155; }
+.pro-tarjeta--nueva { justify-items: center; align-content: center; text-align: center; border-style: dashed; border-color: #c7d2fe; background: #f8fafc; color: #4338ca; min-height: 9.5rem; }
+.pro-tarjeta--nueva .pro-tarjeta-titulo { min-height: 0; }
+.pro-tarjeta--nueva:disabled { cursor: not-allowed; color: #94a3b8; border-color: #e2e8f0; }
+
+/* ---------- Mi proyecto: resumen visual del proyecto abierto ---------- */
+.pro-resumen { display: flex; flex-wrap: wrap; align-items: center; gap: 1.25rem; }
+.pro-anillo { position: relative; width: 7.5rem; height: 7.5rem; flex: none; display: grid; place-content: center; text-align: center; }
+.pro-anillo svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.pro-anillo circle { fill: none; stroke-width: 11; }
+.pro-anillo-fondo { stroke: #e2e8f0; }
+.pro-anillo-valor { stroke: #4f46e5; stroke-linecap: round; transition: stroke-dasharray 0.4s ease; }
+.pro-anillo b { font-size: 1.7rem; line-height: 1; color: #1e293b; }
+.pro-anillo b small { font-size: 0.9rem; font-weight: 600; margin-left: 0.1rem; }
+.pro-anillo span { font-size: 0.75rem; color: #64748b; }
+.pro-cifras { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 14rem; display: grid; gap: 0.6rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pro-cifras li { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 0.55rem; align-items: center; padding: 0.55rem 0.7rem; border-radius: 0.75rem; background: #f8fafc; border: 1px solid #f1f5f9; }
+.pro-cifras svg { grid-row: 1 / 3; color: #4f46e5; }
+.pro-cifras b { font-size: 1.15rem; line-height: 1.1; color: #1e293b; font-variant-numeric: tabular-nums; }
+.pro-cifras b small { font-size: 0.8rem; font-weight: 500; color: #64748b; }
+.pro-cifras span { font-size: 0.78rem; color: #64748b; }
+@media (prefers-reduced-motion: reduce) { .pro-tarjeta, .pro-anillo-valor { transition: none; } .pro-tarjeta:hover:not(:disabled) { transform: none; } }

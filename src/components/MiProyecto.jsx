@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, CheckCircle2, Circle, Clipboard, Download, FileDown, Pencil, Presentation, Plus, Printer, Trash2, UserRound } from 'lucide-react';
+import { ArrowRight, BookMarked, CheckCircle2, Circle, Clipboard, Download, FileDown, FolderOpen, Image as ImageIcon, ListChecks, Pencil, Presentation, Plus, Printer, Trash2, Type as TypeIcon, UserRound, Users } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 import { BUILD_ORDER, buildDocument, documentHtml, documentText } from '../services/projectDoc';
 import { DocumentPaper } from './ProjectDocument';
@@ -10,7 +10,22 @@ import { arbolPng } from '../services/arbol';
 import './Proyecto.css';
 
 // Mismo orden que el menú lateral.
-const MENU_ORDER = ['ideacion', 'titulo', 'pregunta', 'arbol', 'planteamiento', 'objetivos', 'introduccion', 'justificacion', 'alcances', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'resumen', 'referencias'];
+const MENU_ORDER = ['ideacion', 'titulo', 'pregunta', 'arbol', 'planteamiento', 'arbolobjetivos', 'objetivos', 'introduccion', 'justificacion', 'alcances', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'resumen', 'referencias'];
+
+// «hace 3 horas», «ayer», «hace 5 días»… a partir de la fecha del servidor (UTC, «AAAA-MM-DD HH:MM:SS»).
+const haceCuanto = (fecha) => {
+    const t = Date.parse(`${String(fecha || '').replace(' ', 'T')}Z`);
+    if (!Number.isFinite(t)) return '';
+    const min = Math.max(0, Math.round((Date.now() - t) / 60000));
+    if (min < 2) return 'Editado hace un momento';
+    if (min < 60) return `Editado hace ${min} min`;
+    const h = Math.round(min / 60);
+    if (h < 24) return `Editado hace ${h} h`;
+    const d = Math.round(h / 24);
+    if (d === 1) return 'Editado ayer';
+    if (d < 30) return `Editado hace ${d} días`;
+    return `Editado el ${new Date(t).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+};
 
 const SAVE_LABEL = {
     local: 'Guardado solo en este navegador',
@@ -61,6 +76,17 @@ const MiProyecto = ({ onNavigate }) => {
         window.addEventListener('projectsia:equipo', cargar);
         return () => { vivo = false; window.removeEventListener('projectsia:equipo', cargar); };
     }, [project.id]);
+    // Indicadores del proyecto abierto, para el resumen visual.
+    const porcentaje = pasos.length ? Math.round((done.length / pasos.length) * 100) : 0;
+    const cifras = useMemo(() => {
+        const bloques = sections.filter((section) => section.inDocument !== false).flatMap((section) => section.content);
+        const textos = bloques.flatMap((b) => (b.type === 'list' ? b.items : typeof b.text === 'string' && b.type !== 'reference' ? [b.text] : []));
+        return {
+            palabras: textos.join(' ').split(/\s+/).filter(Boolean).length,
+            referencias: bloques.filter((b) => b.type === 'reference').length,
+            visuales: bloques.filter((b) => b.type === 'figure' || b.type === 'gantt' || (b.type === 'table' && b.caption)).length,
+        };
+    }, [sections]);
     const author = String(data?.integrantes || '').trim() || equipo.join('\n') || user?.name || '';
     const extra = { ciudad: data?.ciudad, director: data?.director, dedicatoria: data?.dedicatoria, agradecimientos: data?.agradecimientos };
 
@@ -199,6 +225,53 @@ const MiProyecto = ({ onNavigate }) => {
 
     return (
         <div className="pro-page">
+            {user ? (
+                <section className="pro-galeria" aria-labelledby="pro-galeria-titulo">
+                    <div className="pro-galeria-head">
+                        <h2 id="pro-galeria-titulo"><FolderOpen size={19} aria-hidden="true" /> Tus proyectos</h2>
+                        {user.role !== 'admin' && <small>Propios: {propios} de {cupo} autorizados</small>}
+                    </div>
+                    <ul className="pro-tarjetas">
+                        {projects.map((item) => {
+                            const abierto = item.id === project.id;
+                            const avance = abierto ? porcentaje : Number(item.avance) || 0;
+                            const titulo = abierto ? String(data?.titulo || '').trim() : item.titulo;
+                            return (
+                                <li key={item.id}>
+                                    <button type="button" className="pro-tarjeta" data-abierto={abierto} aria-current={abierto ? 'true' : undefined} onClick={() => { if (!abierto) run(() => openProject(item.id)); }}>
+                                        <span className="pro-tarjeta-top">
+                                            <span className="pro-tarjeta-icono" aria-hidden="true">{item.shared ? <Users size={18} /> : <FolderOpen size={18} />}</span>
+                                            {abierto ? <i className="pro-tarjeta-chip" data-tipo="abierto">Abierto</i> : item.shared ? <i className="pro-tarjeta-chip">Compartido</i> : null}
+                                        </span>
+                                        <b>{item.name}</b>
+                                        <span className="pro-tarjeta-titulo">{titulo || 'Aún sin título de investigación'}</span>
+                                        <span className="pro-tarjeta-barra" aria-hidden="true"><i style={{ width: `${avance}%` }} /></span>
+                                        <span className="pro-tarjeta-pie">
+                                            <span>{avance} % de avance</span>
+                                            <span>{item.shared ? `De ${item.ownerName}` : haceCuanto(item.updatedAt)}</span>
+                                        </span>
+                                    </button>
+                                </li>
+                            );
+                        })}
+                        <li>
+                            <button type="button" className="pro-tarjeta pro-tarjeta--nueva" disabled={propios >= cupo} onClick={() => run(() => createProject('Proyecto nuevo'))}>
+                                <Plus size={26} aria-hidden="true" />
+                                <b>Nuevo proyecto</b>
+                                <span className="pro-tarjeta-titulo">{propios >= cupo ? 'Llegaste al número de proyectos que te autorizó el administrador.' : 'Empieza otro proyecto desde cero.'}</span>
+                            </button>
+                        </li>
+                    </ul>
+                </section>
+            ) : (
+                <div className="pro-callout">
+                    <p><strong>Tu proyecto está solo en este navegador.</strong> Crea una cuenta para guardarlo y abrirlo desde cualquier equipo.</p>
+                    <button type="button" className="pro-btn pro-btn--primary" onClick={() => onNavigate('cuenta')}>
+                        <UserRound size={16} /> Crear cuenta o iniciar sesión
+                    </button>
+                </div>
+            )}
+
             <section className="pro-head">
                 <div className="pro-head-main">
                     <label htmlFor="pro-name">Nombre del proyecto</label>
@@ -234,32 +307,23 @@ const MiProyecto = ({ onNavigate }) => {
                     </p>
                 </div>
 
-                {user ? (
-                    <div className="pro-switch">
-                        <label htmlFor="pro-select">Tus proyectos</label>
-                        <div className="pro-switch-row">
-                            <select
-                                id="pro-select"
-                                className="input-field"
-                                value={project.id ?? ''}
-                                onChange={(event) => run(() => openProject(Number(event.target.value)))}
-                            >
-                                {projects.map((item) => <option key={item.id} value={item.id}>{item.name}{item.shared ? ` (de ${item.ownerName})` : ''}</option>)}
-                            </select>
-                            <button type="button" className="pro-btn pro-btn--ghost" disabled={propios >= cupo} title={propios >= cupo ? 'Llegaste al número de proyectos que te autorizó el administrador' : undefined} onClick={() => run(() => createProject('Proyecto nuevo'))}>
-                                <Plus size={16} /> Nuevo
-                            </button>
-                        </div>
-                        {user.role !== 'admin' && <small className="pro-name-help">Proyectos propios: {propios} de {cupo} autorizados.</small>}
+                {/* Resumen visual del proyecto abierto */}
+                <div className="pro-resumen" aria-label="Resumen del proyecto">
+                    <div className="pro-anillo" role="img" aria-label={`Avance: ${porcentaje} %`}>
+                        <svg viewBox="0 0 120 120" aria-hidden="true">
+                            <circle cx="60" cy="60" r="52" className="pro-anillo-fondo" />
+                            <circle cx="60" cy="60" r="52" className="pro-anillo-valor" strokeDasharray={`${(porcentaje / 100) * 326.7} 326.7`} />
+                        </svg>
+                        <b>{porcentaje}<small>%</small></b>
+                        <span>avance</span>
                     </div>
-                ) : (
-                    <div className="pro-callout">
-                        <p><strong>Tu proyecto está solo en este navegador.</strong> Crea una cuenta para guardarlo y abrirlo desde cualquier equipo.</p>
-                        <button type="button" className="pro-btn pro-btn--primary" onClick={() => onNavigate('cuenta')}>
-                            <UserRound size={16} /> Crear cuenta o iniciar sesión
-                        </button>
-                    </div>
-                )}
+                    <ul className="pro-cifras">
+                        <li><ListChecks size={18} aria-hidden="true" /><b>{done.length}<small> de {pasos.length}</small></b><span>secciones</span></li>
+                        <li><TypeIcon size={18} aria-hidden="true" /><b>{cifras.palabras.toLocaleString('es-CO')}</b><span>palabras</span></li>
+                        <li><BookMarked size={18} aria-hidden="true" /><b>{cifras.referencias}</b><span>referencias</span></li>
+                        <li><ImageIcon size={18} aria-hidden="true" /><b>{cifras.visuales}</b><span>tablas y figuras</span></li>
+                    </ul>
+                </div>
             </section>
 
             {error && <p className="pro-alert" role="alert">{error}</p>}

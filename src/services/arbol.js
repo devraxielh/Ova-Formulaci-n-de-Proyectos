@@ -2,6 +2,9 @@
  * Árbol del problema: raíces (causas), tronco (problema central) y ramas (efectos).
  * Se guarda en data.arbol = { problema, causas: [], efectos: [] } y se dibuja como SVG,
  * la misma figura que se ve en la página, en la vista previa y, convertida a PNG, en Word y PDF.
+ *
+ * Árbol de objetivos: es el mismo árbol «en positivo». Usa la misma forma, con `tipo: 'objetivos'`:
+ * problema → objetivo central, causas → medios, efectos → fines. Se guarda en data.arbolObjetivos.
  */
 
 export const MAX_RAMAS = 6;
@@ -17,6 +20,28 @@ export const leerArbol = (d) => {
     return { problema: limpio(idea.problema), causas: lista([idea.causa1, idea.causa2, idea.causa3]), efectos: lista([idea.efecto1, idea.efecto2, idea.efecto3]), propio: false };
 };
 
+// Árbol de objetivos del proyecto. Si aún no se ha hecho, su centro parte del objetivo general.
+export const leerArbolObjetivos = (d) => {
+    const a = d?.arbolObjetivos;
+    if (a && typeof a === 'object') return { tipo: 'objetivos', problema: limpio(a.problema), causas: lista(a.causas), efectos: lista(a.efectos), explicacion: limpio(a.explicacion), propio: true };
+    return { tipo: 'objetivos', problema: limpio(d?.objetivoGeneral), causas: [], efectos: [], propio: false };
+};
+
+// Palabras de cada árbol: cómo se llama cada nivel en la figura, en la página y en el párrafo del documento.
+export const NIVELES = {
+    problema: {
+        nombre: 'Árbol del problema', centro: 'Problema central', abajo: 'Causa', arriba: 'Efecto', abajoPlural: 'Causas', arribaPlural: 'Efectos',
+        rotuloArriba: 'EFECTOS · ¿Qué consecuencias trae?', rotuloAbajo: 'CAUSAS · ¿Por qué ocurre?',
+        colores: { arriba: { fondo: '#ffe4e6', borde: '#be123c' }, centro: { fondo: '#e0e7ff', borde: '#4338ca' }, abajo: { fondo: '#fef3c7', borde: '#b45309' } },
+    },
+    objetivos: {
+        nombre: 'Árbol de objetivos', centro: 'Objetivo central', abajo: 'Medio', arriba: 'Fin', abajoPlural: 'Medios', arribaPlural: 'Fines',
+        rotuloArriba: 'FINES · ¿Para qué se logra?', rotuloAbajo: 'MEDIOS · ¿Cómo se logra?',
+        colores: { arriba: { fondo: '#dcfce7', borde: '#15803d' }, centro: { fondo: '#e0e7ff', borde: '#4338ca' }, abajo: { fondo: '#e0f2fe', borde: '#0369a1' } },
+    },
+};
+export const nivelesDe = (arbol) => NIVELES[arbol?.tipo === 'objetivos' ? 'objetivos' : 'problema'];
+
 // Párrafo que presenta la figura en el documento, para que no quede aislada. `figura` es cómo se nombra («la Figura 1»).
 // Si el estudiante escribió el suyo, se usa ese; si no, se arma con el contenido del árbol.
 const minuscula = (t) => (/^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]/.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t);
@@ -29,6 +54,11 @@ const enumerar = (items) => {
 export const explicacionArbol = (arbol, figura = 'La figura') => {
     if (arbol.explicacion) return arbol.explicacion;
     const n = (lista, uno, varios) => (lista.length === 1 ? uno : varios);
+    if (arbol.tipo === 'objetivos') {
+        return `${figura} presenta el árbol de objetivos, que convierte el problema estudiado en la situación que se quiere alcanzar. En el centro se ubica el objetivo central: ${minuscula(sinPunto(arbol.problema))}. `
+            + `En la parte inferior ${n(arbol.causas, 'aparece el medio para lograrlo', 'aparecen los medios para lograrlo')}: ${enumerar(arbol.causas)}. `
+            + `En la parte superior ${n(arbol.efectos, 'se muestra el fin al que contribuye', 'se muestran los fines a los que contribuye')}: ${enumerar(arbol.efectos)}.`;
+    }
     return `${figura} presenta el árbol del problema, que resume la situación estudiada en tres niveles. En el centro se ubica el problema central: ${minuscula(sinPunto(arbol.problema))}. `
         + `En la parte inferior ${n(arbol.causas, 'aparece la causa que lo origina', 'aparecen las causas que lo originan')}: ${enumerar(arbol.causas)}. `
         + `En la parte superior ${n(arbol.efectos, 'se muestra el efecto que produce', 'se muestran los efectos que produce')}: ${enumerar(arbol.efectos)}.`;
@@ -73,14 +103,9 @@ const renglones = (texto, maxChars) => {
 const W = 1200;
 const MARGEN = 40;
 const SEP = 20;
-const COLORES = {
-    efecto: { fondo: '#ffe4e6', borde: '#be123c' },
-    problema: { fondo: '#e0e7ff', borde: '#4338ca' },
-    causa: { fondo: '#fef3c7', borde: '#b45309' },
-};
 
 // Una fila de cajas del mismo alto, centrada. Devuelve el SVG, el alto y el centro (x) de cada caja.
-const fila = (textos, y, tipo, { ancho, fuente = 22, negrita = false } = {}) => {
+const fila = (textos, y, c, { ancho, fuente = 22, negrita = false } = {}) => {
     const n = textos.length;
     const util = W - MARGEN * 2;
     const w = ancho || Math.min(360, (util - SEP * (n - 1)) / n);
@@ -90,7 +115,6 @@ const fila = (textos, y, tipo, { ancho, fuente = 22, negrita = false } = {}) => 
     const maxChars = Math.max(6, Math.floor((w - 28) / (fuente * 0.54)));
     const partes = textos.map((t) => renglones(t, maxChars));
     const h = Math.max(...partes.map((p) => p.length)) * interlinea + 30;
-    const c = COLORES[tipo];
     const svg = partes.map((lineas, i) => {
         const x = x0 + i * (w + SEP);
         const y0 = y + h / 2 - ((lineas.length - 1) * interlinea) / 2 + fuente * 0.35;
@@ -116,30 +140,31 @@ const conectores = (centros, yCajas, yBarra, yTronco) => {
  */
 export const arbolSvg = (arbol, { relleno = false } = {}) => {
     const a = arbol || { problema: '', causas: [], efectos: [] };
-    const efectos = a.efectos.length ? a.efectos : relleno ? ['Efecto 1', 'Efecto 2'] : [];
-    const causas = a.causas.length ? a.causas : relleno ? ['Causa 1', 'Causa 2'] : [];
-    const problema = a.problema || (relleno ? 'Problema central' : '');
+    const nv = nivelesDe(a);
+    const efectos = a.efectos.length ? a.efectos : relleno ? [`${nv.arriba} 1`, `${nv.arriba} 2`] : [];
+    const causas = a.causas.length ? a.causas : relleno ? [`${nv.abajo} 1`, `${nv.abajo} 2`] : [];
+    const problema = a.problema || (relleno ? nv.centro : '');
     const fuente = (n) => (n > 4 ? 18 : n > 3 ? 20 : 22);
     const HUECO = 56; // espacio de los conectores
 
     let y = 30;
     const partes = [];
-    partes.push(rotuloFila('EFECTOS · ¿Qué consecuencias trae?', y + 4));
+    partes.push(rotuloFila(nv.rotuloArriba, y + 4));
     y += 22;
-    const fe = fila(efectos.length ? efectos : [' '], y, 'efecto', { fuente: fuente(efectos.length) });
+    const fe = fila(efectos.length ? efectos : [' '], y, nv.colores.arriba, { fuente: fuente(efectos.length) });
     partes.push(fe.svg);
     const yEfectos = y + fe.h;
     y = yEfectos + HUECO;
-    const fp = fila([problema || ' '], y, 'problema', { ancho: 720, fuente: 24, negrita: true });
+    const fp = fila([problema || ' '], y, nv.colores.centro, { ancho: 720, fuente: 24, negrita: true });
     partes.push(fp.svg);
     partes.unshift(conectores(fe.centros, yEfectos, yEfectos + 28, y));
     const yProblema = y + fp.h;
     y = yProblema + HUECO;
-    const fc = fila(causas.length ? causas : [' '], y, 'causa', { fuente: fuente(causas.length) });
+    const fc = fila(causas.length ? causas : [' '], y, nv.colores.abajo, { fuente: fuente(causas.length) });
     partes.push(fc.svg);
     partes.unshift(conectores(fc.centros, y, y - 28, yProblema));
     y += fc.h;
-    partes.push(rotuloFila('CAUSAS · ¿Por qué ocurre?', y + 32));
+    partes.push(rotuloFila(nv.rotuloAbajo, y + 32));
     const h = y + 50;
 
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${h}" viewBox="0 0 ${W} ${h}" font-family="Arial, Helvetica, sans-serif"><rect width="${W}" height="${h}" fill="#ffffff"/>${partes.join('')}</svg>`;

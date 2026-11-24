@@ -1,4 +1,4 @@
-import { arbolCompleto, arbolSvg, explicacionArbol, leerArbol } from './arbol.js';
+import { arbolCompleto, arbolSvg, explicacionArbol, leerArbol, leerArbolObjetivos } from './arbol.js';
 import { ordenarReferencias, referenciaAPA } from './apa.js';
 import { partesObjetivos } from './coherencia.js';
 import { bloquesInstrumento, preguntasDe, ubicacionDe } from './instrumentos.js';
@@ -132,6 +132,23 @@ const conArbol = (d, blocks) => {
     return [...blocks.slice(0, corte), presentacion, figura, ...blocks.slice(corte)];
 };
 
+// Árbol de objetivos: va al final de la sección Objetivos, con su párrafo de presentación. Igual que el del
+// problema, solo entra si la sección ya tiene contenido y el árbol está completo.
+export const ARBOL_OBJ_ID = 'arbolobj';
+const conArbolObjetivos = (d, blocks) => {
+    const arbol = leerArbolObjetivos(d);
+    if (!blocks.length || !arbol.propio || !arbolCompleto(arbol)) return blocks;
+    const { w, h } = arbolSvg(arbol);
+    const presentacion = { type: 'paragraph', text: arbol.explicacion ? arbol.explicacion.replace(/\b[Ll]a figura\b(?! \d)/, (m) => `${m.charAt(0)}a [[${ARBOL_OBJ_ID}]]`) : explicacionArbol(arbol, `La [[${ARBOL_OBJ_ID}]]`), citaDe: [ARBOL_OBJ_ID] };
+    const figura = { type: 'figure', elementoId: ARBOL_OBJ_ID, fileId: ARBOL_OBJ_ID, arbol: { tipo: 'objetivos', problema: arbol.problema, causas: arbol.causas, efectos: arbol.efectos }, caption: 'Árbol de objetivos', nota: 'Elaboración propia.', w, h };
+    return [...blocks, presentacion, figura];
+};
+const arbolObjetivosBlocks = (d) => {
+    const arbol = leerArbolObjetivos(d);
+    if (!arbol.propio || !arbolCompleto(arbol)) return [];
+    return [{ type: 'list', items: [`**Objetivo central:** ${arbol.problema}`, `**Medios:** ${arbol.causas.join('; ')}`, `**Fines:** ${arbol.efectos.join('; ')}`] }];
+};
+
 // Avance de la página «Árbol del problema»: cuenta cuando el estudiante lo armó allí y está completo.
 const arbolBlocks = (d) => {
     const arbol = leerArbol(d);
@@ -258,6 +275,7 @@ export const CAMPOS_SECCION = {
     preliminares: ['integrantes', 'director', 'ciudad', 'dedicatoria', 'agradecimientos', 'declaracionOriginalidad', 'declaracionExoneracion'],
     introduccion: ['introduccion', 'introduccionForm'],
     arbol: ['arbol'],
+    arbolObjetivos: ['arbolObjetivos'],
     planteamiento: ['planteamiento', 'planteamientoForm'],
     pregunta: ['pregunta', 'preguntaForm', 'preguntaTipo'],
     objetivos: ['objetivos', 'objetivosForm', 'objetivoGeneral'],
@@ -310,7 +328,7 @@ export const SECTIONS = [
     { id: 'introduccion', label: 'Introducción', tab: 'introduccion', blocks: (d) => cuerpo(d.introduccion) },
     { id: 'planteamiento', label: 'Planteamiento del problema', tab: 'planteamiento', blocks: (d) => conArbol(d, cuerpo(d.planteamiento)) },
     { id: 'pregunta', label: 'Pregunta de investigación', tab: 'pregunta', blocks: (d) => cuerpo(d.pregunta) },
-    { id: 'objetivos', label: 'Objetivos', tab: 'objetivos', blocks: (d) => objetivosBlocks(d.objetivos) },
+    { id: 'objetivos', label: 'Objetivos', tab: 'objetivos', blocks: (d) => conArbolObjetivos(d, objetivosBlocks(d.objetivos)) },
     { id: 'justificacion', label: 'Justificación', tab: 'justificacion', blocks: (d) => cuerpo(d.justificacion) },
     {
         id: 'alcances',
@@ -393,10 +411,11 @@ export const SECTIONS = [
     { id: 'idea', label: 'Idea de investigación', inDocument: false, tab: 'ideacion', blocks: (d) => ideaBlocks(d.idea) },
     // El árbol no es un capítulo: su figura va dentro del Planteamiento. Esta entrada solo marca el avance de su página.
     { id: 'arbol', label: 'Árbol del problema', inDocument: false, tab: 'arbol', blocks: arbolBlocks },
+    { id: 'arbolObjetivos', label: 'Árbol de objetivos', inDocument: false, tab: 'arbolobjetivos', blocks: arbolObjetivosBlocks },
 ];
 
 // Orden en que se construye el proyecto (menú y avance). El documento sigue el orden de SECTIONS.
-export const BUILD_ORDER = ['ideacion', 'titulo', 'pregunta', 'arbol', 'planteamiento', 'objetivos', 'justificacion', 'alcances', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'introduccion', 'resumen', 'referencias'];
+export const BUILD_ORDER = ['ideacion', 'titulo', 'pregunta', 'arbol', 'planteamiento', 'arbolobjetivos', 'objetivos', 'justificacion', 'alcances', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'introduccion', 'resumen', 'referencias'];
 
 export const buildDocument = (data) => SECTIONS.map((section) => ({ ...section, content: section.blocks(data || {}) }));
 

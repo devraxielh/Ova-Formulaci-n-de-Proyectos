@@ -264,3 +264,23 @@ test('el árbol del problema entra como figura al final del planteamiento y se c
     const { svg, w, h } = arbolSvg(leerArbol(datos));
     assert.ok(svg.startsWith('<svg') && svg.includes('Alta inasistencia') && w === 1200 && h > 200);
 });
+
+test('el árbol de objetivos entra como figura al final de Objetivos, con su párrafo', async () => {
+    const { documentoNumerado } = await import('../src/services/projectDoc.js');
+    const { arbolSvg, leerArbolObjetivos } = await import('../src/services/arbol.js');
+    const datos = { ...proyecto, arbolObjetivos: { problema: 'Reducir la inasistencia a citas', causas: ['Los pacientes recuerdan su cita'], efectos: ['Se aprovechan los cupos', 'Disminuye la espera'] } };
+    const sec = documentoNumerado(buildDocument(datos)).find((s) => s.id === 'objetivos');
+    const figura = sec.content[sec.content.length - 1];
+    assert.equal(figura.type, 'figure');
+    assert.equal(figura.caption, 'Árbol de objetivos');
+    assert.equal(figura.arbol.tipo, 'objetivos');
+    assert.match(sec.content[sec.content.length - 2].text, /^La Figura 1 presenta el árbol de objetivos.*objetivo central: reducir la inasistencia a citas\. .*el medio para lograrlo: los pacientes recuerdan su cita\. .*los fines a los que contribuye: se aprovechan los cupos, y disminuye la espera\.$/);
+    // La figura usa los rótulos del árbol de objetivos, no los del problema.
+    const { svg } = arbolSvg(leerArbolObjetivos(datos));
+    assert.ok(svg.includes('MEDIOS') && svg.includes('FINES') && !svg.includes('CAUSAS'));
+    // Sin hacerlo en su página no hay figura, aunque exista el objetivo general.
+    assert.ok(!buildDocument(proyecto).find((s) => s.id === 'objetivos').content.some((b) => b.type === 'figure'));
+    // Con los dos árboles, se numeran en el orden del documento: problema (planteamiento) y luego objetivos.
+    const ambos = documentoNumerado(buildDocument({ ...datos, planteamiento: 'Texto.', arbol: { problema: 'P', causas: ['C'], efectos: ['E'] } }));
+    assert.deepEqual(ambos.flatMap((s) => s.content).filter((b) => b.type === 'figure').map((b) => `${b.rotulo} ${b.caption}`), ['Figura 1 Árbol del problema', 'Figura 2 Árbol de objetivos']);
+});

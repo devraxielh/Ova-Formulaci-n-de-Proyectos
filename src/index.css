@@ -522,3 +522,11 @@ label {
 .carga--seccion { position: fixed; inset: 0; z-index: 40; align-content: center; justify-content: center; pointer-events: none; padding: 2rem 1rem; opacity: 0; animation: carga-aparece 0.25s ease-out 0.18s forwards; }
 @keyframes carga-aparece { to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .carga--seccion { animation: none; opacity: 1; } }
+
+/* Menú: las opciones se reparten el alto disponible. Con espacio de sobra respiran (hasta 2,85 rem cada una);
+   en pantallas bajas se juntan (mínimo 1,7 rem) y, si aun así no caben, el menú se desplaza. */
+@media (min-width: 769px) {
+  .sidebar nav { display: flex; flex-direction: column; min-height: 0; }
+  .sidebar nav .nav-button,
+  .sidebar--collapsed nav .nav-button { flex: 1 1 0; min-height: 1.7rem; max-height: 2.85rem; padding-block: 0; margin-bottom: 0.12rem; }
+}
