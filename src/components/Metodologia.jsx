@@ -127,6 +127,52 @@ const recomendarTipo = async (proyecto) => {
     return { tipo, razon, descartados };
 };
 
+// Diseño: se elige entre los del enfoque, en coherencia con el tipo, la pregunta y los objetivos.
+const disenosTexto = (enfoque) => (DISENOS[enfoque] || []).map((d) => `- ${d.id}: aquel ${d.def}`).join('\n');
+const REGLA_DISENO = 'No inventes fechas, duraciones, tamaños de muestra, instrumentos ni cifras: si hace falta un dato que el proyecto no da (como el periodo de recolección), deja una indicación entre corchetes, por ejemplo [periodo de recolección].';
+
+// «Cómo se aplica en tu estudio» para un diseño ya elegido.
+const razonDiseno = async ({ diseno, tipo, ...proyecto }) => {
+    const r = await groq.chat.completions.create({
+        messages: [
+            { role: 'system', content: `Ayudas a un estudiante a explicar cómo se aplica el diseño de su investigación en la metodología. Escribes en español, en tercera persona o forma impersonal, con lo que dicen su título, su pregunta y sus objetivos. ${REGLA_DISENO} Devuelves únicamente el texto, sin comillas ni explicaciones.` },
+            { role: 'user', content: `DISEÑOS DEL ENFOQUE ${String(proyecto.enfoque).toUpperCase()}\n${disenosTexto(proyecto.enfoque)}\n\n${proyectoParaTipo(proyecto)}\nTipo de investigación: ${tipo || '(sin definir)'}\n\nDISEÑO ELEGIDO: ${diseno}\n\nEscribe en dos frases completas (entre 40 y 70 palabras) cómo se aplica el diseño ${diseno} en este estudio: qué se observa o se hace con la población, en cuántos momentos, si se interviene o no, y por qué eso permite responder la pregunta y lograr el objetivo general. Debe ser coherente con el enfoque y el tipo de investigación. No repitas la definición del diseño: ya está escrita antes. No señales limitaciones ni recomiendes otro diseño. Sin punto final.` },
+        ],
+        temperature: 0.3,
+        max_tokens: 1200,
+    });
+    const texto = String(r.choices?.[0]?.message?.content ?? '').replace(/\s+/g, ' ').trim().replace(/^["«]|["»]$/g, '').replace(/[.\s]+$/, '');
+    if (texto.length < 120 || /\s(?:de|del|la|el|los|las|y|que|en|a|con|para|por|un|una)$/i.test(texto)) throw new Error('vacio');
+    return texto;
+};
+
+// Elige el diseño que corresponde y explica por qué no los demás del mismo enfoque.
+const recomendarDiseno = async ({ tipo, ...proyecto }) => {
+    const t = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
+    const opciones = DISENOS[proyecto.enfoque] || [];
+    const r = await groq.chat.completions.create({
+        messages: [
+            { role: 'system', content: `Eres asesor metodológico. Eliges el diseño de investigación que corresponde a un proyecto, entre los de su enfoque, según lo que piden su pregunta y sus objetivos y en coherencia con su tipo de investigación. Escribes en español, en tercera persona o forma impersonal. ${REGLA_DISENO} Respondes solo JSON válido.` },
+            { role: 'user', content: `DISEÑOS DEL ENFOQUE ${String(proyecto.enfoque).toUpperCase()}\n${disenosTexto(proyecto.enfoque)}\n\n${proyectoParaTipo(proyecto)}\nTipo de investigación: ${tipo || '(sin definir)'}\n\nElige UN diseño de la lista. Criterios: si el estudio no aplica ninguna intervención ni manipula variables, no puede ser experimental ni cuasiexperimental; si no hay nada que indique varias mediciones en el tiempo, es de un solo momento; el diseño debe permitir lo que el tipo de investigación promete (describir, relacionar, explicar, evaluar una intervención, proponer).\n- "diseno": exactamente uno de ${opciones.map((d) => `"${d.id}"`).join(', ')}.\n- "razon": dos frases completas (40 a 70 palabras) que digan cómo se aplica ese diseño en este estudio: qué se observa o se hace con la población, en cuántos momentos, si se interviene o no, y por qué eso permite responder la pregunta. No repitas la definición ni señales limitaciones. Sin punto final.\n- "descartados": para CADA UNO de los otros diseños de la lista, una frase (12 a 25 palabras) que diga por qué no es el de ESTE proyecto: qué exigiría ese diseño que el proyecto no hace o no busca. Empieza en minúscula. Sin punto final.\n\nResponde exactamente con este JSON: {"diseno": "…", "razon": "…", "descartados": [{"diseno": "…", "porque": "…"}]}` },
+        ],
+        temperature: 0.2,
+        max_tokens: 2200,
+        response_format: { type: 'json_object' },
+    });
+    const content = r.choices?.[0]?.message?.content || '';
+    const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+    const ids = opciones.map((d) => d.id);
+    const cual = (v) => ids.find((id) => id.toLowerCase() === t(v).toLowerCase().replace(/^diseño\s+/, ''));
+    const sinPunto = (v) => t(v).replace(/[.\s]+$/, '');
+    const diseno = cual(json.diseno);
+    const razon = sinPunto(json.razon);
+    if (!diseno || razon.length < 60) throw new Error('vacio');
+    const descartados = (Array.isArray(json.descartados) ? json.descartados : [])
+        .map((d) => ({ diseno: cual(d?.diseno), porque: sinPunto(d?.porque).replace(/^\p{Lu}(?=\p{Ll})/u, (l) => l.toLowerCase()) }))
+        .filter((d) => d.diseno && d.diseno !== diseno && d.porque.length > 15);
+    return { diseno, razon, descartados };
+};
+
 const clean = (text) => String(text || '').trim().replace(/[\s.,;:]+$/, '');
 const lower = (text) => (text ? text.charAt(0).toLowerCase() + text.slice(1) : '');
 const money = (value) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number(value) || 0);
@@ -435,6 +481,42 @@ const Constructor = ({ intro, onNavigate }) => {
         elegirTipo();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tab]);
+    // Diseño: igual que el enfoque y el tipo, pero solo entre los diseños del enfoque elegido.
+    const [razonD, setRazonD] = useState('');
+    const pedirRazonDiseno = async (v, forzar) => {
+        if (!v || !enfoque || (!forzar && String(f.disenoTexto || '').trim() && f.disenoTexto !== f.disenoAuto)) return;
+        setRazonD('pensando');
+        try {
+            const texto = await razonDiseno({ diseno: v, tipo, ...proyectoTipo() });
+            touch();
+            update({ disenoTexto: texto, disenoAuto: texto });
+            setRazonD('');
+        } catch {
+            setRazonD('fallo');
+        }
+    };
+    const elegirDiseno = async () => {
+        if (!enfoque) return;
+        setRazonD('eligiendo');
+        try {
+            const r = await recomendarDiseno({ tipo, ...proyectoTipo() });
+            touch();
+            setDiseno(r.diseno);
+            const libre = !String(f.disenoTexto || '').trim() || f.disenoTexto === f.disenoAuto;
+            update({ disenoNotas: { recomendado: r.diseno, enfoque, tipo, descartados: r.descartados }, ...(libre ? { disenoTexto: r.razon, disenoAuto: r.razon } : {}) });
+            setRazonD('');
+        } catch {
+            setRazonD('fallo');
+        }
+    };
+    const yaEligioDiseno = useRef(false);
+    useEffect(() => {
+        if (tab !== 'diseno' || yaEligioDiseno.current || !enfoque || f.disenoNotas || String(f.disenoTexto || '').trim()) return;
+        if (!especificos.length && !String(estado.data.pregunta || '').trim()) return;
+        yaEligioDiseno.current = true;
+        elegirDiseno();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tab, enfoque]);
     const setPob = (patch) => { touch(); update({ poblacion: { ...f.poblacion, ...patch } }); };
 
     // La primera vez: tipo según los alcances, población del título, una fila de análisis por específico y un cronograma base.
@@ -583,11 +665,43 @@ const Constructor = ({ intro, onNavigate }) => {
                     {tab === 'diseno' && (
                         <div className="input-group pla-part">
                             <span className="alc-label">Elige el diseño {enfoque ? `(${enfoque.toLowerCase()})` : ''}</span>
+                            {enfoque && (
+                                <div className="met-razon">
+                                    <button type="button" className="ide-btn ide-btn--ghost" disabled={razonD === 'eligiendo' || razonD === 'pensando'} onClick={elegirDiseno}>
+                                        {razonD === 'eligiendo' ? <Loader2 size={15} className="met-gira" /> : <Sparkles size={15} />} {razonD === 'eligiendo' ? 'Eligiendo según tu proyecto…' : 'Elegir el diseño con mi proyecto'}
+                                    </button>
+                                    <span>Se basa en tu pregunta, tus objetivos, el enfoque {enfoque.toLowerCase()}{tipo ? ` y el tipo ${tipo.toLowerCase()}` : ''}. Puedes cambiarlo abajo.</span>
+                                </div>
+                            )}
                             {enfoque
-                                ? <Chips options={DISENOS[enfoque].map((d) => d.id)} value={diseno} label="Diseño" onPick={(v) => { touch(); setDiseno(v); }} />
+                                ? <Chips options={DISENOS[enfoque].map((d) => d.id)} value={diseno} label="Diseño" onPick={(v) => { touch(); setDiseno(v); if (v !== diseno) pedirRazonDiseno(v, false); }} />
                                 : <p className="obj-warn"><AlertTriangle size={14} aria-hidden="true" /> Primero elige el enfoque: los diseños dependen de él.</p>}
                             {diseno && <small className="ide-field-hint">Un diseño {diseno} es aquel {(DISENOS[enfoque] || []).find((d) => d.id === diseno)?.def}.</small>}
+                            {f.disenoNotas?.recomendado && (
+                                <div className="met-notas">
+                                    <b>Notas</b>
+                                    {f.disenoNotas.enfoque !== enfoque
+                                        ? <p>Estas notas eran para el enfoque {String(f.disenoNotas.enfoque || '').toLowerCase()} y ahora el enfoque es {String(enfoque || '').toLowerCase() || 'otro'}: vuelve a elegir el diseño con tu proyecto.</p>
+                                        : (
+                                            <>
+                                                <p>Para tu proyecto se recomienda un diseño <strong>{f.disenoNotas.recomendado}</strong>{diseno && diseno !== f.disenoNotas.recomendado ? `, pero elegiste ${diseno}: revisa que tu estudio pueda cumplir lo que ese diseño exige` : ''}.</p>
+                                                {f.disenoNotas.tipo && tipo && f.disenoNotas.tipo !== tipo && <p>Cambiaste el tipo de investigación después de esta recomendación: vuelve a elegir el diseño con tu proyecto.</p>}
+                                                {(f.disenoNotas.descartados || []).map((d) => <p key={d.diseno}><strong>Por qué no el {d.diseno}:</strong> {d.porque}.</p>)}
+                                            </>
+                                        )}
+                                    <small>Las notas son para ti: no pasan al documento.</small>
+                                </div>
+                            )}
                             <Campo id="met-dis-txt" label="Cómo se aplica en tu estudio" rows={3} value={f.disenoTexto} onChange={set('disenoTexto')} placeholder="Ej: Los datos se recogerán una sola vez, entre febrero y abril de 2026, sin intervenir en la atención de los pacientes" />
+                            {diseno && enfoque && (
+                                <div className="met-razon">
+                                    <button type="button" className="ide-link" disabled={razonD === 'pensando' || razonD === 'eligiendo'} onClick={() => pedirRazonDiseno(diseno, true)}>
+                                        {razonD === 'pensando' ? <Loader2 size={13} className="met-gira" /> : <Sparkles size={13} />} {razonD === 'pensando' ? 'Redactando con tu proyecto…' : clean(f.disenoTexto) ? 'Volver a redactar con mi proyecto' : 'Redactar con mi proyecto'}
+                                    </button>
+                                    {razonD === 'fallo' && <span>No se pudo: inténtalo de nuevo o escríbelo tú.</span>}
+                                    {razonD !== 'fallo' && f.disenoTexto && f.disenoTexto === f.disenoAuto && <span>Redactado por la IA con tu proyecto: complétalo donde veas corchetes.</span>}
+                                </div>
+                            )}
                         </div>
                     )}
 
