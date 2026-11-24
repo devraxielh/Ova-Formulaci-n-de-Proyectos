@@ -29,3 +29,15 @@
 .met-total { margin: 0.25rem 0 0 !important; font-size: 1rem; color: #1e293b; }
 .met-row { grid-template-columns: 1.2fr 1fr 1fr !important; }
 @media (max-width: 560px) { .met-row { grid-template-columns: 1fr !important; } }
+
+/* Razón del enfoque redactada con los objetivos */
+.met-razon { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.8rem; margin-top: 0.35rem; font-size: 0.82rem; color: #64748b; }
+.met-razon .ide-link { display: inline-flex; align-items: center; gap: 0.25rem; }
+.met-gira { animation: met-gira 1s linear infinite; }
+@keyframes met-gira { to { transform: rotate(360deg); } }
+
+/* Notas del enfoque: por qué no los otros (informativo) */
+.met-notas { display: grid; gap: 0.3rem; margin: 0.6rem 0; padding: 0.7rem 0.85rem; border-left: 3px solid #a5b4fc; background: #f5f7ff; border-radius: 0 8px 8px 0; font-size: 0.88rem; color: #334155; }
+.met-notas b { font-size: 0.74rem; letter-spacing: 0.06em; text-transform: uppercase; color: #4338ca; }
+.met-notas p { margin: 0; line-height: 1.5; }
+.met-notas small { color: #64748b; font-size: 0.78rem; }

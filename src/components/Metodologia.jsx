@@ -2,11 +2,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import EditorRico from './EditorRico';
 import {
     AlertTriangle, BarChart3, BookOpenCheck, Calculator, CalendarDays, CheckCircle2, ClipboardList, Compass, DollarSign, Layers, Microscope,
-    Plus, ShieldCheck, Target, Trash2, Users, X, XCircle,
+    Loader2, Plus, ShieldCheck, Sparkles, Target, Trash2, Users, X, XCircle,
 } from 'lucide-react';
 import SlideDeck, { Opciones, Pestanas } from './deck/SlideDeck';
 import { useProject, useProjectField } from '../context/ProjectContext';
 import { useAutoGuardar } from '../hooks/useAutoGuardar';
+import { groq } from '../services/api';
 import { partesObjetivos } from '../services/coherencia';
 import { TIPO_ALCANCE } from '../data/ejemplos';
 import {
@@ -32,6 +33,51 @@ import './Metodologia.css';
 const SLIDE_KEY = 'projectsia:metodologia:diapositiva';
 
 /* ---------- Utilidades ---------- */
+
+// «Por qué este enfoque»: la razón sale de los objetivos del proyecto y del enfoque elegido.
+const razonEnfoque = async ({ enfoque, data, especificos }) => {
+    const t = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
+    const def = ENFOQUES.find((e) => e.id === enfoque)?.def || '';
+    const general = t(data.objetivoGeneral) || t(partesObjetivos(data.objetivos).general);
+    const r = await groq.chat.completions.create({
+        messages: [
+            { role: 'system', content: 'Ayudas a un estudiante a justificar el enfoque de su investigación en la metodología. Escribes en español, en tercera persona o forma impersonal, con lo que dicen sus objetivos: no inventas cifras, técnicas, muestras, autores ni citas. Devuelves únicamente el texto, sin comillas ni explicaciones.' },
+            { role: 'user', content: `ENFOQUE ELEGIDO: ${enfoque} (el ${def})\n\nPROYECTO\nTítulo: ${t(data.titulo) || '(sin título)'}\nPregunta: ${t(data.pregunta) || '(sin definir)'}\nObjetivo general: ${general || '(sin definir)'}\nObjetivos específicos:\n${especificos.length ? especificos.map((x, i) => `${i + 1}. ${x}`).join('\n') : '(sin definir)'}\n\nEscribe en dos frases (entre 40 y 70 palabras) por qué el enfoque ${enfoque.toLowerCase()} es el que corresponde a estos objetivos: qué piden hacer los objetivos (medir, relacionar, comprender, describir experiencias…) y qué clase de datos exige eso. ${enfoque === 'Mixto' ? 'Di qué objetivo necesita datos numéricos y cuál necesita datos cualitativos. ' : ''}Empieza con «Este enfoque». No repitas la definición del enfoque: ya está escrita antes. Es una justificación: no señales limitaciones ni recomiendes otro enfoque. Dos frases completas, sin punto final.` },
+        ],
+        temperature: 0.3,
+        max_tokens: 1200,
+    });
+    const texto = t(r.choices?.[0]?.message?.content).replace(/^["«]|["»]$/g, '').replace(/[.\s]+$/, '');
+    // Un texto muy corto o que termina en una palabra suelta («de», «la»…) llegó cortado: no se usa.
+    if (texto.length < 120 || /\s(?:de|del|la|el|los|las|y|que|en|a|con|para|por|un|una)$/i.test(texto)) throw new Error('vacio');
+    return texto;
+};
+
+// Elige el enfoque que corresponde al proyecto y explica por qué no los otros dos.
+const recomendarEnfoque = async ({ data, especificos }) => {
+    const t = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
+    const general = t(data.objetivoGeneral) || t(partesObjetivos(data.objetivos).general);
+    const r = await groq.chat.completions.create({
+        messages: [
+            { role: 'system', content: 'Eres asesor metodológico. Eliges el enfoque de investigación que corresponde a un proyecto según lo que piden su pregunta y sus objetivos, no según preferencias. Escribes en español, en tercera persona o forma impersonal. No inventas cifras, técnicas, muestras, autores ni citas. Respondes solo JSON válido.' },
+            { role: 'user', content: `ENFOQUES POSIBLES\n${ENFOQUES.map((e) => `- ${e.id}: el ${e.def}`).join('\n')}\n\nPROYECTO\nTítulo: ${t(data.titulo) || '(sin título)'}\nPregunta: ${t(data.pregunta) || '(sin definir)'}\nProblema: ${t(data.idea?.problema) || '(sin definir)'}\nObjetivo general: ${general || '(sin definir)'}\nObjetivos específicos:\n${especificos.length ? especificos.map((x, i) => `${i + 1}. ${x}`).join('\n') : '(sin definir)'}\n\nElige UN enfoque. Criterio: cuantitativo si los objetivos piden medir, comparar, relacionar o determinar frecuencias y factores; cualitativo si piden comprender experiencias, percepciones o significados; mixto solo si hay objetivos de las dos clases y ninguno puede lograrse sin la otra clase de datos (no lo elijas por comodidad).\n- "enfoque": "Cuantitativo", "Cualitativo" o "Mixto".\n- "razon": dos frases completas (40 a 70 palabras) que justifiquen ese enfoque con lo que piden los objetivos y la clase de datos que exigen. Empieza con «Este enfoque». No repitas la definición ni señales limitaciones. Sin punto final.\n- "descartados": para CADA UNO de los otros dos enfoques, una frase (15 a 30 palabras) que diga por qué no es el adecuado para ESTE proyecto, nombrando lo que sus objetivos piden y ese enfoque no da (o lo que ese enfoque exigiría y el proyecto no busca). Sin punto final.\n\nResponde exactamente con este JSON: {"enfoque": "…", "razon": "…", "descartados": [{"enfoque": "…", "porque": "…"}, {"enfoque": "…", "porque": "…"}]}` },
+        ],
+        temperature: 0.2,
+        max_tokens: 1500,
+        response_format: { type: 'json_object' },
+    });
+    const content = r.choices?.[0]?.message?.content || '';
+    const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+    const ids = ENFOQUES.map((e) => e.id);
+    const sinPunto = (v) => t(v).replace(/[.\s]+$/, '');
+    const enfoque = ids.find((id) => id.toLowerCase() === t(json.enfoque).toLowerCase());
+    const razon = sinPunto(json.razon);
+    if (!enfoque || razon.length < 60) throw new Error('vacio');
+    const descartados = (Array.isArray(json.descartados) ? json.descartados : [])
+        .map((d) => ({ enfoque: ids.find((id) => id.toLowerCase() === t(d?.enfoque).toLowerCase()), porque: sinPunto(d?.porque).replace(/^\p{Lu}(?=\p{Ll})/u, (l) => l.toLowerCase()) }))
+        .filter((d) => d.enfoque && d.enfoque !== enfoque && d.porque.length > 15);
+    return { enfoque, razon, descartados };
+};
 
 const clean = (text) => String(text || '').trim().replace(/[\s.,;:]+$/, '');
 const lower = (text) => (text ? text.charAt(0).toLowerCase() + text.slice(1) : '');
@@ -249,6 +295,7 @@ const Gantt = ({ filas, periodos, unidad }) => (
 
 const Constructor = ({ intro, onNavigate }) => {
     const s = useMetState();
+    const estado = s;
     const { f, update, setters, enfoque, setEnfoque, tipo, setTipo, diseno, setDiseno, calc, setCalc, unidad, setUnidad, periodos, setPeriodos, presupuesto, setPresupuesto, especificos, quien, donde, tipoEsperado } = s;
     // Si se llega desde «Análisis de datos» u otro enlace a los instrumentos, se abre esa pestaña.
     const [tab, setTab] = useState(() => {
@@ -262,6 +309,46 @@ const Constructor = ({ intro, onNavigate }) => {
     const prefilled = useRef(false);
     const touch = () => setSaved(false);
     const set = (key) => (value) => { touch(); update({ [key]: value }); };
+    // Al elegir el enfoque se redacta su razón con los objetivos. Solo se escribe si el campo está vacío o si lo que
+    // tiene es lo que se redactó antes (el estudiante no lo tocó): lo escrito a mano no se pisa.
+    const [razon, setRazon] = useState('');
+    const pedirRazon = async (v, forzar) => {
+        if (!v || (!forzar && String(f.enfoqueTexto || '').trim() && f.enfoqueTexto !== f.enfoqueAuto)) return;
+        setRazon('pensando');
+        try {
+            const texto = await razonEnfoque({ enfoque: v, data: estado.data, especificos });
+            touch();
+            update({ enfoqueTexto: texto, enfoqueAuto: texto });
+            setRazon('');
+        } catch {
+            setRazon('fallo');
+        }
+    };
+    // «Elegir con mi proyecto»: la IA escoge el enfoque según la pregunta y los objetivos, redacta la razón y deja
+    // en notas por qué no los otros. La razón escrita a mano por el estudiante no se pisa.
+    const elegirEnfoque = async () => {
+        setRazon('eligiendo');
+        try {
+            const r = await recomendarEnfoque({ data: estado.data, especificos });
+            touch();
+            setEnfoque(r.enfoque);
+            if (!(DISENOS[r.enfoque] || []).some((d) => d.id === diseno)) setDiseno('');
+            const libre = !String(f.enfoqueTexto || '').trim() || f.enfoqueTexto === f.enfoqueAuto;
+            update({ enfoqueNotas: { recomendado: r.enfoque, descartados: r.descartados }, ...(libre ? { enfoqueTexto: r.razon, enfoqueAuto: r.razon } : {}) });
+            setRazon('');
+        } catch {
+            setRazon('fallo');
+        }
+    };
+    // La primera vez que se abre el enfoque sin haber elegido ninguno, se elige solo (si ya hay objetivos o pregunta).
+    const yaEligio = useRef(false);
+    useEffect(() => {
+        if (tab !== 'enfoque' || yaEligio.current || enfoque || f.enfoqueNotas) return;
+        if (!especificos.length && !String(estado.data.pregunta || '').trim()) return;
+        yaEligio.current = true;
+        elegirEnfoque();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tab, enfoque]);
     const setPob = (patch) => { touch(); update({ poblacion: { ...f.poblacion, ...patch } }); };
 
     // La primera vez: tipo según los alcances, población del título, una fila de análisis por específico y un cronograma base.
@@ -344,9 +431,32 @@ const Constructor = ({ intro, onNavigate }) => {
                     {tab === 'enfoque' && (
                         <div className="input-group pla-part">
                             <span className="alc-label">Elige el enfoque</span>
-                            <Chips options={ENFOQUES.map((e) => e.id)} value={enfoque} label="Enfoque" onPick={(v) => { touch(); setEnfoque(v); if (!(DISENOS[v] || []).some((d) => d.id === diseno)) setDiseno(''); }} />
+                            <div className="met-razon">
+                                <button type="button" className="ide-btn ide-btn--ghost" disabled={razon === 'eligiendo' || razon === 'pensando'} onClick={elegirEnfoque}>
+                                    {razon === 'eligiendo' ? <Loader2 size={15} className="met-gira" /> : <Sparkles size={15} />} {razon === 'eligiendo' ? 'Eligiendo según tu proyecto…' : 'Elegir el enfoque con mi proyecto'}
+                                </button>
+                                <span>Se basa en tu pregunta y tus objetivos. Puedes cambiarlo abajo.</span>
+                            </div>
+                            <Chips options={ENFOQUES.map((e) => e.id)} value={enfoque} label="Enfoque" onPick={(v) => { touch(); setEnfoque(v); if (!(DISENOS[v] || []).some((d) => d.id === diseno)) setDiseno(''); if (v !== enfoque) pedirRazon(v, false); }} />
                             <small className="ide-field-hint">{ENFOQUES.find((e) => e.id === enfoque)?.def ? `Un enfoque ${enfoque.toLowerCase()} es el ${ENFOQUES.find((e) => e.id === enfoque).def}.` : 'Cuantitativo si mides y relacionas; cualitativo si comprendes; mixto si haces ambas cosas.'}</small>
+                            {f.enfoqueNotas?.recomendado && (
+                                <div className="met-notas">
+                                    <b>Notas</b>
+                                    <p>Para tu proyecto se recomienda el enfoque <strong>{f.enfoqueNotas.recomendado.toLowerCase()}</strong>{enfoque && enfoque !== f.enfoqueNotas.recomendado ? `, pero elegiste el ${enfoque.toLowerCase()}: revisa que tus objetivos lo sostengan` : ''}.</p>
+                                    {(f.enfoqueNotas.descartados || []).map((d) => <p key={d.enfoque}><strong>Por qué no {d.enfoque.toLowerCase()}:</strong> {d.porque}.</p>)}
+                                    <small>Las notas son para ti: no pasan al documento.</small>
+                                </div>
+                            )}
                             <Campo id="met-enf-txt" label="Por qué este enfoque (con tus objetivos)" rows={3} value={f.enfoqueTexto} onChange={set('enfoqueTexto')} placeholder="Ej: Este enfoque permite medir la frecuencia de la inasistencia y su relación con los factores identificados en los pacientes" />
+                            {enfoque && (
+                                <div className="met-razon">
+                                    <button type="button" className="ide-link" disabled={razon === 'pensando'} onClick={() => pedirRazon(enfoque, true)}>
+                                        {razon === 'pensando' ? <Loader2 size={13} className="met-gira" /> : <Sparkles size={13} />} {razon === 'pensando' ? 'Redactando con tus objetivos…' : clean(f.enfoqueTexto) ? 'Volver a redactar con mis objetivos' : 'Redactar con mis objetivos'}
+                                    </button>
+                                    {razon === 'fallo' && <span>No se pudo redactar: inténtalo de nuevo o escríbelo tú.</span>}
+                                    {razon !== 'fallo' && f.enfoqueTexto && f.enfoqueTexto === f.enfoqueAuto && <span>Redactado por la IA con tus objetivos: léelo y ajústalo.</span>}
+                                </div>
+                            )}
                         </div>
                     )}
 
