@@ -14,6 +14,7 @@ import './Objetivos.css';
 import './Justificacion.css';
 import BuscarAntecedentes from './BuscarAntecedentes';
 import { autorCita } from '../services/apa';
+import { groq } from '../services/api';
 import './Marco.css';
 import './Alcances.css';
 
@@ -171,6 +172,24 @@ const checkMarco = (text, { quien, donde }) => {
 
 /* ---------- Constructor ---------- */
 
+// Llena la ficha de un antecedente a partir del resumen del artículo. Solo usa lo que el resumen dice:
+// si no trae resultados, «hallazgo» queda vacío para que el estudiante lo complete al leer el artículo.
+const fichaDesdeResumen = async ({ ref, resumen, proyecto }) => {
+    const r = await groq.chat.completions.create({
+        messages: [
+            { role: 'system', content: 'Ayudas a un estudiante a fichar un antecedente de investigación a partir del resumen (abstract) de un artículo. Te basas únicamente en lo que dice el resumen: no inventas cifras, resultados, métodos ni lugares. Si el resumen no dice algo, dejas ese campo como cadena vacía. Escribes en español aunque el resumen esté en otro idioma. Respondes solo JSON válido.' },
+            { role: 'user', content: `ARTÍCULO\nTítulo: ${ref.titulo}\nAutores: ${ref.autores || ''}\nAño: ${ref.anio || ''}\nResumen: ${String(resumen).slice(0, 3500)}\n\nPROYECTO DEL ESTUDIANTE\nTítulo: ${proyecto.titulo || '(sin título)'}\nProblema: ${proyecto.problema || '(sin definir)'}\nPoblación: ${proyecto.quien || '(sin definir)'}\nLugar: ${proyecto.donde || '(sin definir)'}\n\nLlena la ficha del antecedente:\n- "objetivo": qué buscó el estudio y cómo lo hizo (método, muestra o instrumento, si el resumen lo dice). Una o dos frases que empiecen con un verbo en infinitivo en minúscula. Ej: «identificar las causas de la inasistencia mediante una encuesta a 320 pacientes».\n- "hallazgo": qué encontró, con las cifras que dé el resumen. Una o dos frases que empiecen en minúscula. Cadena vacía si el resumen no informa resultados.\n- "relacion": cómo se relaciona con el proyecto del estudiante (qué le aporta: una variable, un método, un resultado para comparar). Una frase que empiece con un verbo en tercera persona en minúscula. Ej: «aporta una de las causas que este estudio va a medir».\n- "lugar": país, ciudad o institución donde se hizo el estudio, tal como lo diga el resumen. Cadena vacía si no lo dice.\n- "ambito": "Regional o local" si se hizo en la misma ciudad, departamento o región del proyecto; "Nacional" si se hizo en Colombia fuera de esa región; "Internacional" si fue en otro país o el resumen no dice dónde.\nSin punto final en ningún campo.\n\nResponde exactamente con este JSON: {"objetivo": "…", "hallazgo": "…", "relacion": "…", "lugar": "…", "ambito": "…"}` },
+        ],
+        temperature: 0.2,
+        max_tokens: 700,
+        response_format: { type: 'json_object' },
+    });
+    const content = r.choices?.[0]?.message?.content || '';
+    const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+    const t = (v) => clean(String(v ?? '')).replace(/[.\s]+$/, '').slice(0, 600);
+    return { objetivo: t(json.objetivo), hallazgo: t(json.hallazgo), relacion: t(json.relacion), lugar: t(json.lugar).slice(0, 120), ambito: AMBITOS.includes(json.ambito) ? json.ambito : '' };
+};
+
 const useMarcoState = () => {
     const [form, setForm] = useProjectField('marcoForm', MARCO_FORM);
     const [tituloForm] = useProjectField('tituloForm', null);
@@ -197,7 +216,7 @@ const useMarcoState = () => {
     const i = idea || {};
     const t = tituloForm || {};
     return {
-        f, update, setters, guardados, titulo, idea: i,
+        f, update, setForm, setters, guardados, titulo, idea: i,
         quien: clean(t.quien || i.quien), donde: clean(t.donde || i.donde),
     };
 };
@@ -232,7 +251,7 @@ const Campo = ({ id, label, value, onChange, placeholder, rows = 1, className = 
 );
 
 const Constructor = ({ intro, onNavigate }) => {
-    const { f, update, setters, idea, quien, donde } = useMarcoState();
+    const { f, update, setForm, setters, idea, quien, donde, titulo } = useMarcoState();
     const [tab, setTab] = useState('antecedentes');
     const [saved, setSaved] = useState(false);
     const partes = redactar(f);
@@ -285,11 +304,31 @@ const Constructor = ({ intro, onNavigate }) => {
                     {tab === 'antecedentes' && (
                         <BuscarAntecedentes
                             sugerencia={problema}
-                            onUsar={(ref) => {
-                                // La ficha queda con autor, año y título; el hallazgo lo escribe el estudiante después de leer el artículo.
+                            onUsar={async (ref, resumen) => {
+                                // La ficha se crea de una vez con autor, año y título. Si el artículo trae resumen, la IA saca de él
+                                // qué buscó, qué encontró y dónde, y propone cómo se relaciona con este proyecto.
                                 const ficha = { ...VACIO.antecedente, autor: autorCita(ref), anio: ref.anio, titulo: ref.titulo, ambito: 'Internacional' };
                                 const libre = f.antecedentes.findIndex((a) => !clean(a.autor) && !clean(a.titulo) && !clean(a.hallazgo));
                                 set('antecedentes')(libre >= 0 ? f.antecedentes.map((a, i) => (i === libre ? ficha : a)) : [...f.antecedentes, ficha].slice(0, 10));
+                                if (clean(resumen).length < 80) return 'vacia';
+                                try {
+                                    const datos = await fichaDesdeResumen({ ref, resumen, proyecto: { titulo, problema: clean(idea.problema), quien, donde } });
+                                    if (!datos.objetivo && !datos.hallazgo) return 'vacia';
+                                    // Se completa la ficha de ese artículo (por su título) sin pisar lo que el estudiante ya haya escrito en ella.
+                                    setForm((prev) => {
+                                        const base = { ...MARCO_FORM, ...(prev || {}) };
+                                        const lista = Array.isArray(base.antecedentes) ? base.antecedentes : [];
+                                        const k = lista.findIndex((a) => clean(a.titulo) === clean(ficha.titulo) && clean(a.autor) === clean(ficha.autor));
+                                        if (k < 0) return base;
+                                        const a = lista[k];
+                                        const llena = { ...a, objetivo: clean(a.objetivo) || datos.objetivo, hallazgo: clean(a.hallazgo) || datos.hallazgo, relacion: clean(a.relacion) || datos.relacion, lugar: clean(a.lugar) || datos.lugar, ambito: datos.ambito || a.ambito };
+                                        return { ...base, antecedentes: lista.map((x, i) => (i === k ? llena : x)) };
+                                    });
+                                    touch();
+                                    return 'llena';
+                                } catch {
+                                    return 'vacia'; // sin IA: queda la ficha con autor, año y título
+                                }
                             }}
                         />
                     )}

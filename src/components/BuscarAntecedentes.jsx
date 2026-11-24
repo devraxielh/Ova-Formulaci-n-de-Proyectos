@@ -147,8 +147,10 @@ const BuscarAntecedentes = ({ onUsar, sugerencia = '' }) => {
         setUsados((p) => ({ ...p, [item.clave]: 'cargando' }));
         const ref = await completar(item);
         if (!yaEsta(ref)) setRefs((prev) => [...(Array.isArray(prev) ? prev : []), { ...ref, id: uid() }]);
-        if (usar && onUsar) onUsar(ref, item.resumen);
-        setUsados((p) => ({ ...p, [item.clave]: usar ? 'usado' : 'agregado' }));
+        // onUsar crea la ficha y, si el artículo trae resumen, la llena con él: dice cómo quedó ('llena' o 'vacia').
+        if (usar && onUsar) setUsados((p) => ({ ...p, [item.clave]: 'llenando' }));
+        const quedo = usar && onUsar ? await onUsar(ref, item.resumen) : '';
+        setUsados((p) => ({ ...p, [item.clave]: usar ? (quedo === 'llena' ? 'llena' : 'usado') : 'agregado' }));
     };
 
     return (
@@ -197,10 +199,12 @@ const BuscarAntecedentes = ({ onUsar, sugerencia = '' }) => {
                                     </p>
                                     {abierto === item.clave && <p className="bus-resumen">{item.resumen}</p>}
                                     <div className="bus-acciones">
-                                        {esta || estadoItem === 'agregado' || estadoItem === 'usado'
+                                        {esta || estadoItem === 'agregado' || estadoItem === 'usado' || estadoItem === 'llena' || estadoItem === 'llenando'
                                             ? <span className="bus-ok"><CheckCircle2 size={15} /> En tus referencias</span>
                                             : <button type="button" className="ide-btn ide-btn--ghost" disabled={estadoItem === 'cargando'} onClick={() => agregar(item, false)}><BookPlus size={15} /> {estadoItem === 'cargando' ? 'Agregando…' : 'Agregar a mis referencias'}</button>}
-                                        {onUsar && estadoItem !== 'usado' && <button type="button" className="ide-btn ide-btn--ghost" disabled={estadoItem === 'cargando'} onClick={() => agregar(item, true)}>Usar como antecedente</button>}
+                                        {onUsar && !['usado', 'llena', 'llenando'].includes(estadoItem) && <button type="button" className="ide-btn ide-btn--ghost" disabled={estadoItem === 'cargando'} onClick={() => agregar(item, true)}>Usar como antecedente{item.resumen ? ' (llenar con el resumen)' : ''}</button>}
+                                        {estadoItem === 'llenando' && <span className="bus-ok"><Loader2 size={15} className="bus-spin" /> Llenando la ficha con el resumen…</span>}
+                                        {estadoItem === 'llena' && <span className="bus-ok"><CheckCircle2 size={15} /> Ficha llena con el resumen: revísala abajo y verifícala leyendo el artículo</span>}
                                         {estadoItem === 'usado' && <span className="bus-ok"><CheckCircle2 size={15} /> Ficha de antecedente creada: completa su hallazgo</span>}
                                     </div>
                                 </li>
