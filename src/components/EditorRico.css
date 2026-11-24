@@ -10,3 +10,5 @@
 .rico-texto h4 { font-size: 1rem; font-weight: 700; }
 .rico-texto ul, .rico-texto ol { margin: 0.2rem 0; padding-left: 1.5rem; }
 .rico-texto strong, .rico-texto b { font-weight: 700; }
+/* Dentro de una clase, los párrafos del editor no heredan el ancho máximo ni el estilo de los textos de la diapositiva: ocupan toda la caja. */
+.rico .rico-texto p, .rico .rico-texto h4, .rico .rico-texto li { max-width: none; margin-top: 0; font-size: inherit; line-height: inherit; color: inherit; }

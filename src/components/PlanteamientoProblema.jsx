@@ -711,7 +711,6 @@ const PlanteamientoProblema = ({ onNavigate }) => {
                 intro={(
                     <>
                         {heading}
-                        <p>Escribe cada parte en su caja: tu árbol de problemas ya está cargado como punto de partida. Agrega el contexto, los datos y sus fuentes, y une los párrafos con conectores.</p>
                     </>
                 )}
             />
