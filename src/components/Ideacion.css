@@ -1361,3 +1361,4 @@
 .ide-nav-fin { display: flex; align-items: center; gap: 0.5rem; }
 @container (max-width: 760px) { .ide-btn--siguiente-paso { display: none; } }
 @media (max-width: 900px) { .ide-btn--siguiente-paso { display: none; } }
+.ide-elegir { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin: 0.75rem 0; }

@@ -10,7 +10,7 @@ import { ALCANCES, ALL_VERBS, findVerb } from '../data/alcances';
 import './Ideacion.css';
 import { construccionPrimero } from './deck/orden';
 
-/* La clase completa dura 60 minutos: la suma de `min` de todas las diapositivas. */
+/* La clase completa dura 50 minutos: la suma de `min` de todas las diapositivas. */
 const SECTIONS = construccionPrimero([
     { id: 'apertura', label: 'Apertura' },
     { id: 'problema', label: 'Problema' },
@@ -27,11 +27,9 @@ const SLIDES = construccionPrimero([
     { id: 'problema', section: 'problema', min: 4, title: 'Un problema no es la falta de una solución' },
     { id: 'porques', section: 'problema', min: 3, title: 'Del síntoma a la causa: los cinco porqués' },
     { id: 'arbol', section: 'problema', min: 3, title: 'El árbol de problemas' },
-    { id: 'miarbol', section: 'problema', min: 6, title: 'Construye tu árbol de problemas' },
     { id: 'poblacion', section: 'delimitacion', min: 2, title: 'Población afectada' },
     { id: 'delimita', section: 'delimitacion', min: 4, title: 'Delimita tu idea: quién, dónde y cuándo' },
     { id: 'contexto', section: 'delimitacion', min: 2, title: 'Contexto' },
-    { id: 'antecedentes', section: 'sustento', min: 4, title: 'Antecedentes' },
     { id: 'viabilidad', section: 'sustento', min: 3, title: 'Viabilidad' },
     { id: 'impacto', section: 'sustento', min: 2, title: 'Impacto' },
     { id: 'errores', section: 'sustento', min: 3, title: 'Cinco errores frecuentes al idear' },
@@ -201,16 +199,6 @@ const REVIEW = [
         ],
         answer: 2,
         why: 'Dice quiénes son, dónde están y en qué periodo se estudian.',
-    },
-    {
-        text: 'Revisar antecedentes sirve principalmente para…',
-        options: [
-            'Alargar el documento.',
-            'Saber qué se ha hecho y qué falta por hacer.',
-            'Copiar la metodología de otro autor.',
-        ],
-        answer: 1,
-        why: 'Los antecedentes muestran el punto de partida y el vacío que tu proyecto puede cubrir.',
     },
     {
         text: 'Una idea es viable cuando…',
@@ -671,6 +659,26 @@ const SintesisIA = ({ intro, wb, setWb, onNavigate }) => {
         setApplied(idea.idea);
     };
 
+    // «Seleccionar esta idea»: la frase del estudiante queda como su idea elegida y sus datos pasan al Título.
+    const fraseActual = buildSentence(wb);
+    const fraseCompleta = ['problema', 'quien', 'donde'].every((key) => (wb[key] || '').trim());
+    const elegida = Boolean(fraseActual) && (wb.elegida || '') === fraseActual;
+    const seleccionarPropia = () => {
+        const periodo = (wb.cuando || '').trim().replace(/^durante\s+/i, '');
+        setTituloForm((prev) => ({
+            ...TITULO_FORM,
+            ...prev,
+            quien: (wb.quien || '').trim() || prev.quien,
+            donde: (wb.donde || '').trim() || prev.donde,
+            cuando: periodo || prev.cuando,
+        }));
+        const chosen = ALCANCES.find((item) => item.id === wb.alcance);
+        if (chosen?.pregunta) setPreguntaTipo(chosen.pregunta);
+        if (chosen?.tipo) setTipoInvestigacion(chosen.tipo);
+        update({ elegida: fraseActual });
+        setApplied(null);
+    };
+
     const chooseIdea = (idea) => {
         if (hasOwnWork) setConfirming(idea.idea);
         else applyIdea(idea);
@@ -809,6 +817,21 @@ Para cada idea usa ESTRICTAMENTE este formato, una línea por campo:
                 <p className="ide-hint">
                     Se arma sola mientras completas el formulario. Léela en voz alta: si necesitas explicarla, todavía no está lista.
                 </p>
+                <div className="ide-elegir">
+                    {elegida ? (
+                        <>
+                            <p className="ide-feedback ide-feedback--ok" role="status"><CheckCircle2 size={16} /><span>Idea seleccionada. El Título ya tiene tu población, tu lugar y tu periodo.</span></p>
+                            {onNavigate && <button type="button" className="ide-btn ide-btn--ghost" onClick={() => onNavigate('titulo')}>Construir el título <ArrowRight size={15} /></button>}
+                        </>
+                    ) : (
+                        <>
+                            <button type="button" className="ide-btn ide-btn--primary" onClick={seleccionarPropia} disabled={!fraseCompleta}>
+                                <CheckCircle2 size={16} /> Seleccionar esta idea
+                            </button>
+                            {!fraseCompleta && <small className="ide-field-hint">Completa al menos el problema, la población y el lugar.</small>}
+                        </>
+                    )}
+                </div>
                 {showExamples && (
                     <div className="ide-examples">
                         <span className="ide-label" id="ide-ejemplos-label">Mira cómo queda con un ejemplo</span>
@@ -1029,7 +1052,7 @@ const Ideacion = ({ onNavigate }) => {
                     <p><strong>Al terminar esta clase podrás:</strong></p>
                     <ul className="ide-bullets">
                         <li>Distinguir un problema de una solución y de un síntoma.</li>
-                        <li>Construir un árbol de problemas con causas y efectos.</li>
+                        <li>Reconocer causas y efectos con el árbol de problemas.</li>
                         <li>Delimitar población, lugar y periodo.</li>
                         <li>Valorar la viabilidad y el impacto de tu idea.</li>
                         <li>Redactar tu idea de investigación en una frase.</li>
@@ -1137,40 +1160,6 @@ const Ideacion = ({ onNavigate }) => {
                 <Arbol />
             </>
         ),
-        miarbol: (
-            <>
-                <div>
-                    {heading}
-                    <p>Toma el tema que elegiste y conviértelo en un árbol. Empieza por el tronco y luego sube y baja.</p>
-                    <ul className="ide-bullets">
-                        <li>El problema se redacta como un hecho negativo, no como una carencia.</li>
-                        <li>Cada causa responde a «¿por qué ocurre?».</li>
-                        <li>Cada efecto responde a «¿qué consecuencia trae?».</li>
-                    </ul>
-                    <p className="ide-hint">Trabajo individual 4 minutos. Luego intercambia tu árbol con un compañero: ¿alguna causa es en realidad un efecto?</p>
-                </div>
-                <div className="ide-panel ide-workbook">
-                    <h3>Tu árbol de problemas</h3>
-                    <fieldset>
-                        <legend>Ramas · Efectos</legend>
-                        <div className="ide-trio">
-                            {['efecto1', 'efecto2', 'efecto3'].map((key, i) => (
-                                <input key={key} type="text" className="input-field" aria-label={`Efecto ${i + 1}`} placeholder={`Efecto ${i + 1}`} value={wb[key]} onChange={field(key)} />
-                            ))}
-                        </div>
-                    </fieldset>
-                    <Campo id="ide-wb-problema" label="Tronco · Problema central" value={wb.problema} onChange={field('problema')} placeholder="Ej: Bajo rendimiento en matemáticas en primer semestre" />
-                    <fieldset>
-                        <legend>Raíz · Causas</legend>
-                        <div className="ide-trio">
-                            {['causa1', 'causa2', 'causa3'].map((key, i) => (
-                                <input key={key} type="text" className="input-field" aria-label={`Causa ${i + 1}`} placeholder={`Causa ${i + 1}`} value={wb[key]} onChange={field(key)} />
-                            ))}
-                        </div>
-                    </fieldset>
-                </div>
-            </>
-        ),
         poblacion: (
             <>
                 <div>
@@ -1226,32 +1215,6 @@ const Ideacion = ({ onNavigate }) => {
                 </div>
             </>
         ),
-        antecedentes: (
-            <>
-                <div>
-                    {heading}
-                    <p>
-                        Revisa qué se ha hecho antes. No necesitas «reinventar la rueda»: puedes mejorarla, adaptarla a tu contexto o probarla con otra población.
-                    </p>
-                    <ul className="ide-list">
-                        <li><XCircle size={18} /><span><b>¿Qué soluciones han fallado antes?</b>Y por qué: costo, adopción, contexto.</span></li>
-                        <li><CheckCircle2 size={18} /><span><b>¿Qué soluciones existen en otros lugares?</b>Y qué habría que cambiar para tu caso.</span></li>
-                        <li><Search size={18} /><span><b>Dónde buscar</b>Google Académico, el repositorio de tu universidad, SciELO y Scopus.</span></li>
-                    </ul>
-                </div>
-                <div className="ide-panel ide-workbook">
-                    <h3>Actividad: encuentra dos antecedentes</h3>
-                    <p>Busca tu problema en Google Académico con dos o tres palabras clave. Anota autor, año y qué encontraron.</p>
-                    <Campo id="ide-wb-ant1" label="Antecedente 1" value={wb.antecedente1} onChange={field('antecedente1')} placeholder="Autor (año): hallazgo principal" multiline rows={2} />
-                    <Campo id="ide-wb-ant2" label="Antecedente 2" value={wb.antecedente2} onChange={field('antecedente2')} placeholder="Autor (año): hallazgo principal" multiline rows={2} />
-                    {onNavigate && (
-                        <button type="button" className="ide-btn ide-btn--ghost" onClick={() => onNavigate('referencias')}>
-                            Agregar la fuente a mis referencias <ArrowRight size={15} />
-                        </button>
-                    )}
-                </div>
-            </>
-        ),
         viabilidad: (
             <>
                 <div>
@@ -1285,7 +1248,7 @@ const Ideacion = ({ onNavigate }) => {
                 <div>
                     {heading}
                     <p>Estos son los tropiezos que más se repiten en las primeras propuestas. Reconocerlos a tiempo ahorra semanas de trabajo.</p>
-                    <p className="ide-hint">Para discutir: lee tu árbol de problemas y tu delimitación. ¿Caíste en alguno de los cinco?</p>
+                    <p className="ide-hint">Para discutir: lee tu idea y tu delimitación. ¿Caíste en alguno de los cinco?</p>
                 </div>
                 <div className="ide-panel">
                     <h3>Abre cada error para ver cómo corregirlo</h3>
@@ -1332,15 +1295,13 @@ const Ideacion = ({ onNavigate }) => {
                         <li>Un problema es un estado negativo existente, no la ausencia de una solución.</li>
                         <li>El árbol de problemas separa causas, problema central y efectos.</li>
                         <li>Delimitar quién, dónde y cuándo hace posible el estudio.</li>
-                        <li>Los antecedentes muestran qué se ha hecho y qué falta.</li>
                         <li>Una buena idea es interesante, relevante, novedosa y viable.</li>
                     </ul>
                 </div>
                 <div className="ide-panel">
                     <h3>Para la próxima sesión</h3>
                     <ul className="ide-list">
-                        <li><CheckCircle2 size={18} /><span><b>Trae tu ficha de idea</b>Con el árbol, la delimitación y la frase final.</span></li>
-                        <li><CheckCircle2 size={18} /><span><b>Completa dos antecedentes</b>Con autor, año y hallazgo principal.</span></li>
+                        <li><CheckCircle2 size={18} /><span><b>Trae tu ficha de idea</b>Con la delimitación y la frase final.</span></li>
                         <li><CheckCircle2 size={18} /><span><b>Sigue con el título</b>Tu frase es el insumo para construirlo.</span></li>
                     </ul>
                     {copyControls}
