@@ -1,0 +1,91 @@
+.val-modal {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(86rem, calc(100vw - 2rem));
+  height: calc(100dvh - 2rem);
+  max-height: calc(100dvh - 2rem);
+  padding: 0;
+  border: 0;
+  border-radius: 1rem;
+  box-shadow: 0 30px 60px -20px rgb(15 23 42 / 0.45);
+  color: #1e293b;
+}
+.val-modal::backdrop { background: rgb(15 23 42 / 0.55); }
+.val-box { display: flex; flex-direction: column; height: 100%; }
+.val-head { display: flex; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.5rem 0.75rem; }
+.val-kicker { margin: 0; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #4f46e5; }
+.val-head h2 { margin: 0.15rem 0 0; font-size: 1.4rem; }
+.val-tipo { margin: 0.15rem 0 0; color: #64748b; font-size: 0.9rem; }
+.val-close { flex: none; display: grid; place-items: center; width: 2.4rem; height: 2.4rem; border: 1px solid #e2e8f0; border-radius: 0.6rem; background: #fff; cursor: pointer; color: #475569; }
+.val-close:focus-visible, .val-tabs button:focus-visible { outline: 3px solid #a5b4fc; outline-offset: 2px; }
+.val-tabs { display: flex; flex-wrap: wrap; gap: 0.35rem; padding: 0 1.5rem 0.75rem; border-bottom: 1px solid #e2e8f0; }
+.val-tabs button { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.4rem 0.75rem; border: 1px solid #c7d2fe; border-radius: 999px; background: #fff; color: #3730a3; font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+.val-tabs button[aria-selected='true'] { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+.val-body { flex: 1; min-height: 0; overflow-y: auto; padding: 1rem 1.5rem; display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1000px) { .val-body { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); } }
+.val-col { display: grid; gap: 1rem; min-width: 0; }
+.val-calc { padding: 1rem; border-radius: 0.75rem; border: 1px solid #c7d2fe; background: #fff; }
+.val-calc h3 { display: flex; align-items: center; gap: 0.4rem; color: #4338ca !important; }
+.val-foot-left { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
+.val-ok { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.85rem; color: #047857; }
+.val-nota { color: #64748b; }
+.val-body h3 { margin: 0 0 0.4rem; font-size: 0.95rem; color: #1e293b; }
+.val-intro p { margin: 0 0 0.3rem; line-height: 1.5; }
+.val-pasos { margin: 0; padding-left: 1.4rem; display: grid; gap: 0.45rem; line-height: 1.5; }
+.val-pasos li::marker { font-weight: 700; color: #4f46e5; }
+.val-ejemplo { padding: 0.85rem 1rem; border-radius: 0.75rem; background: #eef2ff; }
+.val-ejemplo ul { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.3rem; }
+.val-texto { padding: 0.85rem 1rem; border-radius: 0.75rem; background: #f8fafc; border-left: 3px solid #a5b4fc; }
+.val-texto p { margin: 0 0 0.4rem; font-style: italic; line-height: 1.55; }
+.val-texto small { color: #64748b; }
+.val-foot { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.85rem 1.5rem; border-top: 1px solid #e2e8f0; }
+@media (max-width: 560px) {
+  .val-head, .val-body, .val-foot { padding-inline: 1rem; }
+  .val-tabs { padding-inline: 1rem; }
+}
+
+/* Selección de métodos en cada instrumento */
+.met-val { display: grid; gap: 0.35rem; }
+.met-val-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.met-val-chips .ide-chip[aria-pressed='true'] { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+
+/* Calculadoras */
+.calc { display: grid; gap: 0.75rem; }
+.calc-row { display: flex; flex-wrap: wrap; gap: 0.6rem 0.9rem; align-items: end; }
+.calc-campo { display: grid; gap: 0.25rem; min-width: 9rem; flex: 1; }
+.calc-campo > span { font-size: 0.8rem; font-weight: 600; color: #475569; }
+.calc-wide { flex-basis: 100%; }
+.calc-table-wrap { overflow-x: auto; }
+.calc-table { border-collapse: collapse; font-size: 0.85rem; min-width: 100%; }
+.calc-table th, .calc-table td { padding: 0.25rem 0.3rem; text-align: center; border-bottom: 1px solid #eef2f7; }
+.calc-table thead th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; color: #4f46e5; white-space: nowrap; }
+.calc-table tbody th { text-align: left; }
+.calc-name { min-width: 9rem; padding: 0.35rem 0.5rem !important; }
+.calc-num { width: 3.6rem; padding: 0.35rem !important; text-align: center; }
+.calc-sel { min-width: 7.5rem; padding: 0.35rem !important; }
+.calc-matriz { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; }
+.calc-v { display: inline-block; min-width: 3rem; padding: 0.1rem 0.4rem; border-radius: 999px; background: #f1f5f9; color: #334155; }
+.calc-v[data-ok='true'] { background: #d1fae5; color: #047857; }
+.calc-v[data-ok='false'] { background: #fee2e2; color: #b91c1c; }
+.calc-result { padding: 0.75rem 0.9rem; border-radius: 0.65rem; background: #f8fafc; display: grid; gap: 0.3rem; }
+.calc-result p { margin: 0; font-size: 0.9rem; }
+.calc-big { font-size: 1.1rem !important; }
+.calc-big b { font-size: 1.6rem; color: #4338ca; }
+.calc-big span { margin-left: 0.4rem; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700; background: #e0e7ff; color: #3730a3; }
+.calc-big span[data-nivel='excelente'], .calc-big span[data-nivel='buena'] { background: #d1fae5; color: #047857; }
+.calc-big span[data-nivel='aceptable'] { background: #fef3c7; color: #92400e; }
+.calc-big span[data-nivel='cuestionable'], .calc-big span[data-nivel='pobre'] { background: #fee2e2; color: #b91c1c; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+
+/* Botones propios: el modal vive fuera de la clase y no hereda sus variables */
+.val-modal .ide-btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.6rem 1rem; border-radius: 0.7rem; font: inherit; font-size: 0.9rem; font-weight: 600; cursor: pointer; border: 1px solid transparent; }
+.val-modal .ide-btn--primary { background: #4f46e5; color: #fff; }
+.val-modal .ide-btn--primary:hover { background: #4338ca; }
+.val-modal .ide-btn--primary:disabled { background: #c7d2fe; cursor: default; }
+.val-modal .ide-btn--ghost { background: #fff; color: #3730a3; border-color: #c7d2fe; }
+.val-modal .ide-btn--ghost:hover { background: #eef2ff; }
+.val-modal .ide-btn:focus-visible, .val-modal .ide-link:focus-visible { outline: 3px solid #a5b4fc; outline-offset: 2px; }
+.val-modal .ide-link { background: none; border: 0; padding: 0; font: inherit; font-size: 0.85rem; color: #4338ca; text-decoration: underline; cursor: pointer; }
+.val-modal .obj-remove { display: grid; place-items: center; width: 2rem; height: 2rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; background: #fff; color: #94a3b8; cursor: pointer; }
+.val-modal .obj-warn { margin: 0; font-size: 0.85rem; color: #b45309; }

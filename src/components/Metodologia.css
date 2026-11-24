@@ -1,0 +1,31 @@
+/* Clase larga de metodología */
+.met-calc h3 { display: flex; align-items: center; gap: 0.4rem; }
+.met-calc--compacta { padding: 0.75rem; border-radius: 0.75rem; background: #fff; border: 1px dashed #c7d2fe; }
+.met-calc-grid { display: grid; gap: 0.6rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); }
+.met-calc-result { margin: 0.75rem 0 0.25rem !important; font-size: 1rem; color: #1e293b; }
+.met-calc-result b { font-size: 2rem; color: #4338ca; margin-right: 0.3rem; }
+
+.met-gantt { display: grid; gap: 2px; overflow-x: auto; margin-top: 0.5rem; font-size: 0.82rem; }
+.met-gantt-row { display: grid; grid-template-columns: minmax(10rem, 1.6fr) repeat(var(--periodos, 6), minmax(1.8rem, 1fr)); gap: 2px; align-items: stretch; }
+.met-gantt-row > span { padding: 0.3rem 0.4rem; background: #f8fafc; border-radius: 0.25rem; min-height: 1.6rem; }
+.met-gantt-row > span[role='rowheader'] { background: #fff; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.met-gantt-head > span { background: transparent; font-weight: 700; color: #4f46e5; text-align: center; }
+.met-gantt-head > span:first-child { text-align: left; }
+.met-gantt-row > span[data-on='1'] { background: #a5b4fc; }
+.met-gantt-row > span[data-on='2'] { background: #6ee7b7; }
+.met-gantt-row > span[data-on='3'] { background: #fcd34d; }
+.met-gantt-row > span[data-on='4'] { background: #fda4af; }
+
+.met-crono-opts { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.met-crono-opts .mar-campo { min-width: 9rem; }
+.met-crono-row,
+.met-pres-row { display: grid; gap: 0.4rem; align-items: center; }
+.met-crono-row { grid-template-columns: minmax(0, 1.1fr) minmax(0, 2fr) 4.2rem 4.2rem 2.25rem; }
+.met-pres-row { grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr) minmax(0, 1.1fr) 7.5rem 2.25rem; }
+@media (max-width: 720px) {
+  .met-crono-row, .met-pres-row { grid-template-columns: 1fr 1fr; }
+  .met-crono-row > :nth-child(2), .met-pres-row > :nth-child(2) { grid-column: 1 / -1; }
+}
+.met-total { margin: 0.25rem 0 0 !important; font-size: 1rem; color: #1e293b; }
+.met-row { grid-template-columns: 1.2fr 1fr 1fr !important; }
+@media (max-width: 560px) { .met-row { grid-template-columns: 1fr !important; } }

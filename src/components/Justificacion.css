@@ -1,0 +1,40 @@
+/* Clase de justificación: piezas propias sobre la base de Título, Planteamiento y Objetivos */
+@container (min-width: 1100px) {
+  .pla-part[data-part='viabilidad'] { grid-column: 1 / -1; }
+}
+
+.jus-what { display: block; margin: -0.15rem 0 0.35rem; font-size: 0.85rem; font-weight: 600; color: #4338ca; }
+
+.jus-pending { display: flex; gap: 0.35rem; align-items: center; margin: 0; font-size: 0.85rem; color: #b45309; }
+
+.jus-questions { list-style: none; display: grid; gap: 0.6rem; padding: 0; margin: 0; }
+.jus-questions li {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.8rem 1rem;
+  background: #fff;
+  border-radius: 0.75rem;
+}
+.jus-questions svg { flex: none; color: #4f46e5; margin-top: 0.1rem; }
+.jus-questions b { display: block; color: #1e293b; }
+.jus-questions span { color: #475569; }
+
+.jus-table { display: grid; gap: 0.4rem; }
+.jus-row {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, 0.8fr) 1fr 1fr;
+  gap: 0.6rem;
+  padding: 0.65rem 0.85rem;
+  background: #fff;
+  border-radius: 0.7rem;
+  font-size: 0.92rem;
+  color: #334155;
+}
+.jus-row--head { background: transparent; padding-block: 0.2rem; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #4f46e5; }
+.jus-row [role='rowheader'] { font-weight: 700; color: #1e293b; }
+
+@media (max-width: 560px) {
+  .jus-row { grid-template-columns: 1fr; gap: 0.25rem; }
+  .jus-row--head { display: none; }
+}

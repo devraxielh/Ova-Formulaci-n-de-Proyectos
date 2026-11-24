@@ -1,0 +1,14 @@
+{
+  "name": "projectsia-server",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "express": "^4.22.3",
+    "nodemailer": "^6.10.1"
+  }
+}

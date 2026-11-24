@@ -58,6 +58,35 @@ body {
   margin-bottom: 2rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sidebar-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.sidebar-toggle:hover {
+  background: #f1f5f9;
+  color: var(--text-primary);
+}
+
+.sidebar-toggle:focus-visible,
+.nav-button:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
 }
 
 .sidebar-brand {
@@ -306,12 +335,139 @@ label {
   }
 }
 
+@media (max-width: 768px) {
+  .sidebar-toggle,
+  .sidebar-account-icon,
+  .sidebar-logout-icon {
+    display: none;
+  }
+}
+
+/* Cerrar sesión en el pie del menú */
+.sidebar-logout {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.55rem;
+  align-items: center;
+  width: 100%;
+  margin: -0.35rem 0 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border: none;
+  border-radius: 0.6rem;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: #b91c1c;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.sidebar-logout:hover:not(:disabled) {
+  background: #fef2f2;
+}
+
+.sidebar-logout:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.sidebar-logout span {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.sidebar-logout small {
+  grid-column: 2;
+  font-size: 0.76rem;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-logout:focus-visible,
+.sidebar-account:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.sidebar-logout-icon {
+  color: #b91c1c;
+}
+
+.sidebar-logout-icon:hover {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
 @media (min-width: 769px) {
   .mobile-header {
     display: none;
+  }
+
+  /* Menú recogido: queda una franja de iconos */
+  .sidebar {
+    transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1), padding 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .sidebar--collapsed {
+    width: 4.75rem;
+    padding: 1.5rem 0.75rem;
+  }
+
+  .sidebar--collapsed .sidebar-header {
+    justify-content: center;
+  }
+
+  .sidebar--collapsed .sidebar-brand,
+  .sidebar--collapsed .sidebar-footer {
+    display: none;
+  }
+
+  /* Con el menú abierto, la cuenta y el cierre de sesión se muestran en el pie */
+  .sidebar:not(.sidebar--collapsed) .sidebar-account-icon,
+  .sidebar:not(.sidebar--collapsed) .sidebar-logout-icon {
+    display: none;
+  }
+
+  .sidebar--collapsed .nav-button {
+    justify-content: center;
+    padding: 0.875rem 0;
+    gap: 0;
+  }
+
+  /* El texto sigue disponible para lectores de pantalla */
+  .sidebar--collapsed .nav-button span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .main-content--deck {
+    padding: 1.25rem;
   }
   
   .sidebar-overlay {
     display: none;
   }
 }
+/* Herramientas ya completadas en el proyecto */
+.nav-button--done > svg:first-child {
+  color: #047857;
+}
+
+.nav-done-check {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: #047857;
+}
+
+.sidebar--collapsed .nav-done-check {
+  display: none;
+}
+
+/* Mensaje mientras se descarga una página */
+.app-cargando { padding: 3rem 1rem; text-align: center; color: #64748b; }

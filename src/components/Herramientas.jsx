@@ -1,311 +1,170 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
-    Lightbulb, Type, HelpCircle, FileText, Scale,
-    Target, BookOpen, ArrowRight, Sparkles, Layers, Link, Compass, Library, Microscope, Users, AreaChart, Calendar, DollarSign
+    AlignLeft, ArrowRight, BarChart3, BookMarked, BookOpen, Flag, CheckCircle2, Compass, FileText, FolderOpen,
+    HelpCircle, Library, Lightbulb, ListOrdered, Microscope, Presentation, Scale, Sparkles, Target, Type,
 } from 'lucide-react';
+import { useProject } from '../context/ProjectContext';
+import { BUILD_ORDER, buildDocument } from '../services/projectDoc';
+import './Herramientas.css';
 
-const tools = [
+/* Las herramientas, agrupadas por fase y en el orden en que se construye el proyecto. */
+const FASES = [
     {
-        id: 'ideacion',
-        icon: Lightbulb,
-        color: '#f59e0b',
-        bg: 'linear-gradient(135deg, #fffbeb, #fef3c7)',
-        border: '#fde68a',
-        title: 'Fase de Ideación',
-        description: 'Explora y delimita tu tema de investigación. Define el área de interés, la pertinencia y el alcance inicial del proyecto.',
-        badge: 'Inicio'
+        id: 'formula',
+        label: 'Formula tu investigación',
+        text: 'Clases de una hora con teoría, ejercicios y un constructor que guarda en tu proyecto.',
+        tools: [
+            { id: 'ideacion', icon: Lightbulb, title: 'Ideación', text: 'Del interés a una idea delimitada: problema, causas, efectos, población y lugar.', clase: true, ia: true },
+            { id: 'titulo', icon: Type, title: 'Título', text: 'Arma un título de 10 a 30 palabras con verbo, objeto, población y lugar.', clase: true, ia: true },
+            { id: 'pregunta', icon: HelpCircle, title: 'Pregunta de investigación', text: 'Elige el tipo de pregunta y formúlala alineada con tu título.', clase: true },
+            { id: 'planteamiento', icon: FileText, title: 'Planteamiento del problema', text: 'Redacta contexto, problema, causas, consecuencias y cierre con datos.', clase: true },
+            { id: 'objetivos', icon: Target, title: 'Objetivos', text: 'Convierte tu título en objetivo general y ordena los específicos.', clase: true },
+            { id: 'justificacion', icon: Scale, title: 'Justificación', text: 'Argumenta por qué, para quién y para qué investigar, y que es viable.', clase: true },
+            { id: 'alcances', icon: Compass, title: 'Alcances y limitaciones', text: 'Declara el tipo de alcance, delimita el estudio y responde sus limitaciones.', clase: true },
+        ],
     },
     {
-        id: 'titulo',
-        icon: Type,
-        color: '#6366f1',
-        bg: 'linear-gradient(135deg, #eef2ff, #e0e7ff)',
-        border: '#c7d2fe',
-        title: 'Construcción del Título',
-        description: 'Genera y evalúa títulos académicos con IA. Identifica las variables independiente y dependiente de tu investigación.',
-        badge: 'IA'
+        id: 'fundamenta',
+        label: 'Fundamenta',
+        text: 'Por qué vale la pena y en qué se apoya tu estudio.',
+        tools: [
+            { id: 'marco', icon: Library, title: 'Marco referencial', text: 'Antecedentes, Marco Teórico, Conceptual, Contextual y Legal, con teorías por área y citas APA 7.', clase: true, min: 240 },
+        ],
     },
     {
-        id: 'pregunta',
-        icon: HelpCircle,
-        color: '#0ea5e9',
-        bg: 'linear-gradient(135deg, #f0f9ff, #e0f2fe)',
-        border: '#bae6fd',
-        title: 'Pregunta de Investigación',
-        description: 'Formula preguntas descriptivas, correlacionales o causales. Evalúa su claridad, especificidad y viabilidad.',
-        badge: 'IA'
+        id: 'disena',
+        label: 'Diseña el método',
+        text: 'Cómo, con quiénes, con qué, cuándo y con cuánto se hará el estudio.',
+        tools: [
+            { id: 'metodologia', icon: Microscope, title: 'Metodología', text: 'Enfoque, tipos, diseños, población y muestra, plan de análisis, instrumentos, cronograma y presupuesto.', clase: true, min: 240 },
+            { id: 'fases', icon: ListOrdered, title: 'Desarrollo de las fases', text: 'Una fase por objetivo: actividades, técnicas, productos, tiempos y responsables; se lleva al cronograma.', clase: true, min: 120 },
+        ],
     },
     {
-        id: 'planteamiento',
-        icon: FileText,
-        color: '#d97706',
-        bg: 'linear-gradient(135deg, #fffbeb, #fef9e7)',
-        border: '#fde68a',
-        title: 'Planteamiento del Problema',
-        description: 'Describe la situación problemática, sus causas, efectos y justificación. Genera la estructura de párrafos con IA.',
-        badge: 'IA'
-    },
-    {
-        id: 'justificacion',
-        icon: Scale,
-        color: '#059669',
-        bg: 'linear-gradient(135deg, #ecfdf5, #d1fae5)',
-        border: '#6ee7b7',
-        title: 'Justificación',
-        description: 'Argumenta por qué tu investigación es pertinente. Incluye razones teóricas, metodológicas y prácticas con conectores lógicos.',
-        badge: 'IA'
-    },
-    {
-        id: 'alcances',
-        icon: Compass,
-        color: '#4f46e5',
-        bg: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)',
-        border: '#a5b4fc',
-        title: 'Alcances y Limitaciones',
-        description: 'Define las fronteras de tu proyecto, su impacto real y anticipa las dificultades metodológicas o prácticas.',
-        badge: 'IA'
-    },
-    {
-        id: 'objetivos',
-        icon: Target,
-        color: '#7c3aed',
-        bg: 'linear-gradient(135deg, #f5f3ff, #ede9fe)',
-        border: '#ddd6fe',
-        title: 'Objetivos de Investigación',
-        description: 'Define el objetivo general y hasta tres objetivos específicos con verbos en infinitivo, medibles y alcanzables.',
-        badge: 'IA'
-    },
-    {
-        id: 'introduccion',
-        icon: BookOpen,
-        color: '#db2777',
-        bg: 'linear-gradient(135deg, #fdf2f8, #fce7f3)',
-        border: '#fbcfe8',
-        title: 'Introducción',
-        description: 'Redacta la presentación general de tu proyecto. La IA sugiere la estructura de párrafos y conectores recomendados.',
-        badge: 'IA'
-    },
-    {
-        id: 'marco',
-        icon: Library,
-        color: '#b45309',
-        bg: 'linear-gradient(135deg, #fffbeb, #fef3c7)',
-        border: '#fde68a',
-        title: 'Marco Referencial',
-        description: 'Construye el marco teórico con guía de citación APA 7, fuentes académicas recomendadas y generador de estructura con IA.',
-        badge: 'IA'
-    },
-    {
-        id: 'metodologia',
-        icon: Microscope,
-        color: '#0891b2',
-        bg: 'linear-gradient(135deg, #ecfeff, #cffafe)',
-        border: '#a5f3fc',
-        title: 'Metodología',
-        description: 'Conoce los enfoques (cuantitativo, cualitativo, mixto), tipos y diseños de investigación para alcanzar tus objetivos.',
-        badge: 'Teoría'
-    },
-    {
-        id: 'poblacion',
-        icon: Users,
-        color: '#6d28d9',
-        bg: 'linear-gradient(135deg, #f5f3ff, #ede9fe)',
-        border: '#c4b5fd',
-        title: 'Población y Muestra',
-        description: 'Define claramente el universo de tu estudio y aprende a extraer una muestra representativa con su justificación.',
-        badge: 'Teoría'
-    },
-    {
-        id: 'plan-analisis',
-        icon: AreaChart,
-        color: '#86198f',
-        bg: 'linear-gradient(135deg, #fdf4ff, #fae8ff)',
-        border: '#f5d0fe',
-        title: 'Plan de Análisis e Instrumentos',
-        description: 'Mapas de ruta para procesar y validar los datos obtenidos a través de tus instrumentos de recolección de información.',
-        badge: 'Teoría'
-    },
-    {
-        id: 'cronograma',
-        icon: Calendar,
-        color: '#be123c',
-        bg: 'linear-gradient(135deg, #fff1f2, #ffe4e6)',
-        border: '#fecdd3',
-        title: 'Cronograma',
-        description: 'Organiza en el tiempo todas las actividades necesarias para llevar a cabo el estudio con nuestro asistente de IA.',
-        badge: 'IA'
-    },
-    {
-        id: 'presupuesto',
-        icon: DollarSign,
-        color: '#10b981',
-        bg: 'linear-gradient(135deg, #d1fae5, #a7f3d0)',
-        border: '#6ee7b7',
-        title: 'Presupuesto Financiero',
-        description: 'Estructura la inversión de recursos humanos, nube, encuestas y define las fuentes de financiación requeridas.',
-        badge: 'IA'
-    },
-    {
-        id: 'doi',
-        icon: Link,
-        color: '#be123c',
-        bg: 'linear-gradient(135deg, #ffe4e6, #fecdd3)',
-        border: '#fda4af',
-        title: 'DOI to Cite',
-        description: 'Convierte cualquier DOI en una referencia APA 7 lista para usar. Consulta CrossRef automáticamente y copia la cita al portapapeles.',
-        badge: 'API'
+        id: 'cierra',
+        label: 'Cierra',
+        text: 'Resultados, discusión y la presentación del documento.',
+        tools: [
+            { id: 'resultados', icon: BarChart3, title: 'Resultados y discusión', text: 'Resultados por objetivo con tablas en APA y su discusión con antecedentes y teorías.', clase: true, min: 120 },
+            { id: 'conclusiones', icon: Flag, title: 'Conclusiones', text: 'Una conclusión por objetivo, la conclusión general y recomendaciones con destinatario.', clase: true },
+            { id: 'resumen', icon: AlignLeft, title: 'Resumen', text: 'Objetivo, metodología, resultados y conclusiones en un párrafo de 150 a 250 palabras, con palabras clave.', clase: true },
+            { id: 'introduccion', icon: BookOpen, title: 'Introducción', text: 'Se escribe al final: presenta el problema, los objetivos y el documento.', clase: true },
+        ],
     },
 ];
 
+const APOYO = [
+    { id: 'proyecto', icon: FolderOpen, title: 'Mi proyecto', text: 'Tu documento armado: descárgalo en Word o PDF.' },
+    { id: 'referencias', icon: BookMarked, title: 'Referencias bibliográficas', text: 'Registra tus fuentes, cítalas en los párrafos y arma la lista final en APA 7.' },
+];
+
 const Herramientas = ({ onNavigate }) => {
+    const { data, project, user } = useProject();
+    const sections = useMemo(() => buildDocument(data), [data]);
+    const done = useMemo(() => new Set(sections.filter((section) => section.content.length > 0).map((section) => section.tab)), [sections]);
+    const total = BUILD_ORDER.length;
+    const hechos = BUILD_ORDER.filter((tab) => done.has(tab)).length;
+    const siguiente = BUILD_ORDER.find((tab) => !done.has(tab));
+    const toolOf = (id) => FASES.flatMap((fase) => fase.tools).find((tool) => tool.id === id);
+    let numero = 0;
+
     return (
-        <div style={{ maxWidth: '100%', paddingBottom: '3rem' }}>
-
-            {/* Hero Banner */}
-            <div style={{
-                background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #0ea5e9 100%)',
-                borderRadius: '1.25rem',
-                padding: '2.5rem 2rem',
-                marginBottom: '2.5rem',
-                color: 'white',
-                position: 'relative',
-                overflow: 'hidden'
-            }}>
-                {/* Decorative circles */}
-                <div style={{
-                    position: 'absolute', top: '-40px', right: '-40px',
-                    width: '180px', height: '180px', borderRadius: '50%',
-                    background: 'rgba(255,255,255,0.07)'
-                }} />
-                <div style={{
-                    position: 'absolute', bottom: '-60px', right: '120px',
-                    width: '240px', height: '240px', borderRadius: '50%',
-                    background: 'rgba(255,255,255,0.05)'
-                }} />
-
-                <div style={{ position: 'relative', zIndex: 1 }}>
-                    <p style={{ fontSize: '1.1rem', opacity: 0.9, color: 'white', lineHeight: '1.65', maxWidth: '600px', margin: 0 }}>
-                        Plataforma de herramientas interactivas con Inteligencia Artificial para la formulación
-                        de proyectos de investigación académica. Navega por las secciones en orden o accede
-                        directamente a la herramienta que necesitas.
-                    </p>
-                    <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem', flexWrap: 'wrap' }}>
-                        <span style={{ padding: '0.35rem 0.9rem', background: 'rgba(255,255,255,0.15)', borderRadius: '2rem', fontSize: '0.85rem', backdropFilter: 'blur(4px)' }}>
-                            ✨ Generación con IA
-                        </span>
-                        <span style={{ padding: '0.35rem 0.9rem', background: 'rgba(255,255,255,0.15)', borderRadius: '2rem', fontSize: '0.85rem', backdropFilter: 'blur(4px)' }}>
-                            📐 Normas APA
-                        </span>
-                        <span style={{ padding: '0.35rem 0.9rem', background: 'rgba(255,255,255,0.15)', borderRadius: '2rem', fontSize: '0.85rem', backdropFilter: 'blur(4px)' }}>
-                            🔗 Conectores lógicos
-                        </span>
-                    </div>
+        <div className="her-page">
+            <section className="her-hero">
+                <div className="her-hero-text">
+                    <h2>Formula tu proyecto de investigación paso a paso</h2>
+                    <p>Cada herramienta toma lo que hiciste en la anterior: la idea pasa al título, el título a la pregunta y así hasta tener el documento completo en <b>Mi proyecto</b>.</p>
+                    <ul className="her-tags">
+                        <li><Presentation size={15} aria-hidden="true" /> Clases de 60 minutos</li>
+                        <li><Sparkles size={15} aria-hidden="true" /> Apoyo con IA</li>
+                        <li><FileText size={15} aria-hidden="true" /> Documento en Word y PDF</li>
+                    </ul>
                 </div>
-            </div>
-
-            {/* Workflow hint */}
-            <div style={{
-                display: 'flex', alignItems: 'center', gap: '0.6rem',
-                marginBottom: '1.5rem', color: '#64748b', fontSize: '0.9rem'
-            }}>
-                <Sparkles size={16} color="#6366f1" />
-                <span>Flujo recomendado: sigue las herramientas en orden para construir tu proyecto paso a paso.</span>
-            </div>
-
-            {/* Tools Grid */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                gap: '1.25rem'
-            }}>
-                {tools.map((tool, index) => {
-                    const Icon = tool.icon;
-                    return (
-                        <button
-                            key={tool.id}
-                            onClick={() => onNavigate(tool.id)}
-                            style={{
-                                background: tool.bg,
-                                border: `1px solid ${tool.border}`,
-                                borderRadius: '0.875rem',
-                                padding: '1.5rem',
-                                cursor: 'pointer',
-                                textAlign: 'left',
-                                transition: 'transform 0.18s, box-shadow 0.18s',
-                                position: 'relative',
-                                overflow: 'hidden'
-                            }}
-                            onMouseEnter={e => {
-                                e.currentTarget.style.transform = 'translateY(-3px)';
-                                e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.1)';
-                            }}
-                            onMouseLeave={e => {
-                                e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = 'none';
-                            }}
-                        >
-                            {/* Step number */}
-                            <div style={{
-                                position: 'absolute', top: '1rem', right: '1rem',
-                                width: '26px', height: '26px', borderRadius: '50%',
-                                background: 'rgba(0,0,0,0.07)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: '0.75rem', fontWeight: '700', color: tool.color
-                            }}>
-                                {index + 1}
-                            </div>
-
-                            {/* Icon */}
-                            <div style={{
-                                width: '44px', height: '44px', borderRadius: '0.625rem',
-                                background: 'rgba(255,255,255,0.7)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                marginBottom: '1rem',
-                                boxShadow: '0 2px 6px rgba(0,0,0,0.07)'
-                            }}>
-                                <Icon size={22} color={tool.color} />
-                            </div>
-
-                            {/* Badge */}
-                            {tool.badge === 'IA' && (
-                                <span style={{
-                                    display: 'inline-block', marginBottom: '0.5rem',
-                                    padding: '0.15rem 0.55rem',
-                                    background: tool.color, color: 'white',
-                                    borderRadius: '2rem', fontSize: '0.7rem', fontWeight: '700'
-                                }}>✨ IA</span>
-                            )}
-                            {tool.badge === 'Inicio' && (
-                                <span style={{
-                                    display: 'inline-block', marginBottom: '0.5rem',
-                                    padding: '0.15rem 0.55rem',
-                                    background: '#64748b', color: 'white',
-                                    borderRadius: '2rem', fontSize: '0.7rem', fontWeight: '700'
-                                }}>Inicio</span>
-                            )}
-                            {tool.badge === 'API' && (
-                                <span style={{
-                                    display: 'inline-block', marginBottom: '0.5rem',
-                                    padding: '0.15rem 0.55rem',
-                                    background: tool.color, color: 'white',
-                                    borderRadius: '2rem', fontSize: '0.7rem', fontWeight: '700'
-                                }}>🔗 API</span>
-                            )}
-
-                            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#1e293b', margin: '0 0 0.5rem 0' }}>
-                                {tool.title}
-                            </h3>
-                            <p style={{ fontSize: '0.875rem', color: '#475569', lineHeight: '1.55', margin: '0 0 1rem 0' }}>
-                                {tool.description}
-                            </p>
-
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: tool.color, fontSize: '0.85rem', fontWeight: '600' }}>
-                                Ir a la herramienta <ArrowRight size={15} />
-                            </div>
+                <div className="her-progress">
+                    <p className="her-progress-label">{user ? project.name : 'Tu avance'}</p>
+                    <p className="her-progress-count"><b>{hechos}</b> de {total} pasos</p>
+                    <div className="her-bar" aria-hidden="true"><span style={{ width: `${(hechos / total) * 100}%` }} /></div>
+                    {siguiente ? (
+                        <button type="button" className="her-cta" onClick={() => onNavigate(siguiente)}>
+                            {hechos === 0 ? 'Empezar por la Ideación' : `Continuar: ${toolOf(siguiente)?.title || 'siguiente paso'}`} <ArrowRight size={16} />
                         </button>
-                    );
-                })}
-            </div>
+                    ) : (
+                        <button type="button" className="her-cta" onClick={() => onNavigate('proyecto')}>
+                            Ver mi proyecto completo <ArrowRight size={16} />
+                        </button>
+                    )}
+                    {!user && <button type="button" className="her-link" onClick={() => onNavigate('cuenta')}>Crea una cuenta para guardarlo en la nube</button>}
+                </div>
+            </section>
+
+            {FASES.map((fase, faseIndex) => (
+                <section className="her-fase" key={fase.id} aria-labelledby={`her-${fase.id}`}>
+                    <header className="her-fase-head">
+                        <span className="her-fase-num">{faseIndex + 1}</span>
+                        <div>
+                            <h3 id={`her-${fase.id}`}>{fase.label}</h3>
+                            <p>{fase.text}</p>
+                        </div>
+                    </header>
+                    <div className="her-grid">
+                        {fase.tools.map((tool) => {
+                            numero += 1;
+                            const Icon = tool.icon;
+                            const hecho = done.has(tool.id);
+                            const esSiguiente = tool.id === siguiente;
+                            return (
+                                <button
+                                    type="button"
+                                    key={tool.id}
+                                    className="her-card"
+                                    data-fase={fase.id}
+                                    data-state={hecho ? 'done' : esSiguiente ? 'next' : 'pending'}
+                                    onClick={() => onNavigate(tool.id)}
+                                >
+                                    <span className="her-card-top">
+                                        <span className="her-icon"><Icon size={20} aria-hidden="true" /></span>
+                                        <span className="her-step">Paso {numero}</span>
+                                        {hecho && <span className="her-done"><CheckCircle2 size={15} aria-hidden="true" /> Hecho</span>}
+                                        {esSiguiente && <span className="her-next">Siguiente</span>}
+                                    </span>
+                                    <span className="her-title">{tool.title}</span>
+                                    <span className="her-text">{tool.text}</span>
+                                    <span className="her-meta">
+                                        {tool.clase && <span className="her-badge her-badge--clase">Clase · {tool.min || 60} min</span>}
+                                        {tool.ia && <span className="her-badge her-badge--ia">IA</span>}
+                                        <span className="her-go">{hecho ? 'Revisar' : 'Abrir'} <ArrowRight size={14} aria-hidden="true" /></span>
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </section>
+            ))}
+
+            <section className="her-fase" aria-labelledby="her-apoyo">
+                <header className="her-fase-head">
+                    <span className="her-fase-num her-fase-num--apoyo"><Sparkles size={15} aria-hidden="true" /></span>
+                    <div>
+                        <h3 id="her-apoyo">Apoyo</h3>
+                        <p>Úsalas en cualquier momento.</p>
+                    </div>
+                </header>
+                <div className="her-grid her-grid--apoyo">
+                    {APOYO.map((tool) => {
+                        const Icon = tool.icon;
+                        return (
+                            <button type="button" key={tool.id} className="her-card her-card--row" data-fase="apoyo" onClick={() => onNavigate(tool.id)}>
+                                <span className="her-icon"><Icon size={20} aria-hidden="true" /></span>
+                                <span>
+                                    <span className="her-title">{tool.title}</span>
+                                    <span className="her-text">{tool.text}</span>
+                                </span>
+                                <ArrowRight size={16} className="her-row-arrow" aria-hidden="true" />
+                            </button>
+                        );
+                    })}
+                </div>
+            </section>
         </div>
     );
 };

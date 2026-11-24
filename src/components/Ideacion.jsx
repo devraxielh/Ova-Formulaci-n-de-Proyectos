@@ -1,455 +1,1353 @@
-import React, { useState } from 'react';
-import { Target, Users, TrendingUp, BookOpen, AlertTriangle, Check, ArrowRight, MapPin, History, Globe, Sparkles, Cpu, Key } from 'lucide-react';
-import { Groq } from 'groq-sdk';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    AlertTriangle, ArrowLeft, ArrowRight, BookOpen, CheckCircle2, Clipboard, Clock, Compass, Cpu, Database,
+    MapPin, Maximize2, Minimize2, Pause, Play, RotateCcw, Search, Users, Wallet, Wrench, XCircle,
+} from 'lucide-react';
+import { groq } from '../services/api';
+import SlideDeck, { Opciones, Pestanas } from './deck/SlideDeck';
+import { useProjectField } from '../context/ProjectContext';
+import { ALCANCES, ALL_VERBS, findVerb } from '../data/alcances';
+import './Ideacion.css';
 
-const Ideacion = () => {
-    // AI Generator State
-    const [level, setLevel] = useState('Pregrado');
-    const [program, setProgram] = useState('');
-    const [interest, setInterest] = useState('');
-    // Initialize with env var or empty string
-    const [apiKey, setApiKey] = useState(import.meta.env.VITE_GROQ_API_KEY || '');
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [generatedIdeas, setGeneratedIdeas] = useState([]);
-    const [error, setError] = useState('');
+/* La clase completa dura 60 minutos: la suma de `min` de todas las diapositivas. */
+const SECTIONS = [
+    { id: 'apertura', label: 'Apertura' },
+    { id: 'problema', label: 'Problema' },
+    { id: 'delimitacion', label: 'Delimitación' },
+    { id: 'sustento', label: 'Sustento' },
+    { id: 'cierre', label: 'Cierre' },
+    { id: 'sintesis', label: 'Síntesis con IA' },
+];
 
-    const generateIdeas = async () => {
-        if (!program || !interest) {
-            setError('Por favor completa el programa y el área de interés.');
-            return;
+const SLIDES = [
+    { id: 'portada', section: 'apertura', min: 3, title: '¿Cómo nace un proyecto?' },
+    { id: 'fuentes', section: 'apertura', min: 4, title: '¿De dónde salen las ideas?' },
+    { id: 'criterios', section: 'apertura', min: 3, title: 'Qué hace buena a una idea de investigación' },
+    { id: 'problema', section: 'problema', min: 4, title: 'Un problema no es la falta de una solución' },
+    { id: 'porques', section: 'problema', min: 3, title: 'Del síntoma a la causa: los cinco porqués' },
+    { id: 'arbol', section: 'problema', min: 3, title: 'El árbol de problemas' },
+    { id: 'miarbol', section: 'problema', min: 6, title: 'Construye tu árbol de problemas' },
+    { id: 'poblacion', section: 'delimitacion', min: 2, title: 'Población afectada' },
+    { id: 'delimita', section: 'delimitacion', min: 4, title: 'Delimita tu idea: quién, dónde y cuándo' },
+    { id: 'contexto', section: 'delimitacion', min: 2, title: 'Contexto' },
+    { id: 'antecedentes', section: 'sustento', min: 4, title: 'Antecedentes' },
+    { id: 'viabilidad', section: 'sustento', min: 3, title: 'Viabilidad' },
+    { id: 'impacto', section: 'sustento', min: 2, title: 'Impacto' },
+    { id: 'errores', section: 'sustento', min: 3, title: 'Cinco errores frecuentes al idear' },
+    { id: 'repaso', section: 'cierre', min: 3, title: 'Repaso: comprueba lo aprendido' },
+    { id: 'cierre', section: 'cierre', min: 2, title: 'Lo que te llevas de esta clase' },
+    { id: 'asistente', section: 'sintesis', min: 9, title: 'Tu idea de investigación' },
+];
+
+
+const SLIDE_KEY = 'projectsia:ideacion:diapositiva';
+
+const EMPTY_WORKBOOK = {
+    temas: '', problema: '',
+    causa1: '', causa2: '', causa3: '',
+    efecto1: '', efecto2: '', efecto3: '',
+    quien: '', donde: '', cuando: '',
+    antecedente1: '', antecedente2: '',
+    programa: '', nivel: 'Pregrado', alcance: '',
+    frase: '',
+};
+
+
+const joinFilled = (values, separator = '; ') => values.map((value) => value.trim()).filter(Boolean).join(separator);
+
+// Quita espacios y la puntuación final para que la frase no termine en «..».
+const cleanPart = (text) => String(text || '').trim().replace(/[\s.,;:]+$/, '');
+const lowerFirst = (text) => (text ? text.charAt(0).toLowerCase() + text.slice(1) : text);
+const upperFirst = (text) => (text ? text.charAt(0).toUpperCase() + text.slice(1) : text);
+
+// Partes de la frase; los huecos sin llenar se muestran resaltados como guía.
+const sentenceParts = (wb) => {
+    const v = (key) => cleanPart(wb[key]);
+    // El lugar conserva sus mayúsculas (nombre propio); el resto va en minúscula inicial.
+    const slot = (value, placeholder, keepCase = false) => ({
+        slot: true,
+        filled: Boolean(value),
+        text: value ? (keepCase ? value : lowerFirst(value)) : placeholder,
+    });
+    const parts = [{ text: 'En ' }, slot(v('donde'), 'lugar', true), { text: ', ' }, slot(v('quien'), 'población'), { text: ' presentan ' }, slot(v('problema'), 'problema')];
+    if (v('causa1')) parts.push({ text: ', debido a ' }, slot(v('causa1')));
+    if (v('efecto1')) parts.push({ text: ', lo que genera ' }, slot(v('efecto1')));
+    if (v('cuando')) parts.push({ text: ', durante ' }, slot(v('cuando').replace(/^durante\s+/i, '')));
+    parts.push({ text: '.' });
+    return parts;
+};
+
+// Texto que se guarda en el proyecto: solo con lo que el estudiante ya escribió.
+const buildSentence = (wb) => {
+    const v = (key) => cleanPart(wb[key]);
+    if (!v('problema')) return '';
+    const sujeto = v('quien') ? `${lowerFirst(v('quien'))} presentan` : 'se presenta';
+    let text = v('donde') ? `En ${v('donde')}, ${sujeto} ${lowerFirst(v('problema'))}` : `${upperFirst(sujeto)} ${lowerFirst(v('problema'))}`;
+    if (v('causa1')) text += `, debido a ${lowerFirst(v('causa1'))}`;
+    if (v('efecto1')) text += `, lo que genera ${lowerFirst(v('efecto1'))}`;
+    if (v('cuando')) text += `, durante ${lowerFirst(v('cuando').replace(/^durante\s+/i, ''))}`;
+    return `${text}.`;
+};
+
+const buildFicha = (wb) => [
+    'FICHA DE IDEA DE INVESTIGACIÓN',
+    '',
+    `Temas de interés: ${wb.temas.trim() || '—'}`,
+    `Problema central: ${wb.problema.trim() || '—'}`,
+    `Causas: ${joinFilled([wb.causa1, wb.causa2, wb.causa3]) || '—'}`,
+    `Efectos: ${joinFilled([wb.efecto1, wb.efecto2, wb.efecto3]) || '—'}`,
+    `Población: ${wb.quien.trim() || '—'}`,
+    `Lugar: ${wb.donde.trim() || '—'}`,
+    `Periodo: ${wb.cuando.trim() || '—'}`,
+    `Antecedentes: ${joinFilled([wb.antecedente1, wb.antecedente2]) || '—'}`,
+    '',
+    `Programa: ${(wb.programa || '').trim() || '—'}`,
+    '',
+    `Idea en una frase: ${(wb.frase || '').trim() || buildSentence(wb) || '—'}`,
+].join('\n');
+
+/* ---------- Piezas reutilizables ---------- */
+
+const Campo = ({ id, label, value, onChange, placeholder, hint, autofill, multiline = false, rows = 3 }) => (
+    <div className="input-group">
+        <label htmlFor={id}>{label}</label>
+        {multiline
+            ? <textarea id={id} className="textarea-field" rows={rows} value={value} onChange={onChange} placeholder={placeholder} data-autofill={autofill} aria-describedby={hint ? `${id}-ayuda` : undefined} />
+            : <input id={id} type="text" className="input-field" value={value} onChange={onChange} placeholder={placeholder} data-autofill={autofill} aria-describedby={hint ? `${id}-ayuda` : undefined} />}
+        {hint && <small className="ide-field-hint" id={`${id}-ayuda`}>{hint}</small>}
+    </div>
+);
+
+/* ---------- Contenido de los ejercicios ---------- */
+
+const CRITERIA = [
+    {
+        id: 'interesante',
+        label: 'Interesante',
+        what: 'Te importa lo suficiente como para trabajar en ella durante meses.',
+        example: 'Pregúntate: ¿seguiría leyendo sobre este tema aunque nadie me lo pidiera?',
+    },
+    {
+        id: 'relevante',
+        label: 'Relevante',
+        what: 'Le importa a alguien más: una comunidad, una organización o tu disciplina.',
+        example: 'Pregúntate: ¿quién usaría los resultados y para qué?',
+    },
+    {
+        id: 'novedosa',
+        label: 'Novedosa',
+        what: 'Aporta algo que no estaba: otro contexto, otra población, otro método o datos más recientes.',
+        example: 'No tiene que ser inédita en el mundo. Basta con que no sea una repetición exacta.',
+    },
+    {
+        id: 'viable',
+        label: 'Viable',
+        what: 'Puedes terminarla con el tiempo, los datos y los recursos que realmente tienes.',
+        example: 'Pregúntate: ¿puedo conseguir la información en el plazo de mi trabajo de grado?',
+    },
+];
+
+const STATEMENTS = [
+    {
+        text: 'No existe una aplicación para pedir citas en el centro de salud.',
+        options: ['Problema', 'Falta de solución'],
+        answer: 1,
+        why: 'Describe algo que falta, no lo que le pasa a la gente. Como problema sería: «Los pacientes esperan varias horas para conseguir una cita».',
+    },
+    {
+        text: 'Muchos estudiantes de primer semestre reprueban cálculo.',
+        options: ['Problema', 'Falta de solución'],
+        answer: 0,
+        why: 'Es un estado negativo que ya existe y se puede medir, sin importar cómo se resuelva.',
+    },
+    {
+        text: 'Falta un laboratorio de computación en el colegio.',
+        options: ['Problema', 'Falta de solución'],
+        answer: 1,
+        why: 'El laboratorio es una solución posible. El problema sería: «Los estudiantes se gradúan sin competencias digitales básicas».',
+    },
+    {
+        text: 'Los pequeños agricultores pierden parte de su cosecha porque no pueden anticipar las lluvias.',
+        options: ['Problema', 'Falta de solución'],
+        answer: 0,
+        why: 'Nombra a quién le pasa y qué consecuencia sufre. Admite varias soluciones distintas.',
+    },
+];
+
+const REVIEW = [
+    {
+        text: '¿Cuál de estos enunciados es un problema bien formulado?',
+        options: [
+            'No hay un software de inventarios en la tienda.',
+            'La tienda pierde mercancía porque no registra sus existencias.',
+            'Se necesita capacitar a los empleados.',
+        ],
+        answer: 1,
+        why: 'Es el único que describe un estado negativo existente. Los otros dos son soluciones.',
+    },
+    {
+        text: 'En el árbol de problemas, las raíces representan…',
+        options: ['Las causas', 'Los efectos', 'Las soluciones'],
+        answer: 0,
+        why: 'Raíces: causas. Tronco: problema central. Ramas: efectos.',
+    },
+    {
+        text: '¿Cuál población está mejor delimitada?',
+        options: [
+            'Los jóvenes del país.',
+            'Personas que usan internet.',
+            'Estudiantes de grado 11 de colegios públicos de una ciudad durante 2026.',
+        ],
+        answer: 2,
+        why: 'Dice quiénes son, dónde están y en qué periodo se estudian.',
+    },
+    {
+        text: 'Revisar antecedentes sirve principalmente para…',
+        options: [
+            'Alargar el documento.',
+            'Saber qué se ha hecho y qué falta por hacer.',
+            'Copiar la metodología de otro autor.',
+        ],
+        answer: 1,
+        why: 'Los antecedentes muestran el punto de partida y el vacío que tu proyecto puede cubrir.',
+    },
+    {
+        text: 'Una idea es viable cuando…',
+        options: [
+            'Puedes terminarla con el tiempo, los datos y los recursos que tienes.',
+            'Usa la tecnología más reciente.',
+            'Nadie la ha investigado antes.',
+        ],
+        answer: 0,
+        why: 'La novedad y la tecnología no sirven si no puedes completar el proyecto.',
+    },
+];
+
+const WHYS = [
+    { q: 'Síntoma observado', a: 'Los estudiantes reprueban el primer parcial de cálculo.' },
+    { q: '¿Por qué?', a: 'No logran resolver los ejercicios de álgebra básica.' },
+    { q: '¿Por qué?', a: 'Llegan a la universidad con vacíos del bachillerato.' },
+    { q: '¿Por qué?', a: 'En el colegio memorizaron procedimientos sin comprenderlos.' },
+    { q: '¿Por qué?', a: 'Nadie detecta ni nivela esos vacíos al ingresar a la carrera.' },
+];
+
+const Porques = () => {
+    const [shown, setShown] = useState(1);
+    const complete = shown === WHYS.length;
+
+    return (
+        <div className="ide-panel">
+            <h3>Ejemplo: pregunta «¿por qué?» hasta llegar a la raíz</h3>
+            <ol className="ide-whys">
+                {WHYS.slice(0, shown).map((step, index) => (
+                    <li key={step.a} data-last={complete && index === WHYS.length - 1}>
+                        <span>{step.q}</span>
+                        {step.a}
+                    </li>
+                ))}
+            </ol>
+            <div className="ide-row">
+                <span>{complete ? 'Causa raíz encontrada' : `Nivel ${shown} de ${WHYS.length}`}</span>
+                <button
+                    type="button"
+                    className={`ide-btn ${complete ? 'ide-btn--ghost' : 'ide-btn--primary'}`}
+                    onClick={() => setShown(complete ? 1 : shown + 1)}
+                >
+                    {complete ? <><RotateCcw size={15} /> Empezar de nuevo</> : <>¿Por qué? <ArrowRight size={15} /></>}
+                </button>
+            </div>
+            {complete && (
+                <p style={{ marginTop: '1rem' }}>
+                    Un proyecto sobre «más horas de clase» atacaría el síntoma. Uno sobre diagnóstico y nivelación al ingreso ataca la causa.
+                </p>
+            )}
+        </div>
+    );
+};
+
+const TREE = {
+    efectos: {
+        name: 'Ramas · Efectos',
+        items: ['Repitencia de asignaturas', 'Deserción temprana', 'Retraso en la graduación'],
+        note: 'Los efectos responden a «¿qué consecuencias trae?». Muestran por qué vale la pena investigar el problema.',
+    },
+    problema: {
+        name: 'Tronco · Problema central',
+        text: 'Bajo rendimiento en matemáticas de los estudiantes de primer semestre de ingeniería',
+        note: 'El tronco es la situación negativa principal. Se redacta como un hecho que ya ocurre, no como una carencia.',
+    },
+    causas: {
+        name: 'Raíz · Causas',
+        items: ['Bases débiles del bachillerato', 'Poco tiempo de estudio autónomo', 'Clases poco prácticas'],
+        note: 'Las causas responden a «¿por qué ocurre esto?». Tu proyecto normalmente interviene sobre una de ellas.',
+    },
+};
+
+const Arbol = () => {
+    const [selected, setSelected] = useState('problema');
+
+    const tier = (key, extraClass = '') => (
+        <button
+            type="button"
+            className={`ide-tree-tier ${extraClass}`}
+            aria-pressed={selected === key}
+            onClick={() => setSelected(key)}
+        >
+            <span className="ide-tree-name">{TREE[key].name}</span>
+            {TREE[key].text
+                ? <span className="ide-tree-text">{TREE[key].text}</span>
+                : (
+                    <span className="ide-tree-list">
+                        {TREE[key].items.map((item) => <span key={item}>{item}</span>)}
+                    </span>
+                )}
+        </button>
+    );
+
+    return (
+        <div className="ide-panel">
+            <h3>Ejemplo: toca cada nivel del árbol</h3>
+            <div className="ide-tree">
+                {tier('efectos')}
+                <div className="ide-tree-link" aria-hidden="true" />
+                {tier('problema', 'ide-tree-tier--trunk')}
+                <div className="ide-tree-link" aria-hidden="true" />
+                {tier('causas')}
+            </div>
+            <p className="ide-tree-note" role="status">{TREE[selected].note}</p>
+        </div>
+    );
+};
+
+const SCOPE_STEPS = [
+    { label: 'Muy amplia', parts: ['Todos los estudiantes'] },
+    { label: 'Amplia', parts: ['Estudiantes', 'de ingeniería'] },
+    { label: 'Acotada', parts: ['Estudiantes', 'de ingeniería', 'de primer semestre'] },
+    { label: 'Específica', parts: ['Estudiantes', 'de ingeniería', 'de primer semestre', 'con dificultades en matemáticas'] },
+];
+
+const Poblacion = () => {
+    const [step, setStep] = useState(0);
+    const current = SCOPE_STEPS[step];
+    const isLast = step === SCOPE_STEPS.length - 1;
+
+    return (
+        <div className="ide-panel">
+            <h3>Afina la población paso a paso</h3>
+            <div className="ide-scope" aria-live="polite">
+                {current.parts.map((part, index) => (
+                    <React.Fragment key={part}>
+                        {index > 0 && ' '}
+                        {index === current.parts.length - 1 && step > 0 ? <mark>{part}</mark> : part}
+                    </React.Fragment>
+                ))}
+                .
+            </div>
+            <div className="ide-meter" aria-hidden="true">
+                {SCOPE_STEPS.map((item, index) => <span key={item.label} data-on={index <= step} />)}
+            </div>
+            <div className="ide-row">
+                <span>Precisión: {current.label}</span>
+                <button
+                    type="button"
+                    className={`ide-btn ${isLast ? 'ide-btn--ghost' : 'ide-btn--primary'}`}
+                    onClick={() => setStep(isLast ? 0 : step + 1)}
+                >
+                    {isLast ? <><RotateCcw size={15} /> Empezar de nuevo</> : <>Hacerla más específica <ArrowRight size={15} /></>}
+                </button>
+            </div>
+            {isLast && (
+                <p style={{ marginTop: '1rem' }}>
+                    Ahora sabes a quién encuestar, dónde encontrarlo y qué medir. Con «todos los estudiantes» no sabrías por dónde empezar.
+                </p>
+            )}
+        </div>
+    );
+};
+
+const FEASIBILITY = [
+    { text: '¿Tengo acceso a la información?', hint: 'Datos, personas o documentos que necesitas consultar.' },
+    { text: '¿Tengo los conocimientos técnicos?', hint: 'O puedo adquirirlos en el tiempo del proyecto.' },
+    { text: '¿El costo es manejable?', hint: 'Equipos, desplazamientos, licencias, encuestas.' },
+    { text: '¿Me alcanza el tiempo?', hint: 'Cuenta el plazo real de tu trabajo de grado.' },
+];
+
+const Viabilidad = () => {
+    const [checked, setChecked] = useState(FEASIBILITY.map(() => false));
+    const total = checked.filter(Boolean).length;
+
+    const verdict = total === FEASIBILITY.length
+        ? { ok: true, text: 'Tu idea es viable con lo que tienes. Puedes avanzar al título.' }
+        : total === 0
+            ? null
+            : { ok: false, text: 'Antes de avanzar, reduce el alcance o busca apoyo para lo que aún no marcaste.' };
+
+    return (
+        <div className="ide-panel">
+            <h3>Evalúa tu idea</h3>
+            {FEASIBILITY.map((item, index) => (
+                <label className="ide-check" key={item.text}>
+                    <input
+                        type="checkbox"
+                        checked={checked[index]}
+                        onChange={() => setChecked((prev) => prev.map((value, i) => (i === index ? !value : value)))}
+                    />
+                    <span>
+                        {item.text}
+                        <small>{item.hint}</small>
+                    </span>
+                </label>
+            ))}
+            {verdict ? (
+                <div className={`ide-feedback ${verdict.ok ? 'ide-feedback--ok' : 'ide-feedback--bad'}`} role="status">
+                    {verdict.ok ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+                    <span>{verdict.text}</span>
+                </div>
+            ) : (
+                <p>Marca las preguntas a las que puedes responder «sí» con tu idea actual.</p>
+            )}
+        </div>
+    );
+};
+
+const IMPACTS = [
+    {
+        id: 'social',
+        label: 'Social',
+        what: '¿Cómo cambia la vida de las personas o de la comunidad?',
+        example: 'Ejemplo: menos estudiantes abandonan la carrera en el primer año.',
+    },
+    {
+        id: 'economico',
+        label: 'Económico',
+        what: '¿Genera ahorros, ingresos o un uso más eficiente de los recursos?',
+        example: 'Ejemplo: las familias no pagan semestres repetidos y la universidad retiene matrícula.',
+    },
+    {
+        id: 'ambiental',
+        label: 'Ambiental',
+        what: '¿Reduce o aumenta la presión sobre el entorno natural?',
+        example: 'Ejemplo: las tutorías virtuales evitan desplazamientos y material impreso.',
+    },
+];
+
+const MISTAKES = [
+    {
+        error: 'El tema es demasiado amplio',
+        example: '«La inteligencia artificial en la educación».',
+        fix: 'Acota población, lugar y periodo hasta que sepas a quién le preguntarías y qué medirías.',
+    },
+    {
+        error: 'Se parte de la solución',
+        example: '«Desarrollar una app para el restaurante».',
+        fix: 'Pregunta qué consecuencia sufre la gente hoy y redacta ese estado negativo.',
+    },
+    {
+        error: 'El problema no tiene evidencia',
+        example: '«Yo creo que los clientes están insatisfechos».',
+        fix: 'Busca un dato, un informe o un antecedente que muestre que el problema existe.',
+    },
+    {
+        error: 'No se puede observar ni medir',
+        example: '«Mejorar la calidad de vida».',
+        fix: 'Define qué observarías: un indicador, una conducta o una opinión que se pueda recoger.',
+    },
+    {
+        error: 'Se elige el tema solo por moda',
+        example: 'Un tema de tendencia que no conoces ni puedes abordar.',
+        fix: 'Contrasta con los cuatro criterios: interesante, relevante, novedosa y viable.',
+    },
+];
+
+/* ---------- Asistente IA ---------- */
+
+const IDEA_SECTIONS = [
+    { key: 'idea', pattern: /^idea\s*:/i },
+    { key: 'problema', pattern: /^problema\s*:/i },
+    { key: 'poblacion', pattern: /^poblaci[oó]n\s*:/i },
+    { key: 'lugar', pattern: /^lugar\s*:/i },
+    { key: 'periodo', pattern: /^periodo\s*:/i },
+    { key: 'verbo', pattern: /^verbo\s*:/i },
+    { key: 'objeto', pattern: /^objeto de estudio\s*:/i },
+    { key: 'titulo', pattern: /^t[ií]tulo\s*:/i },
+    { key: 'pregunta', pattern: /^pregunta\s*:/i },
+    { key: 'como', pattern: /^c[oó]mo hacerlo\s*:/i },
+    { key: 'limites', pattern: /^posibles limitaciones\s*:/i },
+];
+
+// El alcance agrupa los 38 verbos sustantivados que usa la herramienta de Título
+// y decide el tipo de pregunta y de investigación.
+// Qué se espera de una idea según el nivel académico.
+const NIVEL_GUIA = {
+    Pregrado: 'alcance acotado, realizable en un semestre o un año con los recursos de un estudiante',
+    'Especialización': 'aplicada a una organización o contexto profesional concreto, con resultados útiles para tomar decisiones',
+    'Maestría': 'con mayor rigor metodológico y un aporte al conocimiento del área',
+    Doctorado: 'con un aporte original al conocimiento y una fundamentación teórica sólida',
+};
+
+
+const ENFOQUES = ['Cuantitativo', 'Cualitativo', 'Mixto'];
+const TIEMPOS = ['3 meses', '6 meses', '1 año', 'Más de 1 año'];
+
+// Misma forma inicial que usa la herramienta de Título.
+const TITULO_FORM = {
+    accion: '', objeto: '', donde: '', quien: '', cuando: '', paraque: '',
+    includeParaque: true, includeQuien: true, includeDonde: true, includeCuando: true,
+};
+
+const parseIdea = (raw) => {
+    const parsed = { idea: '', problema: '', poblacion: '', lugar: '', periodo: '', verbo: '', objeto: '', titulo: '', pregunta: '', como: '', limites: '' };
+    let current = 'idea';
+    raw.replace(/\*\*/g, '').split('\n').forEach((line) => {
+        let text = line.trim().replace(/^[-*•]\s*/, '');
+        if (!text) return;
+        const section = IDEA_SECTIONS.find((item) => item.pattern.test(text));
+        if (section) {
+            current = section.key;
+            text = text.replace(section.pattern, '').trim();
         }
+        if (text) parsed[current] = parsed[current] ? `${parsed[current]} ${text}` : text;
+    });
+    return parsed;
+};
 
-        if (!apiKey) {
-            setError('Necesitas una API Key de Groq para usar esta función.');
+// Ejemplos de distintas carreras para mostrar cómo se arma una idea completa.
+const EJEMPLOS = [
+    {
+        nombre: 'Zootecnia', grupo: 'Pregrado', nivel: 'Pregrado',
+        programa: 'Zootecnia', temas: 'salud de terneros',
+        problema: 'alta mortalidad de terneros en su primer mes de vida',
+        quien: 'pequeños productores ganaderos', donde: 'Montería, Córdoba', cuando: 'el primer semestre de 2026',
+        alcance: 'predecir',
+    },
+    {
+        nombre: 'Ingeniería de Sistemas', grupo: 'Pregrado', nivel: 'Pregrado',
+        programa: 'Ingeniería de Sistemas', temas: 'tecnología en salud',
+        problema: 'inasistencia frecuente a las citas médicas programadas',
+        quien: 'pacientes de consulta externa', donde: 'un hospital de Sincelejo, Sucre', cuando: 'el año 2026',
+        alcance: 'proponer',
+    },
+    {
+        nombre: 'Enfermería', grupo: 'Pregrado', nivel: 'Pregrado',
+        programa: 'Enfermería', temas: 'enfermedades crónicas',
+        problema: 'baja adherencia al tratamiento de la hipertensión',
+        quien: 'adultos mayores', donde: 'un centro de salud de Cartagena, Bolívar', cuando: 'el segundo semestre de 2026',
+        alcance: 'explicar',
+    },
+    {
+        nombre: 'Licenciatura en Educación', grupo: 'Pregrado', nivel: 'Pregrado',
+        programa: 'Licenciatura en Educación Básica', temas: 'lectura en la escuela',
+        problema: 'bajo nivel de comprensión lectora',
+        quien: 'estudiantes de quinto grado', donde: 'escuelas rurales de Lorica, Córdoba', cuando: 'el año escolar 2026',
+        alcance: 'evaluar',
+    },
+    {
+        nombre: 'Administración de Empresas', grupo: 'Pregrado', nivel: 'Pregrado',
+        programa: 'Administración de Empresas', temas: 'gestión del talento humano',
+        problema: 'alta rotación de personal',
+        quien: 'empleados de pequeñas empresas de comercio', donde: 'Montería, Córdoba', cuando: 'el año 2026',
+        alcance: 'relacionar',
+    },
+    {
+        nombre: 'Ventas en línea', grupo: 'Especialización en Gestión de Negocios Digitales', nivel: 'Especialización',
+        programa: 'Especialización en Gestión de Negocios Digitales', temas: 'comercio electrónico',
+        problema: 'bajo volumen de ventas a través de canales digitales',
+        quien: 'micro y pequeñas empresas de comercio minorista', donde: 'Montería, Córdoba', cuando: 'el año 2026',
+        alcance: 'describir',
+    },
+    {
+        nombre: 'Carritos abandonados', grupo: 'Especialización en Gestión de Negocios Digitales', nivel: 'Especialización',
+        programa: 'Especialización en Gestión de Negocios Digitales', temas: 'experiencia de compra en línea',
+        problema: 'alta tasa de abandono del carrito de compras',
+        quien: 'clientes de tiendas virtuales de moda', donde: 'Colombia', cuando: 'el primer semestre de 2026',
+        alcance: 'explicar',
+    },
+    {
+        nombre: 'Pagos digitales', grupo: 'Especialización en Gestión de Negocios Digitales', nivel: 'Especialización',
+        programa: 'Especialización en Gestión de Negocios Digitales', temas: 'billeteras y pagos digitales',
+        problema: 'baja adopción de los pagos digitales',
+        quien: 'comerciantes de plazas de mercado', donde: 'Montería, Córdoba', cuando: 'el año 2026',
+        alcance: 'comparar',
+    },
+    {
+        nombre: 'Redes sociales', grupo: 'Especialización en Gestión de Negocios Digitales', nivel: 'Especialización',
+        programa: 'Especialización en Gestión de Negocios Digitales', temas: 'marketing digital',
+        problema: 'baja interacción con los clientes en redes sociales',
+        quien: 'emprendimientos turísticos', donde: 'el Golfo de Morrosquillo, Sucre', cuando: 'el segundo semestre de 2026',
+        alcance: 'mejorar',
+    },
+    {
+        nombre: 'Acuerdos con proveedores', grupo: 'Especialización en Negociación y Toma de Decisiones', nivel: 'Especialización',
+        programa: 'Especialización en Negociación y Toma de Decisiones', temas: 'negociación con proveedores',
+        problema: 'incumplimiento frecuente de los acuerdos pactados con proveedores',
+        quien: 'pequeñas empresas de alimentos', donde: 'Montería, Córdoba', cuando: 'el año 2026',
+        alcance: 'explicar',
+    },
+    {
+        nombre: 'Negociación colectiva', grupo: 'Especialización en Negociación y Toma de Decisiones', nivel: 'Especialización',
+        programa: 'Especialización en Negociación y Toma de Decisiones', temas: 'conflictos laborales',
+        problema: 'negociaciones colectivas prolongadas que terminan sin acuerdo',
+        quien: 'sindicatos y directivos de empresas agroindustriales', donde: 'el departamento de Córdoba', cuando: 'el periodo 2024-2026',
+        alcance: 'describir',
+    },
+    {
+        nombre: 'Decisiones gerenciales', grupo: 'Especialización en Negociación y Toma de Decisiones', nivel: 'Especialización',
+        programa: 'Especialización en Negociación y Toma de Decisiones', temas: 'toma de decisiones basada en datos',
+        problema: 'decisiones de inversión tomadas sin análisis de información',
+        quien: 'gerentes de pequeñas y medianas empresas', donde: 'Montería, Córdoba', cuando: 'el año 2026',
+        alcance: 'relacionar',
+    },
+    {
+        nombre: 'Conflictos comunitarios', grupo: 'Especialización en Negociación y Toma de Decisiones', nivel: 'Especialización',
+        programa: 'Especialización en Negociación y Toma de Decisiones', temas: 'resolución de conflictos',
+        problema: 'pocos acuerdos alcanzados en los conflictos por el uso de la tierra',
+        quien: 'comunidades campesinas', donde: 'el sur de Córdoba', cuando: 'el año 2026',
+        alcance: 'proponer',
+    },
+];
+const EXAMPLE_GROUPS = [...new Set(EJEMPLOS.map((example) => example.grupo))];
+const EXAMPLE_KEYS = ['nivel', 'programa', 'temas', 'problema', 'quien', 'donde', 'cuando', 'alcance'];
+const exampleFields = (example) => Object.fromEntries(EXAMPLE_KEYS.map((key) => [key, example[key]]));
+
+// Un solo formulario: arma la idea en una frase y, con los mismos datos, pide 5 ideas a la IA.
+const SintesisIA = ({ intro, wb, setWb, onNavigate }) => {
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [ideas, setIdeas] = useProjectField('ideasIA', []);
+    const [error, setError] = useState('');
+    const [confirming, setConfirming] = useState(null);
+    const [applied, setApplied] = useState(null);
+
+    const [, setTituloForm] = useProjectField('tituloForm', TITULO_FORM);
+    const [, setTituloIA] = useProjectField('tituloIA', '');
+    const [titulo, setTitulo] = useProjectField('titulo', '');
+    const [, setPregunta] = useProjectField('pregunta', '');
+    const [, setPreguntaTipo] = useProjectField('preguntaTipo', 'Descriptiva');
+    const [, setTipoInvestigacion] = useProjectField('tipoInvestigacion', 'Exploratoria');
+
+    // Cada cambio actualiza la ficha y vuelve a armar la frase.
+    const update = (patch) => setWb((prev) => {
+        const next = { ...prev, ...patch };
+        return { ...next, frase: buildSentence(next) };
+    });
+    const field = (key) => (event) => update({ [key]: event.target.value });
+
+    const isEmpty = !['programa', 'problema', 'quien', 'donde', 'cuando'].some((key) => (wb[key] || '').trim());
+    // Los ejemplos se muestran mientras el formulario está vacío o tiene cargado un ejemplo.
+    const currentExample = EJEMPLOS.find((example) => example.problema === (wb.problema || '').trim());
+    const showExamples = isEmpty || Boolean(currentExample);
+    const hasOwnWork = Boolean((wb.problema || '').trim() || (titulo || '').trim());
+    const alcanceSel = ALCANCES.find((item) => item.id === wb.alcance);
+
+    const applyIdea = (idea) => {
+        const periodo = (wb.cuando || '').trim().replace(/^durante\s+/i, '');
+        update({
+            problema: idea.problema || wb.problema,
+            quien: idea.poblacion || wb.quien,
+            donde: idea.lugar || wb.donde,
+            cuando: periodo || wb.cuando,
+        });
+        setTituloForm((prev) => ({
+            ...TITULO_FORM,
+            ...prev,
+            accion: findVerb(idea.verbo) || prev.accion,
+            objeto: idea.objeto || prev.objeto,
+            quien: idea.poblacion || prev.quien,
+            donde: idea.lugar || prev.donde,
+            cuando: periodo || prev.cuando,
+        }));
+        if (idea.titulo) {
+            setTituloIA(idea.titulo);
+            setTitulo(idea.titulo);
+        }
+        if (idea.pregunta) setPregunta(idea.pregunta);
+        const chosen = ALCANCES.find((item) => item.id === idea.alcance);
+        if (chosen?.pregunta) setPreguntaTipo(chosen.pregunta);
+        if (chosen?.tipo) setTipoInvestigacion(chosen.tipo);
+        setConfirming(null);
+        setApplied(idea.idea);
+    };
+
+    const chooseIdea = (idea) => {
+        if (hasOwnWork) setConfirming(idea.idea);
+        else applyIdea(idea);
+    };
+
+    const buildPrompt = (count, tema, avoid = []) => {
+        const v = (key) => (wb[key] || '').trim();
+        const nivel = wb.nivel || 'Pregrado';
+        const verbs = alcanceSel ? alcanceSel.verbs : ALL_VERBS;
+        const reglas = [
+            `- Nivel ${nivel}: cada idea debe ser ${NIVEL_GUIA[nivel] || NIVEL_GUIA.Pregrado}.`,
+            v('problema') && `- Problema observado: «${v('problema')}». Cada idea debe estudiar este problema o una de sus causas; no cambies de problema.`,
+            v('quien') && `- Población: escribe exactamente «${v('quien')}» en el campo Población y menciónala en el título.`,
+            v('donde') && `- Lugar: escribe exactamente «${v('donde')}» en el campo Lugar y menciónalo en el título.`,
+            v('cuando')
+                ? `- Periodo: escribe exactamente «${v('cuando')}» en el campo Periodo.`
+                : '- El estudiante no definió un periodo: deja el campo Periodo vacío y no incluyas fechas ni años en el título.',
+            alcanceSel && `- Objetivo: ${alcanceSel.label.toUpperCase()} (${alcanceSel.hint.toLowerCase()}). Las 5 ideas deben tener este objetivo, no otro.`,
+            alcanceSel && `- La pregunta debe ser ${alcanceSel.pregunta.toLowerCase()}, con una forma como: ${alcanceSel.questionForm}`,
+            alcanceSel && `- El "Cómo hacerlo" debe corresponder a ese objetivo: ${alcanceSel.method}.`,
+            `- El campo Verbo debe ser EXACTAMENTE uno de estos sustantivos: ${verbs.join(', ')}. El título debe empezar con ese mismo sustantivo (por ejemplo «${verbs[0]} de…»).`,
+            avoid.length && `- No repitas estas ideas ya propuestas: ${avoid.map((t) => `«${t}»`).join('; ')}.`,
+        ].filter(Boolean);
+
+        return `Actúa como un profesor experto en metodología de la investigación.
+Genera ${count} ${count === 1 ? 'idea' : 'ideas'} de proyecto de investigación para un estudiante de ${nivel} del programa ${v('programa')}.
+Tema de interés: ${tema}.
+
+REGLAS OBLIGATORIAS (si una idea no cumple alguna, no la incluyas):
+${reglas.join('\n')}
+- Cada idea parte de un problema real: un estado negativo que ya existe, no la ausencia de una solución.
+
+Separa cada idea EXCLUSIVAMENTE con el texto "---IDEA---". NO uses números al inicio.
+Para cada idea usa ESTRICTAMENTE este formato, una línea por campo:
+
+**Idea**: [Descripción clara en una o dos oraciones]
+**Problema**: [El estado negativo que se estudia, en una frase]
+**Población**: [Quiénes lo sufren, sin artículo inicial]
+**Lugar**: [Dónde ocurre]
+**Periodo**: [Cuándo se estudiará]
+**Verbo**: [Uno de los sustantivos permitidos]
+**Objeto de estudio**: [Lo que se estudia, para completar el título después del verbo]
+**Título**: [Empieza con el Verbo; de 10 a 30 palabras]
+**Pregunta**: [Pregunta de investigación clara, entre signos de interrogación]
+**Cómo hacerlo**: [Método breve, coherente con el objetivo]
+**Posibles Limitaciones**: [1 o 2 limitaciones principales]`;
+    };
+
+    // Comprueba que la idea respete el formulario; completa con los datos del estudiante lo que debe ser idéntico.
+    const checkIdea = (raw) => {
+        const v = (key) => (wb[key] || '').trim();
+        const allowed = alcanceSel ? alcanceSel.verbs : ALL_VERBS;
+        const titulo = (raw.titulo || '').trim();
+        const verbo = findVerb(raw.verbo) || allowed.find((label) => titulo.toLowerCase().startsWith(label.toLowerCase())) || '';
+        const idea = {
+            ...raw,
+            verbo,
+            poblacion: v('quien') || raw.poblacion,
+            lugar: v('donde') || raw.lugar,
+            periodo: v('cuando'),
+            alcance: wb.alcance || '',
+        };
+        const ok = Boolean(
+            idea.idea
+            && titulo
+            && allowed.includes(verbo)
+            && titulo.toLowerCase().startsWith(verbo.toLowerCase())
+            && (idea.pregunta || '').includes('?'),
+        );
+        return { idea, ok };
+    };
+
+    const requestIdeas = async (count, tema, avoid) => {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [{ role: 'user', content: buildPrompt(count, tema, avoid) }],
+            temperature: 0.6,
+            max_tokens: 6000,
+        });
+        const content = chatCompletion.choices[0]?.message?.content || '';
+        return content.split('---IDEA---').map((item) => parseIdea(item)).filter((item) => item.idea).map(checkIdea);
+    };
+
+    const generateIdeas = async (event) => {
+        event.preventDefault();
+        const tema = (wb.temas || '').trim() || (wb.problema || '').trim();
+        if (!(wb.programa || '').trim() || !tema) {
+            setError('Escribe al menos tu programa y el tema o el problema para generar ideas.');
             return;
         }
 
         setIsGenerating(true);
         setError('');
-        setGeneratedIdeas([]);
+        setApplied(null);
+        setConfirming(null);
 
         try {
-            const groq = new Groq({
-                apiKey: apiKey,
-                dangerouslyAllowBrowser: true // Required for client-side usage
-            });
-
-            const prompt = `Actúa como un profesor experto en metodología de la investigación.
-      Genera una lista de 5 ideas de proyectos de investigación innovadores y viables para un estudiante de nivel ${level} en el programa de ${program}.
-      El área de interés específica es: ${interest}.
-      
-      Formato de respuesta deseado:
-      Genera 5 ideas. Separa cada una EXCLUSIVAMENTE con el texto "---IDEA---".
-      NO uses números al inicio de la idea.
-      
-      Formato de respuesta deseado:
-      Genera 5 ideas. Separa cada una EXCLUSIVAMENTE con el texto "---IDEA---".
-      NO uses números al inicio de la idea.
-      
-      Para cada idea, usa ESTRICTAMENTE este formato:
-      
-      **Idea**: [Descripción clara de la idea]
-      **Cómo hacerlo**: [Metodología o enfoque breve]
-      **Posibles Limitaciones**: [Menciona 1 o 2 limitaciones principales]`;
-
-            const chatCompletion = await groq.chat.completions.create({
-                messages: [
-                    {
-                        role: "user",
-                        content: prompt
-                    }
-                ],
-                model: import.meta.env.VITE_GROQ_MODEL || "llama3-70b-8192",
-                temperature: 0.7,
-                max_tokens: 2048,
-            });
-
-            const content = chatCompletion.choices[0]?.message?.content || '';
-
-            // Robust parsing using the explicit separator
-            const ideasList = content.split('---IDEA---')
-                .map(item => item.trim())
-                .filter(item => item.length > 0 && item.includes('Idea'));
-
-            setGeneratedIdeas(ideasList);
-
+            let results = await requestIdeas(5, tema, []);
+            let valid = results.filter((item) => item.ok).map((item) => item.idea);
+            // Si alguna no respetó el formulario, se piden de nuevo solo las que faltan.
+            if (valid.length < 5) {
+                const retry = await requestIdeas(5 - valid.length, tema, valid.map((item) => item.titulo));
+                valid = [...valid, ...retry.filter((item) => item.ok).map((item) => item.idea)].slice(0, 5);
+                results = [...results, ...retry];
+            }
+            if (valid.length === 0) {
+                setError('La IA no generó ideas que respeten tus datos. Revisa el formulario e inténtalo de nuevo.');
+                return;
+            }
+            setIdeas(valid);
         } catch (err) {
             console.error(err);
-            setError(`Error: ${err.message || 'Error al conectar con Groq. Verifica tu configuración.'}`);
+            setError(err.message || 'No se pudieron generar las ideas. Revisa tu conexión y vuelve a intentarlo.');
         } finally {
             setIsGenerating(false);
         }
     };
 
+    const parts = sentenceParts(wb);
+
     return (
-        <div style={{ maxWidth: '100%', paddingBottom: '3rem' }}>
-            {/* Introduction Banner */}
-            <div className="responsive-banner" style={{
-                background: 'linear-gradient(to right, #eff6ff, #f0fdf4)',
-                border: '1px solid #dbeafe',
-                borderRadius: '1rem',
-                padding: '2rem',
-                marginBottom: '2.5rem',
-                display: 'flex',
-                gap: '2rem',
-                alignItems: 'start'
-            }}>
-                <div style={{ flex: 1 }}>
-                    <h2 style={{ fontSize: '1.5rem', color: '#1e3a8a', marginBottom: '1rem' }}>
-                        ¿Cómo nace un proyecto?
-                    </h2>
-                    <p style={{ color: '#1e40af', lineHeight: '1.7', fontSize: '1.05rem' }}>
-                        Todo gran proyecto comienza con la identificación de una <strong>situación problemática</strong> o una <strong>oportunidad de mejora</strong>.
-                        No basta con tener una "buena idea"; es necesario validar que responda a una necesidad real de una población específica.
-                    </p>
-                </div>
-                <div style={{
-                    background: 'white',
-                    padding: '1.5rem',
-                    borderRadius: '0.75rem',
-                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
-                    maxWidth: '300px',
-                    width: '100%'
-                }}>
-                    <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#059669', marginBottom: '0.5rem' }}>
-                        <BookOpen size={18} /> Concepto Clave
-                    </h4>
-                    <p style={{ fontSize: '0.9rem', color: '#475569' }}>
-                        Un <strong>problema</strong> no es la ausencia de una solución (ej: "falta una app"), sino un estado negativo existente (ej: "baja productividad").
-                    </p>
-                </div>
-            </div>
-
-            {/* Primary Educational Cards */}
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', color: '#334155' }}>Fundamentos del Problema</h3>
-            <div className="grid-cols-3 responsive-flex-grid" style={{ marginBottom: '3rem' }}>
-                {/* Card 1: Problems vs Symptoms */}
-                <div className="card" style={{ borderTop: '4px solid #ef4444' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-                        <div style={{ padding: '0.5rem', background: '#fef2f2', borderRadius: '0.5rem' }}>
-                            <AlertTriangle size={24} color="#ef4444" />
-                        </div>
-                        <div>
-                            <h3 style={{ margin: 0 }}>Problema vs. Síntoma</h3>
-                            <span style={{ fontSize: '0.8rem', color: '#991b1b', fontWeight: '500' }}>DIAGNÓSTICO</span>
-                        </div>
-                    </div>
-                    <p style={{ marginBottom: '1rem' }}>
-                        Para formular bien, debes ir a la raíz. Usa la técnica del <strong>Árbol de Problemas</strong>:
-                    </p>
-                    <ul style={{ listStyle: 'none', fontSize: '0.95rem', color: '#475569', paddingLeft: '0.5rem' }}>
-                        <li style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.5rem' }}>
-                            <ArrowRight size={16} style={{ marginTop: '4px', flexShrink: 0 }} color="#ef4444" />
-                            <strong>Raíz (Causas):</strong> ¿Por qué ocurre esto?
-                        </li>
-                        <li style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.5rem' }}>
-                            <ArrowRight size={16} style={{ marginTop: '4px', flexShrink: 0 }} color="#ef4444" />
-                            <strong>Tronco (Problema Central):</strong> La situación negativa principal.
-                        </li>
-                        <li style={{ display: 'flex', gap: '0.5rem' }}>
-                            <ArrowRight size={16} style={{ marginTop: '4px', flexShrink: 0 }} color="#ef4444" />
-                            <strong>Ramas (Efectos):</strong> ¿Qué consecuencias trae?
-                        </li>
-                    </ul>
-                </div>
-
-                {/* Card 2: Population */}
-                <div className="card" style={{ borderTop: '4px solid #3b82f6' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-                        <div style={{ padding: '0.5rem', background: '#eff6ff', borderRadius: '0.5rem' }}>
-                            <Users size={24} color="#3b82f6" />
-                        </div>
-                        <div>
-                            <h3 style={{ margin: 0 }}>Población Afectada</h3>
-                            <span style={{ fontSize: '0.8rem', color: '#1e40af', fontWeight: '500' }}>ALCANCE</span>
-                        </div>
-                    </div>
-                    <p style={{ marginBottom: '1rem' }}>
-                        Define quién sufre el problema. Entre más específico seas, más efectiva será tu solución.
-                    </p>
-                    <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.9rem' }}>
-                        <strong>Ejemplo:</strong>
-                        <p style={{ marginTop: '0.25rem', color: '#64748b' }}>
-                            ❌ "Todos los estudiantes."<br />
-                            ✅ "Estudiantes de ingeniería de primer semestre con dificultades en matemáticas."
-                        </p>
-                    </div>
-                </div>
-
-                {/* Card 3: Solution Feasibility */}
-                <div className="card" style={{ borderTop: '4px solid #10b981' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-                        <div style={{ padding: '0.5rem', background: '#ecfdf5', borderRadius: '0.5rem' }}>
-                            <Check size={24} color="#10b981" />
-                        </div>
-                        <div>
-                            <h3 style={{ margin: 0 }}>Viabilidad</h3>
-                            <span style={{ fontSize: '0.8rem', color: '#065f46', fontWeight: '500' }}>SOLUCIÓN</span>
-                        </div>
-                    </div>
-                    <p style={{ marginBottom: '1rem' }}>
-                        Tu idea debe ser realizable con los recursos y tiempo disponibles. Pregúntate:
-                    </p>
-                    <ul style={{ listStyle: 'none', fontSize: '0.95rem', color: '#475569', paddingLeft: '0.5rem' }}>
-                        <li style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.5rem' }}>
-                            <Check size={16} color="#10b981" /> ¿Tengo acceso a la información?
-                        </li>
-                        <li style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.5rem' }}>
-                            <Check size={16} color="#10b981" /> ¿Tengo los conocimientos técnicos?
-                        </li>
-                        <li style={{ display: 'flex', gap: '0.5rem' }}>
-                            <Check size={16} color="#10b981" /> ¿El costo es manejable?
-                        </li>
-                    </ul>
-                </div>
-            </div>
-
-            {/* Secondary Educational Cards */}
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', color: '#334155' }}>Contexto y Justificación</h3>
-            <div className="grid-cols-3 responsive-flex-grid" style={{ marginBottom: '3rem' }}>
-
-                {/* Card 4: Environmental Context */}
-                <div className="card" style={{ borderTop: '4px solid #f59e0b' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-                        <div style={{ padding: '0.5rem', background: '#fffbeb', borderRadius: '0.5rem' }}>
-                            <MapPin size={24} color="#f59e0b" />
-                        </div>
-                        <div>
-                            <h3 style={{ margin: 0 }}>Contexto</h3>
-                            <span style={{ fontSize: '0.8rem', color: '#b45309', fontWeight: '500' }}>ENTORNO</span>
-                        </div>
-                    </div>
-                    <p style={{ marginBottom: '1rem', fontSize: '0.95rem' }}>
-                        Ningún problema existe en el vacío. Describe las características físicas, sociales o culturales del lugar.
-                    </p>
-                    <p style={{ fontSize: '0.9rem', color: '#64748b' }}>
-                        <em>¿Es una zona rural o urbana? ¿Qué recursos tecnológicos hay disponibles? ¿Existen barreras culturales?</em>
-                    </p>
-                </div>
-
-                {/* Card 5: Background/State of Art */}
-                <div className="card" style={{ borderTop: '4px solid #8b5cf6' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-                        <div style={{ padding: '0.5rem', background: '#f3f0ff', borderRadius: '0.5rem' }}>
-                            <History size={24} color="#8b5cf6" />
-                        </div>
-                        <div>
-                            <h3 style={{ margin: 0 }}>Antecedentes</h3>
-                            <span style={{ fontSize: '0.8rem', color: '#6d28d9', fontWeight: '500' }}>INVESTIGACIÓN PREVIA</span>
-                        </div>
-                    </div>
-                    <p style={{ marginBottom: '1rem', fontSize: '0.95rem' }}>
-                        Revisa qué se ha hecho antes. No necesitas "reinventar la rueda", puedes mejorarla.
-                    </p>
-                    <ul style={{ listStyle: 'none', fontSize: '0.9rem', color: '#475569' }}>
-                        <li style={{ marginBottom: '0.5rem' }}>• ¿Qué soluciones han fallado antes?</li>
-                        <li style={{ marginBottom: '0.5rem' }}>• ¿Qué soluciones existen en otros lugares?</li>
-                    </ul>
-                </div>
-
-                {/* Card 6: Impact */}
-                <div className="card" style={{ borderTop: '4px solid #ec4899' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-                        <div style={{ padding: '0.5rem', background: '#fdf2f8', borderRadius: '0.5rem' }}>
-                            <Globe size={24} color="#ec4899" />
-                        </div>
-                        <div>
-                            <h3 style={{ margin: 0 }}>Impacto</h3>
-                            <span style={{ fontSize: '0.8rem', color: '#be185d', fontWeight: '500' }}>PROYECCIÓN</span>
-                        </div>
-                    </div>
-                    <p style={{ marginBottom: '1rem', fontSize: '0.95rem' }}>
-                        Analiza las consecuencias de tu proyecto más allá de la solución inmediata.
-                    </p>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '0.75rem', background: '#f1f5f9', padding: '0.25rem 0.5rem', borderRadius: '1rem', color: '#475569' }}>Social</span>
-                        <span style={{ fontSize: '0.75rem', background: '#f1f5f9', padding: '0.25rem 0.5rem', borderRadius: '1rem', color: '#475569' }}>Económico</span>
-                        <span style={{ fontSize: '0.75rem', background: '#f1f5f9', padding: '0.25rem 0.5rem', borderRadius: '1rem', color: '#475569' }}>Ambiental</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* AI Idea Generator Section */}
-            <div className="card" style={{
-                padding: '2rem',
-                border: '1px solid #c084fc',
-                boxShadow: '0 0 20px rgba(192, 132, 252, 0.15)',
-                background: 'linear-gradient(to bottom, #ffffff, #faf5ff)'
-            }}>
-                <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
-                    <h2 style={{ fontSize: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', color: '#7e22ce' }}>
-                        <Sparkles size={28} className="text-purple-600" />
-                        Asistente de Lluvia de Ideas IA
-                    </h2>
-                    <p style={{ color: '#64748b', marginTop: '0.5rem', maxWidth: '600px', marginInline: 'auto' }}>
-                        ¿Necesitas inspiración? Cuéntanos qué estudias y qué te interesa, y nuestra IA generará 5 ideas de proyectos a medida.
-                    </p>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '800px', margin: '0 auto' }}>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                        <div className="input-group">
-                            <label>Nivel Académico</label>
-                            <select
-                                className="input-field"
-                                value={level}
-                                onChange={(e) => setLevel(e.target.value)}
-                                style={{ cursor: 'pointer' }}
-                            >
-                                <option value="Pregrado">Pregrado</option>
-                                <option value="Especialización">Especialización</option>
-                                <option value="Maestría">Maestría</option>
-                            </select>
-                        </div>
-
-                        <div className="input-group">
-                            <label>Programa Académico</label>
-                            <input
-                                type="text"
-                                className="input-field"
-                                placeholder="Ej: Ingeniería de Sistemas, Derecho..."
-                                value={program}
-                                onChange={(e) => setProgram(e.target.value)}
-                            />
-                        </div>
-                    </div>
-
-                    <div className="input-group">
-                        <label>Área de Interés Específica</label>
-                        <input
-                            type="text"
-                            className="input-field"
-                            placeholder="Ej: Inteligencia Artificial en medicina, Derechos humanos en zonas rurales..."
-                            value={interest}
-                            onChange={(e) => setInterest(e.target.value)}
-                        />
-                    </div>
-
-                    {!import.meta.env.VITE_GROQ_API_KEY && (
-                        <div className="input-group" style={{ background: '#f8fafc', padding: '1rem', borderRadius: '0.5rem', border: '1px dashed #cbd5e1' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <Key size={16} /> Groq API Key
-                            </label>
-                            <input
-                                type="password"
-                                className="input-field"
-                                placeholder="gsk_..."
-                                value={apiKey}
-                                onChange={(e) => setApiKey(e.target.value)}
-                                style={{ background: 'white' }}
-                            />
-                            <small style={{ color: '#94a3b8', marginTop: '0.5rem', display: 'block' }}>
-                                Tu clave no se guarda y se usa solo para esta consulta. Obtenla en <a href="https://console.groq.com" target="_blank" rel="noreferrer" style={{ color: '#7e22ce' }}>console.groq.com</a>.
-                            </small>
-                        </div>
-                    )}
-
-                    {error && (
-                        <div style={{ padding: '1rem', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '0.5rem', color: '#ef4444', display: 'flex', gap: '0.5rem' }}>
-                            <AlertTriangle size={20} />
-                            {error}
-                        </div>
-                    )}
-
-                    <button
-                        className="btn-primary"
-                        onClick={generateIdeas}
-                        disabled={isGenerating}
-                        style={{
-                            background: isGenerating ? '#94a3b8' : 'linear-gradient(135deg, #7e22ce, #a855f7)',
-                            padding: '1rem',
-                            fontSize: '1.1rem',
-                            marginTop: '1rem',
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            gap: '0.75rem'
-                        }}
-                    >
-                        {isGenerating ? (
-                            <>
-                                <div style={{ width: '20px', height: '20px', border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-                                Generando Ideas...
-                            </>
-                        ) : (
-                            <>
-                                <Cpu size={20} /> Sugerir 5 Ideas
-                            </>
-                        )}
-                    </button>
-                </div>
-
-                {/* Results Area */}
-                {generatedIdeas.length > 0 && (
-                    <div className="fade-in" style={{ marginTop: '3rem', borderTop: '1px solid #e2e8f0', paddingTop: '2rem' }}>
-                        <h3 style={{ textAlign: 'center', marginBottom: '2rem', color: '#334155' }}>Ideas Sugeridas para Ti</h3>
-                        <div style={{ display: 'grid', gap: '1rem' }}>
-                            {generatedIdeas.map((idea, index) => (
-                                <div key={index} style={{
-                                    background: 'white',
-                                    padding: '1.5rem',
-                                    borderRadius: '0.75rem',
-                                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
-                                    borderLeft: `4px solid ${['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'][index % 5]}`,
-                                    display: 'flex',
-                                    gap: '1rem'
-                                }}>
-                                    <div style={{
-                                        background: '#f1f5f9',
-                                        width: '32px',
-                                        height: '32px',
-                                        borderRadius: '50%',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontWeight: 'bold',
-                                        color: '#64748b',
-                                        flexShrink: 0
-                                    }}>
-                                        {index + 1}
-                                    </div>
-                                    <div style={{ color: '#334155', lineHeight: '1.6', width: '100%' }}>
-                                        {idea.split('\n').map((line, i) => {
-                                            const formattedLine = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-                                            // Style for specific component lines (Action, Object, etc.) to make them look like a list
-                                            if (line.trim().startsWith('*')) {
-                                                return (
-                                                    <div key={i} style={{ paddingLeft: '1rem', color: '#475569', fontSize: '0.95rem', display: 'flex', gap: '0.5rem' }}>
-                                                        <span style={{ color: '#7e22ce' }}>•</span>
-                                                        <span dangerouslySetInnerHTML={{ __html: formattedLine.replace('*', '').trim() }} />
-                                                    </div>
-                                                );
-                                            }
-
-                                            // Style for "How to do it" section
-                                            if (line.toLowerCase().includes('cómo hacerlo') || line.toLowerCase().includes('metodología')) {
-                                                return (
-                                                    <div key={i} style={{ marginTop: '0.75rem', padding: '0.75rem', background: '#f8fafc', borderRadius: '0.5rem', borderLeft: '3px solid #0ea5e9', fontSize: '0.9rem' }}>
-                                                        <span dangerouslySetInnerHTML={{ __html: formattedLine }} />
-                                                    </div>
-                                                );
-                                            }
-
-                                            return (
-                                                <div key={i} style={{ marginBottom: line.trim() ? '0.25rem' : '0' }}>
-                                                    <span dangerouslySetInnerHTML={{ __html: formattedLine }} />
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
+        <>
+            <div className="ide-synth-left">
+                {intro}
+                <p className="ide-synth-label">Tu idea en una frase</p>
+                <p className="ide-template ide-sentence" aria-live="polite">
+                    {parts.map((part, index) => (part.slot
+                        ? <mark key={index} data-filled={part.filled}>{part.text}</mark>
+                        : <React.Fragment key={index}>{part.text}</React.Fragment>))}
+                </p>
+                <p className="ide-hint">
+                    Se arma sola mientras completas el formulario. Léela en voz alta: si necesitas explicarla, todavía no está lista.
+                </p>
+                {showExamples && (
+                    <div className="ide-examples">
+                        <span className="ide-label" id="ide-ejemplos-label">Mira cómo queda con un ejemplo</span>
+                        {EXAMPLE_GROUPS.map((grupo) => (
+                            <div key={grupo} className="ide-example-group">
+                                <small id={`ide-ej-${grupo.length}`}>{grupo}</small>
+                                <div className="ide-verbs" role="group" aria-labelledby={`ide-ej-${grupo.length}`}>
+                                    {EJEMPLOS.filter((example) => example.grupo === grupo).map((example) => (
+                                        <button
+                                            key={example.nombre}
+                                            type="button"
+                                            className="ide-chip"
+                                            aria-pressed={currentExample === example}
+                                            onClick={() => update(exampleFields(example))}
+                                        >
+                                            {example.nombre}
+                                        </button>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
+                            </div>
+                        ))}
+                        {currentExample && (
+                            <button
+                                type="button"
+                                className="ide-link"
+                                onClick={() => update({ ...Object.fromEntries(EXAMPLE_KEYS.map((key) => [key, ''])), nivel: 'Pregrado' })}
+                            >
+                                Quitar el ejemplo y escribir el mío
+                            </button>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            <form className="ide-panel ide-form" onSubmit={generateIdeas} noValidate>
+                <div className="ide-form-pair">
+                    <div className="input-group">
+                        <label htmlFor="ide-nivel">Nivel</label>
+                        <select id="ide-nivel" className="input-field" value={wb.nivel || 'Pregrado'} onChange={field('nivel')}>
+                            <option value="Pregrado">Pregrado</option>
+                            <option value="Especialización">Especialización</option>
+                            <option value="Maestría">Maestría</option>
+                            <option value="Doctorado">Doctorado</option>
+                        </select>
+                    </div>
+                    <Campo id="ide-programa" label="Programa académico" value={wb.programa || ''} onChange={field('programa')} placeholder="Ej: Zootecnia, Ingeniería de Sistemas" autofill="Zootecnia" />
+                </div>
+
+                <Campo
+                    id="ide-problema"
+                    label="¿Qué problema has observado?"
+                    value={wb.problema || ''}
+                    onChange={field('problema')}
+                    placeholder="Ej: alta mortalidad de terneros en su primer mes"
+                    hint="Escríbelo como algo que ya ocurre, no como algo que falta («no hay una app»)."
+                />
+
+                <div className="ide-form-trio">
+                    <Campo id="ide-quien" label="¿A quiénes afecta?" value={wb.quien || ''} onChange={field('quien')} placeholder="Ej: pequeños productores" />
+                    <Campo id="ide-donde" label="¿Dónde?" value={wb.donde || ''} onChange={field('donde')} placeholder="Ej: Montería, Córdoba" />
+                    <Campo id="ide-cuando" label="¿Cuándo? (opcional)" value={wb.cuando || ''} onChange={field('cuando')} placeholder="Ej: primer semestre de 2026" />
+                </div>
+
+                <div className="input-group">
+                    <span className="ide-label" id="ide-alcance-label">¿Qué quieres lograr?</span>
+                    <div className="ide-alcances" role="group" aria-labelledby="ide-alcance-label">
+                        {ALCANCES.map((item) => (
+                            <button
+                                key={item.id}
+                                type="button"
+                                className="ide-alcance"
+                                aria-pressed={wb.alcance === item.id}
+                                onClick={() => update({ alcance: wb.alcance === item.id ? '' : item.id })}
+                            >
+                                <b>{item.label}</b>
+                                <small>{item.hint}</small>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <Campo
+                    id="ide-tema"
+                    label="Tema de interés (para la IA)"
+                    value={wb.temas || ''}
+                    onChange={field('temas')}
+                    placeholder="Ej: salud animal, deserción universitaria"
+                    autofill="salud animal"
+                />
+
+                {error && (
+                    <div className="ide-alert" role="alert">
+                        <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: '0.1rem' }} />
+                        <span>{error}</span>
                     </div>
                 )}
 
+                <button type="submit" className="ide-btn ide-btn--primary" disabled={isGenerating} style={{ justifyContent: 'center', padding: '0.8rem 1rem' }}>
+                    {isGenerating
+                        ? <><span className="ide-spinner" aria-hidden="true" /> Generando ideas…</>
+                        : <><Cpu size={17} /> {ideas.length > 0 ? 'Generar otras 5 ideas' : '¿Te falta inspiración? Sugerir 5 ideas'}</>}
+                </button>
+            </form>
+
+            {ideas.length > 0 && (
+                <section className="ide-results" aria-live="polite">
+                    <h3>Ideas sugeridas para ti</h3>
+                    <ol className="ide-ideas">
+                        {ideas.map((idea) => {
+                            const isApplied = applied === idea.idea;
+                            return (
+                                <li key={idea.idea} data-applied={isApplied}>
+                                    <div>
+                                        <p className="ide-idea-main">{idea.idea}</p>
+                                        {(() => {
+                                            const meta = ALCANCES.find((item) => item.id === idea.alcance);
+                                            const tags = [
+                                                meta && `Objetivo: ${meta.label}`,
+                                                meta && `Pregunta ${meta.pregunta.toLowerCase()}`,
+                                                idea.verbo && `Verbo: ${idea.verbo}`,
+                                                [idea.poblacion, idea.lugar, idea.periodo].filter(Boolean).join(' · '),
+                                            ].filter(Boolean);
+                                            return tags.length > 0 && (
+                                                <ul className="ide-idea-tags">{tags.map((tag) => <li key={tag}>{tag}</li>)}</ul>
+                                            );
+                                        })()}
+                                        <dl>
+                                            {idea.titulo && <div><dt>Título sugerido</dt><dd>{idea.titulo}</dd></div>}
+                                            {idea.pregunta && <div><dt>Pregunta sugerida</dt><dd>{idea.pregunta}</dd></div>}
+                                            {idea.como && <div><dt>Cómo hacerlo</dt><dd>{idea.como}</dd></div>}
+                                            {idea.limites && <div><dt>Posibles limitaciones</dt><dd>{idea.limites}</dd></div>}
+                                        </dl>
+                                        <div className="ide-idea-actions">
+                                            {isApplied ? (
+                                                <div className="ide-feedback ide-feedback--ok" role="status">
+                                                    <CheckCircle2 size={16} />
+                                                    <span>Idea guardada: tu frase, el Título y la Pregunta ya la tienen.</span>
+                                                </div>
+                                            ) : confirming === idea.idea ? (
+                                                <div className="ide-confirm" role="alert">
+                                                    <span>Esto reemplaza el problema, la población, el título y la pregunta que ya tienes.</span>
+                                                    <button type="button" className="ide-btn ide-btn--primary" onClick={() => applyIdea(idea)}>Reemplazar</button>
+                                                    <button type="button" className="ide-btn ide-btn--ghost" onClick={() => setConfirming(null)}>Cancelar</button>
+                                                </div>
+                                            ) : (
+                                                <button type="button" className="ide-btn ide-btn--primary" onClick={() => chooseIdea(idea)}>
+                                                    <CheckCircle2 size={16} /> Usar esta idea
+                                                </button>
+                                            )}
+                                            {isApplied && onNavigate && (
+                                                <div className="ide-idea-next">
+                                                    <button type="button" className="ide-btn ide-btn--primary" onClick={() => onNavigate('titulo')}>
+                                                        Seguir con el título <ArrowRight size={16} />
+                                                    </button>
+                                                    <button type="button" className="ide-btn ide-btn--ghost" onClick={() => onNavigate('pregunta')}>
+                                                        Ver la pregunta
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </li>
+                            );
+                        })}
+                    </ol>
+                </section>
+            )}
+        </>
+    );
+};
+
+/* ---------- Presentación ---------- */
+
+const Ideacion = ({ onNavigate }) => {
+    const [storedIdea, setStoredIdea] = useProjectField('idea', EMPTY_WORKBOOK);
+    const wb = useMemo(() => ({ ...EMPTY_WORKBOOK, ...(storedIdea || {}) }), [storedIdea]);
+    const setWb = useCallback((update) => {
+        setStoredIdea((prev) => {
+            const current = { ...EMPTY_WORKBOOK, ...(prev || {}) };
+            return typeof update === 'function' ? update(current) : update;
+        });
+    }, [setStoredIdea]);
+    const [copied, setCopied] = useState('');
+    const field = (key) => (event) => setWb((prev) => ({ ...prev, [key]: event.target.value }));
+
+    const copyFicha = async () => {
+        try {
+            await navigator.clipboard.writeText(buildFicha(wb));
+            setCopied('Ficha copiada al portapapeles.');
+        } catch {
+            setCopied('No se pudo copiar. Selecciona el texto de la ficha y cópialo manualmente.');
+        }
+    };
+
+    const copyControls = (
+        <>
+            <div className="ide-row">
+                <span>Tus respuestas se guardan en tu proyecto.</span>
+                <button type="button" className="ide-btn ide-btn--ghost" onClick={copyFicha}>
+                    <Clipboard size={15} /> Copiar mi ficha
+                </button>
             </div>
-            <style>{`
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-      `}</style>
-        </div>
+            {copied && <p className="ide-hint" role="status">{copied}</p>}
+        </>
+    );
+
+    const renderSlide = ({ slide, heading, goTo, sectionMinutes, totalMinutes }) => ({
+        portada: (
+            <>
+                <div>
+                    {heading}
+                    <p>
+                        Todo gran proyecto comienza con la identificación de una <strong>situación problemática</strong> o una <strong>oportunidad de mejora</strong>.
+                    </p>
+                    <p>
+                        No basta con tener una «buena idea»: hay que validar que responda a una necesidad real de una población específica.
+                    </p>
+                    <p><strong>Al terminar esta clase podrás:</strong></p>
+                    <ul className="ide-bullets">
+                        <li>Distinguir un problema de una solución y de un síntoma.</li>
+                        <li>Construir un árbol de problemas con causas y efectos.</li>
+                        <li>Delimitar población, lugar y periodo.</li>
+                        <li>Valorar la viabilidad y el impacto de tu idea.</li>
+                        <li>Redactar tu idea de investigación en una frase.</li>
+                    </ul>
+                </div>
+                <div className="ide-panel">
+                    <h3>Plan de la clase · {totalMinutes} minutos</h3>
+                    <ol className="ide-agenda">
+                        {SECTIONS.map((section) => (
+                            <li key={section.id}>
+                                <button type="button" onClick={() => goTo(SLIDES.findIndex((item) => item.section === section.id))}>
+                                    <span>{section.label}</span>
+                                    <small>{SLIDES.filter((item) => item.section === section.id).map((item) => item.title).join(' · ')}</small>
+                                    <b>{sectionMinutes(section.id)} min</b>
+                                </button>
+                            </li>
+                        ))}
+                    </ol>
+                    <p className="ide-hint">Ten a mano papel y lápiz. Lo que escribas en los ejercicios se reúne al final en tu ficha de idea.</p>
+                </div>
+            </>
+        ),
+        fuentes: (
+            <>
+                <div>
+                    {heading}
+                    <p>Las ideas de investigación rara vez aparecen de la nada. Casi siempre vienen de una de estas cuatro fuentes.</p>
+                    <ul className="ide-list">
+                        <li><Users size={18} /><span><b>Tu experiencia</b>Lo que has visto en prácticas, trabajo, voluntariado o tu propio barrio.</span></li>
+                        <li><MapPin size={18} /><span><b>Necesidades del entorno</b>Problemas que una comunidad, empresa o institución ya reconoce.</span></li>
+                        <li><BookOpen size={18} /><span><b>Vacíos en la literatura</b>La sección «futuras investigaciones» de artículos y tesis recientes.</span></li>
+                        <li><Compass size={18} /><span><b>Líneas de tu programa</b>Grupos y semilleros que ya tienen datos, asesores y proyectos en curso.</span></li>
+                    </ul>
+                </div>
+                <div className="ide-panel">
+                    <h3>Actividad individual: tus temas de interés</h3>
+                    <Campo
+                        id="ide-temas"
+                        label="Escribe tres temas que te gustaría investigar"
+                        value={wb.temas}
+                        onChange={field('temas')}
+                        placeholder="Ej: deserción universitaria, agricultura de precisión, salud mental en adolescentes"
+                        multiline
+                        rows={4}
+                    />
+                    <p>Para discutir en parejas: ¿de cuál de las cuatro fuentes salió cada tema? ¿Cuál conoces de primera mano?</p>
+                </div>
+            </>
+        ),
+        criterios: (
+            <>
+                <div>
+                    {heading}
+                    <p>Antes de enamorarte de una idea, pásala por cuatro criterios. Si falla en uno, se puede ajustar; si falla en varios, conviene cambiarla.</p>
+                    <p className="ide-hint">Para discutir: de tus tres temas, ¿cuál cumple mejor los cuatro criterios? Marca ese y trabaja con él el resto de la clase.</p>
+                </div>
+                <Pestanas title="Los cuatro criterios" name="criterios" items={CRITERIA} />
+            </>
+        ),
+        problema: (
+            <>
+                <div>
+                    {heading}
+                    <p>
+                        Un <strong>problema</strong> es un estado negativo que ya existe: algo que le ocurre a alguien y que se puede observar o medir.
+                    </p>
+                    <p>
+                        «Falta una app» no es un problema, es una solución disfrazada. El problema real podría ser «baja productividad», y la app solo una de varias formas de atenderlo.
+                    </p>
+                    <p className="ide-hint">
+                        <BookOpen size={15} style={{ verticalAlign: '-2px', marginRight: '0.35rem' }} />
+                        Prueba rápida: si tu frase empieza con «falta», «no hay» o «no existe», pregúntate qué consecuencia sufre la gente.
+                    </p>
+                </div>
+                <Opciones title="Practica: ¿problema o falta de solución?" questions={STATEMENTS} />
+            </>
+        ),
+        porques: (
+            <>
+                <div>
+                    {heading}
+                    <p>
+                        Un <strong>síntoma</strong> es lo que se ve; la <strong>causa</strong> es lo que lo produce. Si tu proyecto ataca el síntoma, el problema vuelve a aparecer.
+                    </p>
+                    <p>La técnica es sencilla: toma lo que observas y pregunta «¿por qué?» varias veces, hasta llegar a algo sobre lo que sí puedes intervenir.</p>
+                    <p className="ide-hint">No siempre son exactamente cinco. Detente cuando la respuesta ya no dependa de ti o de tu disciplina.</p>
+                </div>
+                <Porques />
+            </>
+        ),
+        arbol: (
+            <>
+                <div>
+                    {heading}
+                    <p>
+                        Para formular bien hay que ir a la raíz y no quedarse en el síntoma. El árbol de problemas ordena lo que observas en tres niveles.
+                    </p>
+                    <p>
+                        <strong>Raíz (causas):</strong> ¿por qué ocurre esto?<br />
+                        <strong>Tronco (problema central):</strong> la situación negativa principal.<br />
+                        <strong>Ramas (efectos):</strong> ¿qué consecuencias trae?
+                    </p>
+                    <p className="ide-hint">En la siguiente diapositiva vas a construir el tuyo.</p>
+                </div>
+                <Arbol />
+            </>
+        ),
+        miarbol: (
+            <>
+                <div>
+                    {heading}
+                    <p>Toma el tema que elegiste y conviértelo en un árbol. Empieza por el tronco y luego sube y baja.</p>
+                    <ul className="ide-bullets">
+                        <li>El problema se redacta como un hecho negativo, no como una carencia.</li>
+                        <li>Cada causa responde a «¿por qué ocurre?».</li>
+                        <li>Cada efecto responde a «¿qué consecuencia trae?».</li>
+                    </ul>
+                    <p className="ide-hint">Trabajo individual 4 minutos. Luego intercambia tu árbol con un compañero: ¿alguna causa es en realidad un efecto?</p>
+                </div>
+                <div className="ide-panel ide-workbook">
+                    <h3>Tu árbol de problemas</h3>
+                    <fieldset>
+                        <legend>Ramas · Efectos</legend>
+                        <div className="ide-trio">
+                            {['efecto1', 'efecto2', 'efecto3'].map((key, i) => (
+                                <input key={key} type="text" className="input-field" aria-label={`Efecto ${i + 1}`} placeholder={`Efecto ${i + 1}`} value={wb[key]} onChange={field(key)} />
+                            ))}
+                        </div>
+                    </fieldset>
+                    <Campo id="ide-wb-problema" label="Tronco · Problema central" value={wb.problema} onChange={field('problema')} placeholder="Ej: Bajo rendimiento en matemáticas en primer semestre" />
+                    <fieldset>
+                        <legend>Raíz · Causas</legend>
+                        <div className="ide-trio">
+                            {['causa1', 'causa2', 'causa3'].map((key, i) => (
+                                <input key={key} type="text" className="input-field" aria-label={`Causa ${i + 1}`} placeholder={`Causa ${i + 1}`} value={wb[key]} onChange={field(key)} />
+                            ))}
+                        </div>
+                    </fieldset>
+                </div>
+            </>
+        ),
+        poblacion: (
+            <>
+                <div>
+                    {heading}
+                    <p>
+                        Define <strong>quién sufre el problema</strong>. Entre más específico seas, más efectiva será tu solución y más fácil será recolectar datos.
+                    </p>
+                    <p>
+                        Una buena delimitación responde a quiénes son, dónde están y qué condición comparten.
+                    </p>
+                </div>
+                <Poblacion />
+            </>
+        ),
+        delimita: (
+            <>
+                <div>
+                    {heading}
+                    <p>Delimitar es decidir hasta dónde llega tu estudio. No lo hace menos importante: lo hace posible.</p>
+                    <ul className="ide-list">
+                        <li><Users size={18} /><span><b>Quién</b>La población y la condición que comparte.</span></li>
+                        <li><MapPin size={18} /><span><b>Dónde</b>La institución, municipio o región donde ocurre.</span></li>
+                        <li><Clock size={18} /><span><b>Cuándo</b>El periodo que vas a observar.</span></li>
+                    </ul>
+                </div>
+                <div className="ide-panel ide-workbook">
+                    <h3>Actividad: delimita tu problema</h3>
+                    <Campo id="ide-wb-quien" label="¿Quién sufre el problema?" value={wb.quien} onChange={field('quien')} placeholder="Ej: Los estudiantes de primer semestre de ingeniería" />
+                    <Campo id="ide-wb-donde" label="¿Dónde ocurre?" value={wb.donde} onChange={field('donde')} placeholder="Ej: una universidad pública de la región Caribe" />
+                    <Campo id="ide-wb-cuando" label="¿En qué periodo lo vas a estudiar?" value={wb.cuando} onChange={field('cuando')} placeholder="Ej: durante el año 2026" />
+                </div>
+            </>
+        ),
+        contexto: (
+            <>
+                <div>
+                    {heading}
+                    <p>
+                        Ningún problema existe en el vacío. Describe las características físicas, sociales o culturales del lugar donde ocurre.
+                    </p>
+                    <p>
+                        El mismo problema exige soluciones distintas en una ciudad con buena conectividad que en una vereda sin señal.
+                    </p>
+                    <p className="ide-hint">Para discutir: ¿qué característica del lugar que elegiste cambia la forma de abordar tu problema?</p>
+                </div>
+                <div className="ide-panel">
+                    <h3>Preguntas para describir tu entorno</h3>
+                    <ul className="ide-list">
+                        <li><MapPin size={18} /><span><b>¿Es una zona rural o urbana?</b>Define distancias, transporte y acceso a servicios.</span></li>
+                        <li><Cpu size={18} /><span><b>¿Qué recursos tecnológicos hay disponibles?</b>Internet, equipos, energía estable.</span></li>
+                        <li><Users size={18} /><span><b>¿Existen barreras culturales?</b>Idioma, costumbres, desconfianza frente a lo nuevo.</span></li>
+                    </ul>
+                </div>
+            </>
+        ),
+        antecedentes: (
+            <>
+                <div>
+                    {heading}
+                    <p>
+                        Revisa qué se ha hecho antes. No necesitas «reinventar la rueda»: puedes mejorarla, adaptarla a tu contexto o probarla con otra población.
+                    </p>
+                    <ul className="ide-list">
+                        <li><XCircle size={18} /><span><b>¿Qué soluciones han fallado antes?</b>Y por qué: costo, adopción, contexto.</span></li>
+                        <li><CheckCircle2 size={18} /><span><b>¿Qué soluciones existen en otros lugares?</b>Y qué habría que cambiar para tu caso.</span></li>
+                        <li><Search size={18} /><span><b>Dónde buscar</b>Google Académico, el repositorio de tu universidad, SciELO y Scopus.</span></li>
+                    </ul>
+                </div>
+                <div className="ide-panel ide-workbook">
+                    <h3>Actividad: encuentra dos antecedentes</h3>
+                    <p>Busca tu problema en Google Académico con dos o tres palabras clave. Anota autor, año y qué encontraron.</p>
+                    <Campo id="ide-wb-ant1" label="Antecedente 1" value={wb.antecedente1} onChange={field('antecedente1')} placeholder="Autor (año): hallazgo principal" multiline rows={2} />
+                    <Campo id="ide-wb-ant2" label="Antecedente 2" value={wb.antecedente2} onChange={field('antecedente2')} placeholder="Autor (año): hallazgo principal" multiline rows={2} />
+                    {onNavigate && (
+                        <button type="button" className="ide-btn ide-btn--ghost" onClick={() => onNavigate('referencias')}>
+                            Agregar la fuente a mis referencias <ArrowRight size={15} />
+                        </button>
+                    )}
+                </div>
+            </>
+        ),
+        viabilidad: (
+            <>
+                <div>
+                    {heading}
+                    <p>
+                        Tu idea debe ser <strong>realizable</strong> con los recursos y el tiempo disponibles. Una idea brillante que no puedes terminar no es un buen proyecto.
+                    </p>
+                    <ul className="ide-list">
+                        <li><Database size={18} /><span><b>Información</b>¿Alguien te dará acceso a los datos o a las personas?</span></li>
+                        <li><Wrench size={18} /><span><b>Conocimiento</b>¿Dominas el método o puedes aprenderlo a tiempo?</span></li>
+                        <li><Wallet size={18} /><span><b>Costo</b>¿Quién paga equipos, viajes o licencias?</span></li>
+                    </ul>
+                </div>
+                <Viabilidad />
+            </>
+        ),
+        impacto: (
+            <>
+                <div>
+                    {heading}
+                    <p>
+                        Analiza las consecuencias de tu proyecto más allá de la solución inmediata. El impacto es lo que justifica invertir tiempo y recursos en él.
+                    </p>
+                    <p>No todo proyecto impacta en las tres dimensiones. Elige las que de verdad aplican y sé concreto.</p>
+                </div>
+                <Pestanas title="Tres dimensiones para proyectar tu idea" name="impacto" items={IMPACTS} />
+            </>
+        ),
+        errores: (
+            <>
+                <div>
+                    {heading}
+                    <p>Estos son los tropiezos que más se repiten en las primeras propuestas. Reconocerlos a tiempo ahorra semanas de trabajo.</p>
+                    <p className="ide-hint">Para discutir: lee tu árbol de problemas y tu delimitación. ¿Caíste en alguno de los cinco?</p>
+                </div>
+                <div className="ide-panel">
+                    <h3>Abre cada error para ver cómo corregirlo</h3>
+                    <div className="ide-accordion">
+                        {MISTAKES.map((item, i) => (
+                            <details key={item.error} open={i === 0}>
+                                <summary>{item.error}</summary>
+                                <p><em>{item.example}</em></p>
+                                <p><strong>Cómo corregirlo:</strong> {item.fix}</p>
+                            </details>
+                        ))}
+                    </div>
+                </div>
+            </>
+        ),
+        asistente: (
+            <SintesisIA
+                wb={wb}
+                setWb={setWb}
+                onNavigate={onNavigate}
+                intro={(
+                    <>
+                        {heading}
+                        <p>Completa los datos y verás tu idea armarse en una frase. Si te falta inspiración, la IA te propone 5 ideas con esos mismos datos.</p>
+                    </>
+                )}
+            />
+        ),
+        repaso: (
+            <>
+                <div>
+                    {heading}
+                    <p>Cinco preguntas rápidas sobre lo visto. Respóndelas sin volver atrás y revisa la explicación de cada una.</p>
+                    <p className="ide-hint">Si fallas alguna, vuelve a la diapositiva del tema con la barra de progreso.</p>
+                </div>
+                <Opciones title="Cuestionario de repaso" questions={REVIEW} />
+            </>
+        ),
+        cierre: (
+            <>
+                <div>
+                    {heading}
+                    <ul className="ide-bullets">
+                        <li>Un problema es un estado negativo existente, no la ausencia de una solución.</li>
+                        <li>El árbol de problemas separa causas, problema central y efectos.</li>
+                        <li>Delimitar quién, dónde y cuándo hace posible el estudio.</li>
+                        <li>Los antecedentes muestran qué se ha hecho y qué falta.</li>
+                        <li>Una buena idea es interesante, relevante, novedosa y viable.</li>
+                    </ul>
+                </div>
+                <div className="ide-panel">
+                    <h3>Para la próxima sesión</h3>
+                    <ul className="ide-list">
+                        <li><CheckCircle2 size={18} /><span><b>Trae tu ficha de idea</b>Con el árbol, la delimitación y la frase final.</span></li>
+                        <li><CheckCircle2 size={18} /><span><b>Completa dos antecedentes</b>Con autor, año y hallazgo principal.</span></li>
+                        <li><CheckCircle2 size={18} /><span><b>Sigue con el título</b>Tu frase es el insumo para construirlo.</span></li>
+                    </ul>
+                    {copyControls}
+                </div>
+            </>
+        ),
+    })[slide.id];
+
+    return (
+        <SlideDeck
+            sections={SECTIONS}
+            slides={SLIDES}
+            storageKey={SLIDE_KEY}
+            label="Fase de Ideación"
+            renderSlide={renderSlide}
+            finish={onNavigate ? { label: 'Construir el título', onClick: () => onNavigate('titulo') } : null}
+        />
     );
 };
 

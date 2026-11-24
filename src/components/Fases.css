@@ -1,0 +1,33 @@
+/* Desarrollo de las fases del proyecto */
+.fas-toolbar { display: flex; flex-wrap: wrap; gap: 0.6rem 1rem; align-items: end; }
+.fas-toolbar .mar-campo { min-width: 10rem; }
+.fas-tabs { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.fas-tabs button {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.45rem 0.75rem; border: 1px solid #c7d2fe; border-radius: 0.7rem;
+  background: #fff; color: #3730a3; font: inherit; font-size: 0.86rem; font-weight: 600; cursor: pointer; text-align: left;
+}
+.fas-tabs button[aria-selected='true'] { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+.fas-tabs button:focus-visible { outline: 3px solid #a5b4fc; outline-offset: 2px; }
+.fas-num { display: inline-grid; place-items: center; width: 1.35rem; height: 1.35rem; border-radius: 999px; background: #e0e7ff; color: #3730a3; font-size: 0.75rem; }
+.fas-tabs button[aria-selected='true'] .fas-num { background: rgb(255 255 255 / 0.25); color: #fff; }
+.fas-add { border-style: dashed !important; }
+.fas-acts { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.4rem; }
+.fas-acts li { display: grid; grid-template-columns: minmax(0, 1fr) 2.25rem 2.25rem; gap: 0.35rem; align-items: center; }
+.fas-acts li .obj-warn { grid-column: 1 / -1; }
+.fas-move { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.fas-move button:disabled { opacity: 0.4; cursor: default; }
+.fas-del { color: #b91c1c !important; }
+.fas-ruta ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.fas-ruta li button {
+  width: 100%; display: grid; gap: 0.15rem; text-align: left; font: inherit; cursor: pointer;
+  padding: 0.6rem 0.75rem; border: 1px solid #e2e8f0; border-left: 4px solid #6366f1; border-radius: 0.6rem; background: #fff;
+}
+.fas-ruta li[data-active='true'] button { box-shadow: 0 0 0 2px #c7d2fe; }
+.fas-ruta li b { color: #1e293b; font-size: 0.9rem; }
+.fas-ruta li small { color: #64748b; font-size: 0.8rem; }
+.fas-barra { display: flex; gap: 2px; height: 0.6rem; margin-top: 0.8rem; border-radius: 999px; overflow: hidden; }
+.fas-barra span[data-n='1'] { background: #a5b4fc; }
+.fas-barra span[data-n='2'] { background: #6ee7b7; }
+.fas-barra span[data-n='3'] { background: #fcd34d; }
+.fas-barra span[data-n='4'] { background: #fda4af; }

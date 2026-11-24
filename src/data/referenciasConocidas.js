@@ -1,0 +1,38 @@
+/*
+ * Referencias completas de las teorías, autores y normas que la plataforma menciona en sus clases
+ * y en los textos que redacta. Sirven para completar con un clic una cita que el estudiante ya usa.
+ */
+export const REFERENCIAS_CONOCIDAS = [
+    { tipo: 'libro', autores: 'George, D.; Mallery, P.', anio: '2003', titulo: 'SPSS for Windows step by step: A simple guide and reference. 11.0 update', edicion: '4.ª ed.', editorial: 'Allyn & Bacon' },
+    { tipo: 'libro', autores: 'Lincoln, Y. S.; Guba, E. G.', anio: '1985', titulo: 'Naturalistic inquiry', editorial: 'Sage' },
+    { tipo: 'libro', autores: 'Hernández-Sampieri, R.; Mendoza, C.', anio: '2018', titulo: 'Metodología de la investigación: las rutas cuantitativa, cualitativa y mixta', editorial: 'McGraw-Hill' },
+    { tipo: 'articulo', autores: 'Parasuraman, A.; Zeithaml, V. A.; Berry, L. L.', anio: '1988', titulo: 'SERVQUAL: A multiple-item scale for measuring consumer perceptions of service quality', revista: 'Journal of Retailing', volumen: '64', numero: '1', paginas: '12-40' },
+    { tipo: 'articulo', autores: 'Davis, F. D.', anio: '1989', titulo: 'Perceived usefulness, perceived ease of use, and user acceptance of information technology', revista: 'MIS Quarterly', volumen: '13', numero: '3', paginas: '319-340', doi: '10.2307/249008' },
+    { tipo: 'articulo', autores: 'Venkatesh, V.; Morris, M. G.; Davis, G. B.; Davis, F. D.', anio: '2003', titulo: 'User acceptance of information technology: Toward a unified view', revista: 'MIS Quarterly', volumen: '27', numero: '3', paginas: '425-478', doi: '10.2307/30036540' },
+    { tipo: 'articulo', autores: 'Ajzen, I.', anio: '1991', titulo: 'The theory of planned behavior', revista: 'Organizational Behavior and Human Decision Processes', volumen: '50', numero: '2', paginas: '179-211', doi: '10.1016/0749-5978(91)90020-T' },
+    { tipo: 'articulo', autores: 'Rosenstock, I. M.', anio: '1974', titulo: 'Historical origins of the health belief model', revista: 'Health Education Monographs', volumen: '2', numero: '4', paginas: '328-335', doi: '10.1177/109019817400200403' },
+    { tipo: 'articulo', autores: 'Maslow, A. H.', anio: '1943', titulo: 'A theory of human motivation', revista: 'Psychological Review', volumen: '50', numero: '4', paginas: '370-396', doi: '10.1037/h0054346' },
+    { tipo: 'articulo', autores: 'Barney, J.', anio: '1991', titulo: 'Firm resources and sustained competitive advantage', revista: 'Journal of Management', volumen: '17', numero: '1', paginas: '99-120', doi: '10.1177/014920639101700108' },
+    { tipo: 'articulo', autores: 'Porter, M. E.', anio: '1979', titulo: 'How competitive forces shape strategy', revista: 'Harvard Business Review', volumen: '57', numero: '2', paginas: '137-145' },
+    { tipo: 'libro', autores: 'Herzberg, F.; Mausner, B.; Snyderman, B. B.', anio: '1959', titulo: 'The motivation to work', editorial: 'Wiley' },
+    { tipo: 'libro', autores: 'Bandura, A.', anio: '1977', titulo: 'Social learning theory', editorial: 'Prentice Hall' },
+    { tipo: 'libro', autores: 'Vygotsky, L. S.', anio: '1978', titulo: 'Mind in society: The development of higher psychological processes', editorial: 'Harvard University Press' },
+    { tipo: 'libro', autores: 'Piaget, J.', anio: '1952', titulo: 'The origins of intelligence in children', editorial: 'International Universities Press' },
+    { tipo: 'libro', autores: 'Ausubel, D. P.', anio: '1963', titulo: 'The psychology of meaningful verbal learning', editorial: 'Grune & Stratton' },
+    { tipo: 'libro', autores: 'Gardner, H.', anio: '1983', titulo: 'Frames of mind: The theory of multiple intelligences', editorial: 'Basic Books' },
+    { tipo: 'libro', autores: 'Bronfenbrenner, U.', anio: '1979', titulo: 'The ecology of human development: Experiments by nature and design', editorial: 'Harvard University Press' },
+    { tipo: 'libro', autores: 'Deci, E. L.; Ryan, R. M.', anio: '1985', titulo: 'Intrinsic motivation and self-determination in human behavior', editorial: 'Plenum Press' },
+    { tipo: 'libro', autores: 'Rogers, E. M.', anio: '1962', titulo: 'Diffusion of innovations', editorial: 'Free Press' },
+    { tipo: 'libro', autores: 'Bertalanffy, L. von', anio: '1968', titulo: 'General system theory: Foundations, development, applications', editorial: 'George Braziller' },
+    { tipo: 'libro', autores: 'Goldratt, E. M.; Cox, J.', anio: '1984', titulo: 'The goal: A process of ongoing improvement', editorial: 'North River Press' },
+    { tipo: 'libro', autores: 'Orem, D. E.', anio: '1971', titulo: 'Nursing: Concepts of practice', editorial: 'McGraw-Hill' },
+    { tipo: 'libro', autores: 'Pender, N. J.', anio: '1982', titulo: 'Health promotion in nursing practice', editorial: 'Appleton-Century-Crofts' },
+    { tipo: 'libro', autores: 'Kemmis, S.; McTaggart, R.', anio: '1988', titulo: 'The action research planner', edicion: '3.ª ed.', editorial: 'Deakin University Press' },
+    { tipo: 'informe', autores: 'Chapman, P.; Clinton, J.; Kerber, R.; Khabaza, T.; Reinartz, T.; Shearer, C.; Wirth, R.', anio: '2000', titulo: 'CRISP-DM 1.0: Step-by-step data mining guide', editorial: 'SPSS' },
+    { tipo: 'ley', titulo: 'Ley 100 de 1993', anio: '1993', descripcion: 'Por la cual se crea el sistema de seguridad social integral y se dictan otras disposiciones', fecha: '23 de diciembre', fuente: 'Congreso de la República de Colombia' },
+    { tipo: 'ley', titulo: 'Ley 1751 de 2015', anio: '2015', descripcion: 'Por medio de la cual se regula el derecho fundamental a la salud y se dictan otras disposiciones', fecha: '16 de febrero', fuente: 'Congreso de la República de Colombia' },
+    { tipo: 'ley', titulo: 'Ley 1581 de 2012', anio: '2012', descripcion: 'Por la cual se dictan disposiciones generales para la protección de datos personales', fecha: '17 de octubre', fuente: 'Congreso de la República de Colombia' },
+    { tipo: 'ley', titulo: 'Resolución 8430 de 1993', anio: '1993', descripcion: 'Por la cual se establecen las normas científicas, técnicas y administrativas para la investigación en salud', fecha: '4 de octubre', fuente: 'Ministerio de Salud de Colombia' },
+    { tipo: 'ley', titulo: 'Ley 115 de 1994', anio: '1994', descripcion: 'Por la cual se expide la Ley General de Educación', fecha: '8 de febrero', fuente: 'Congreso de la República de Colombia' },
+    { tipo: 'ley', titulo: 'Ley 30 de 1992', anio: '1992', descripcion: 'Por la cual se organiza el servicio público de la Educación Superior', fecha: '28 de diciembre', fuente: 'Congreso de la República de Colombia' },
+];

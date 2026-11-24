@@ -1,0 +1,36 @@
+/* Botón «Citar» de la barra de las clases */
+.cit { position: relative; }
+.cit-btn {
+  display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.75rem;
+  border: 1px solid #c7d2fe; border-radius: 999px; background: #eef2ff; color: #3730a3;
+  font: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer;
+}
+.cit-btn:hover, .cit-btn[aria-expanded='true'] { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+.cit-btn:focus-visible { outline: 3px solid #a5b4fc; outline-offset: 2px; }
+.cit-pop {
+  position: absolute; top: calc(100% + 0.5rem); right: 0; z-index: 40;
+  width: min(26rem, calc(100vw - 2rem)); max-height: min(28rem, 70vh);
+  display: flex; flex-direction: column; gap: 0.5rem; padding: 0.85rem;
+  background: #fff; color: #1e293b; border: 1px solid #c7d2fe; border-radius: 0.9rem;
+  box-shadow: 0 20px 45px -18px rgb(15 23 42 / 0.45);
+}
+.cit-head { display: flex; align-items: center; justify-content: space-between; }
+.cit-x { display: grid; place-items: center; width: 1.8rem; height: 1.8rem; border: 0; border-radius: 0.5rem; background: #f1f5f9; color: #475569; cursor: pointer; }
+.cit-donde { margin: 0; font-size: 0.82rem; color: #047857; }
+.cit-donde--falta { color: #b45309; font-weight: 600; }
+.cit-buscar { display: flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.6rem; border: 1px solid #e2e8f0; border-radius: 0.6rem; color: #94a3b8; }
+.cit-buscar input { flex: 1; border: 0; outline: 0; font: inherit; font-size: 0.88rem; background: transparent; color: #1e293b; }
+.cit-lista { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: grid; gap: 0.45rem; }
+.cit-lista li { padding: 0.55rem 0.65rem; border: 1px solid #e2e8f0; border-radius: 0.65rem; display: grid; gap: 0.4rem; }
+.cit-lista small { color: #475569; font-size: 0.8rem; line-height: 1.4; }
+.cit-lista li > div { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.cit-lista li button {
+  padding: 0.3rem 0.65rem; border: 1px solid #c7d2fe; border-radius: 999px; background: #eef2ff; color: #3730a3;
+  font: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer;
+}
+.cit-lista li button:hover:not(:disabled) { background: #4f46e5; color: #fff; }
+.cit-lista li button:disabled { opacity: 0.5; cursor: not-allowed; }
+.cit-ir { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.5rem; border: 1px dashed #a5b4fc; border-radius: 0.65rem; background: #fff; color: #3730a3; font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+.cit-vacio p { margin: 0 0 0.5rem; font-size: 0.9rem; color: #475569; }
+.cit-ok { position: absolute; top: calc(100% + 0.4rem); right: 0; z-index: 30; padding: 0.3rem 0.6rem; border-radius: 0.5rem; background: #d1fae5; color: #047857; font-size: 0.78rem; white-space: nowrap; pointer-events: none; }
+@media (max-width: 640px) { .cit-btn span { display: none; } }

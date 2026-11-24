@@ -1,654 +1,684 @@
-import React, { useState } from 'react';
-import { Microscope, Activity, Eye, Sliders, Settings, GitMerge, FileSearch, LineChart, Users, Sparkles } from 'lucide-react';
-import { suggestMethodology, justifyMethodology, generateMethodologyStructure, generateMethodologyPhases } from '../services/groqService';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+    AlertTriangle, BarChart3, BookOpenCheck, Calculator, CalendarDays, CheckCircle2, ClipboardList, Compass, DollarSign, Layers, Microscope,
+    Plus, ShieldCheck, Target, Trash2, Users, XCircle,
+} from 'lucide-react';
+import SlideDeck, { Opciones, Pestanas } from './deck/SlideDeck';
+import { useProject, useProjectField } from '../context/ProjectContext';
+import { useAutoGuardar } from '../hooks/useAutoGuardar';
+import { partesObjetivos } from '../services/coherencia';
+import { TIPO_ALCANCE } from '../data/ejemplos';
+import {
+    CATEGORIAS, CONFIANZAS, DISENOS, ENFOQUES, FASES, FUENTES, MUESTREOS, SOFTWARE, TECNICAS, TECNICAS_ANALISIS, TIPOS, VALIDACIONES,
+    periodoLabel, redactarAnalisis, validacionesDe, redactarDiseno, redactarEnfoque, redactarInstrumentos, redactarPoblacion, redactarTipo, tamanoMuestra,
+} from '../data/metodologia';
+import { SECTIONS, SLIDES } from '../data/metodologiaClase';
+import { Generica } from './deck/Contenido';
+import ValidacionModal from './ValidacionModal';
+import { VALIDACION_DETALLE } from '../data/validacion';
+import './Titulo.css';
+import './Planteamiento.css';
+import './Objetivos.css';
+import './Justificacion.css';
+import './Marco.css';
+import './Alcances.css';
+import './Metodologia.css';
 
-const Metodologia = () => {
-    const [title, setTitle] = useState('');
-    const [enfoque, setEnfoque] = useState('Cuantitativo');
-    const [tipo, setTipo] = useState('Exploratoria');
-    const [diseno, setDiseno] = useState('Experimental');
-    const [objetivos, setObjetivos] = useState('');
-    const [explicacion, setExplicacion] = useState('');
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [error, setError] = useState('');
+/* Clase larga de 4 horas: el contenido de cada diapositiva está en data/metodologiaClase.js. */
 
-    const [showGuiaEnfoque, setShowGuiaEnfoque] = useState(false);
-    const [showGuiaTipo, setShowGuiaTipo] = useState(false);
-    const [showGuiaDiseno, setShowGuiaDiseno] = useState(false);
+const SLIDE_KEY = 'projectsia:metodologia:diapositiva';
 
-    const handleSuggest = async () => {
-        if (!title.trim()) {
-            setError('Por favor ingresa el título de tu investigación');
-            return;
-        }
+/* ---------- Utilidades ---------- */
 
-        setIsGenerating(true);
-        setError('');
-        try {
-            const result = await suggestMethodology(title);
-            
-            const lines = result.split('\n');
-            let newEnfoque = enfoque;
-            let newTipo = tipo;
-            let newDiseno = diseno;
-            let explanationText = '';
-            let parsingExplanation = false;
+const clean = (text) => String(text || '').trim().replace(/[\s.,;:]+$/, '');
+const lower = (text) => (text ? text.charAt(0).toLowerCase() + text.slice(1) : '');
+const money = (value) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number(value) || 0);
+const uid = () => Math.random().toString(36).slice(2, 10);
 
-            for (const line of lines) {
-                if (line.startsWith('ENFOQUE:')) newEnfoque = line.replace('ENFOQUE:', '').trim();
-                else if (line.startsWith('TIPO:')) newTipo = line.replace('TIPO:', '').trim();
-                else if (line.startsWith('DISEÑO:')) newDiseno = line.replace('DISEÑO:', '').trim();
-                else if (line.startsWith('EXPLICACION:')) {
-                    parsingExplanation = true;
-                    explanationText += line.replace('EXPLICACION:', '').trim() + '\n';
-                }
-                else if (parsingExplanation) {
-                    explanationText += line + '\n';
-                }
-            }
+const SUBTITULOS = [
+    { key: 'enfoque', label: 'Enfoque de investigación', icon: Compass },
+    { key: 'tipo', label: 'Tipos de investigación', icon: Layers },
+    { key: 'diseno', label: 'Diseños de investigación', icon: Microscope },
+    { key: 'poblacion', label: 'Población y muestra', icon: Users },
+    { key: 'analisis', label: 'Plan de análisis de la información', icon: BarChart3 },
+    { key: 'instrumentos', label: 'Instrumentos de recolección de información', icon: ClipboardList },
+    { key: 'cronograma', label: 'Cronograma', icon: CalendarDays },
+    { key: 'presupuesto', label: 'Presupuesto', icon: DollarSign },
+];
 
-            setEnfoque(newEnfoque || 'Cuantitativo');
-            setTipo(newTipo || 'Exploratoria');
-            setDiseno(newDiseno || 'Experimental');
-            setExplicacion(explanationText.trim());
-        } catch (error) {
-            console.error('Error:', error);
-            setError(error.message || 'Error al sugerir metodología');
-        } finally {
-            setIsGenerating(false);
-        }
+const MET_FORM = {
+    enfoqueTexto: '', tipoTexto: '', disenoTexto: '',
+    poblacion: { descripcion: '', unidad: '', inclusion: '', exclusion: '', muestreo: '', muestraTexto: '' },
+    analisis: [],
+    instrumentos: [{ id: 'i1', tecnica: 'Encuesta', instrumento: 'cuestionario', aplicaA: '', objetivo: '', validez: 'juicio de expertos' }],
+    cronograma: [],
+};
+
+const CRONO_BASE = [
+    { fase: 'Preparación', actividad: 'Ajustar la propuesta con el asesor', inicio: 1, fin: 1 },
+    { fase: 'Preparación', actividad: 'Diseñar y validar los instrumentos', inicio: 1, fin: 2 },
+    { fase: 'Recolección de datos', actividad: 'Aplicar los instrumentos', inicio: 2, fin: 3 },
+    { fase: 'Análisis', actividad: 'Organizar y analizar los datos', inicio: 3, fin: 4 },
+    { fase: 'Informe y socialización', actividad: 'Redactar el informe final', inicio: 4, fin: 5 },
+    { fase: 'Informe y socialización', actividad: 'Socializar los resultados', inicio: 6, fin: 6 },
+];
+
+/* ---------- Piezas visuales ---------- */
+
+
+
+// Calculadora interactiva de muestra (en la clase y en la construcción).
+const Calculadora = ({ calc, onChange, compacta = false }) => {
+    const n = tamanoMuestra(calc);
+    return (
+        <div className={compacta ? 'met-calc met-calc--compacta' : 'ide-panel met-calc'}>
+            {!compacta && <h3><Calculator size={18} aria-hidden="true" /> Calculadora de muestra</h3>}
+            <div className="met-calc-grid">
+                <label className="mar-campo">
+                    <span>Población</span>
+                    <select className="input-field" value={calc.finita ? 'finita' : 'infinita'} onChange={(e) => onChange({ finita: e.target.value === 'finita' })}>
+                        <option value="finita">Finita (se conoce el total)</option>
+                        <option value="infinita">Infinita o desconocida</option>
+                    </select>
+                </label>
+                {calc.finita && (
+                    <label className="mar-campo">
+                        <span>Tamaño de la población (N)</span>
+                        <input className="input-field" type="number" min="1" value={calc.N} onChange={(e) => onChange({ N: Number(e.target.value) })} />
+                    </label>
+                )}
+                <label className="mar-campo">
+                    <span>Nivel de confianza</span>
+                    <select className="input-field" value={calc.Z} onChange={(e) => onChange({ Z: Number(e.target.value) })}>
+                        {CONFIANZAS.map((c) => <option key={c.z} value={c.z}>{c.label}</option>)}
+                    </select>
+                </label>
+                <label className="mar-campo">
+                    <span>Margen de error</span>
+                    <select className="input-field" value={calc.e} onChange={(e) => onChange({ e: Number(e.target.value) })}>
+                        {[0.03, 0.05, 0.07, 0.1].map((x) => <option key={x} value={x}>{Math.round(x * 100)} %</option>)}
+                    </select>
+                </label>
+            </div>
+            <p className="met-calc-result"><b>{n}</b> {n === 1 ? 'participante' : 'participantes'}</p>
+            <small className="ide-field-hint">
+                {calc.finita ? 'n = N·Z²·p·q / (e²·(N−1) + Z²·p·q)' : 'n = Z²·p·q / e²'}, con p = q = 0,5 (máxima variabilidad).
+            </small>
+        </div>
+    );
+};
+
+/* ---------- Estado del constructor ---------- */
+
+const useMetState = () => {
+    const { data } = useProject();
+    const [form, setForm] = useProjectField('metodologiaForm', MET_FORM);
+    const [enfoque, setEnfoque] = useProjectField('enfoque', '');
+    const [tipo, setTipo] = useProjectField('tipoInvestigacion', '');
+    const [diseno, setDiseno] = useProjectField('diseno', '');
+    const [popTipo, setPopTipo] = useProjectField('poblacionTipo', 'finita');
+    const [popN, setPopN] = useProjectField('poblacionTamano', 1000);
+    const [conf, setConf] = useProjectField('muestraConfianza', 1.96);
+    const [err, setErr] = useProjectField('muestraError', 0.05);
+    const [unidad, setUnidad] = useProjectField('ganttUnidad', 'mensual');
+    const [periodos, setPeriodos] = useProjectField('ganttPeriodos', 6);
+    const [presupuesto, setPresupuesto] = useProjectField('presupuesto', []);
+    const setters = {
+        metEnfoque: useProjectField('metEnfoque', '')[1],
+        metTipo: useProjectField('metTipo', '')[1],
+        metDiseno: useProjectField('metDiseno', '')[1],
+        poblacionSugerida: useProjectField('poblacionSugerida', '')[1],
+        metPlanAnalisis: useProjectField('metPlanAnalisis', '')[1],
+        instrumentos: useProjectField('instrumentos', '')[1],
+        cronogramaItems: useProjectField('cronogramaItems', [])[1],
+        metodologia: useProjectField('metodologia', '')[1],
     };
-
-    const handleJustify = async () => {
-        if (!title.trim()) {
-            setError('Por favor ingresa el título de tu investigación');
-            return;
-        }
-
-        setIsGenerating(true);
-        setError('');
-        try {
-            const justification = await justifyMethodology(title, enfoque, tipo, diseno);
-            setExplicacion(justification);
-        } catch (error) {
-            console.error('Error:', error);
-            setError(error.message || 'Error al justificar metodología');
-        } finally {
-            setIsGenerating(false);
-        }
+    const f = { ...MET_FORM, ...(form || {}) };
+    f.poblacion = { ...MET_FORM.poblacion, ...(f.poblacion || {}) };
+    if (!Array.isArray(f.analisis)) f.analisis = [];
+    if (!Array.isArray(f.instrumentos) || f.instrumentos.length === 0) f.instrumentos = MET_FORM.instrumentos;
+    if (!Array.isArray(f.cronograma)) f.cronograma = [];
+    const update = (patch) => setForm((prev) => ({ ...MET_FORM, ...(prev || {}), ...patch }));
+    const idea = data.idea || {};
+    const t = data.tituloForm || {};
+    const { especificos } = partesObjetivos(data.objetivos);
+    const calc = { finita: popTipo !== 'infinita', N: Number(popN) || 0, Z: Number(conf) || 1.96, e: Number(err) || 0.05 };
+    const setCalc = (patch) => {
+        if ('finita' in patch) setPopTipo(patch.finita ? 'finita' : 'infinita');
+        if ('N' in patch) setPopN(patch.N);
+        if ('Z' in patch) setConf(patch.Z);
+        if ('e' in patch) setErr(patch.e);
     };
-
-    const handleGuide = async () => {
-        if (!title.trim()) {
-            setError('Por favor ingresa el título de tu investigación');
-            return;
-        }
-
-        setIsGenerating(true);
-        setError('');
-        try {
-            const outline = await generateMethodologyStructure(title, enfoque, tipo, diseno);
-            setExplicacion(outline);
-        } catch (error) {
-            console.error('Error:', error);
-            setError(error.message || 'Error al generar la guía estructurada');
-        } finally {
-            setIsGenerating(false);
-        }
+    return {
+        data, f, update, setters,
+        enfoque, setEnfoque, tipo, setTipo, diseno, setDiseno,
+        calc, setCalc, unidad, setUnidad, periodos: Number(periodos) || 6, setPeriodos,
+        presupuesto: Array.isArray(presupuesto) ? presupuesto : [], setPresupuesto,
+        especificos,
+        quien: clean(t.quien || idea.quien), donde: clean(t.donde || idea.donde),
+        tipoEsperado: TIPOS.find((x) => x.alcance === (TIPO_ALCANCE[idea.alcance] || '').split(' ')[0])?.id || '',
+        alcancesTexto: String(data.alcances || ''),
     };
+};
 
-    const handlePhases = async () => {
-        if (!title.trim()) {
-            setError('Por favor ingresa el título de tu investigación');
-            return;
-        }
+const redactarTodo = (s) => ({
+    metEnfoque: redactarEnfoque({ enfoque: s.enfoque, texto: s.f.enfoqueTexto }),
+    metTipo: redactarTipo({ tipo: s.tipo, texto: s.f.tipoTexto }),
+    metDiseno: redactarDiseno({ enfoque: s.enfoque, diseno: s.diseno, texto: s.f.disenoTexto }),
+    poblacionSugerida: redactarPoblacion(s.f.poblacion, s.calc),
+    metPlanAnalisis: redactarAnalisis(s.f.analisis),
+    instrumentos: redactarInstrumentos(s.f.instrumentos),
+});
 
-        setIsGenerating(true);
-        setError('');
-        try {
-            const structure = await generateMethodologyPhases(title, objetivos, enfoque, tipo, diseno);
-            setExplicacion(structure);
-        } catch (error) {
-            console.error('Error:', error);
-            setError(error.message || 'Error al generar las fases');
-        } finally {
-            setIsGenerating(false);
-        }
+/* ---------- Constructor ---------- */
+
+const Campo = ({ id, label, value, onChange, placeholder, rows = 1, className = '' }) => (
+    <label className={`mar-campo ${className}`} htmlFor={id}>
+        <span>{label}</span>
+        {rows > 1
+            ? <textarea id={id} className="textarea-field" rows={rows} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+            : <input id={id} className="input-field" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />}
+    </label>
+);
+
+const Chips = ({ options, value, onPick, label, sugerido }) => (
+    <div className="alc-tipos" role="radiogroup" aria-label={label}>
+        {options.map((option) => (
+            <button key={option} type="button" role="radio" aria-checked={value === option} className="ide-chip" onClick={() => onPick(option)}>
+                {option.charAt(0).toUpperCase() + option.slice(1)}{sugerido === option ? ' ★' : ''}
+            </button>
+        ))}
+    </div>
+);
+
+const Gantt = ({ filas, periodos, unidad }) => (
+    <div className="met-gantt" role="table" aria-label="Diagrama de Gantt" style={{ '--periodos': periodos }}>
+        <div className="met-gantt-row met-gantt-head" role="row">
+            <span role="columnheader">Actividad</span>
+            {Array.from({ length: periodos }, (_, i) => <span role="columnheader" key={i}>{periodoLabel(unidad).charAt(0)}{i + 1}</span>)}
+        </div>
+        {filas.filter((x) => clean(x.actividad)).map((x) => (
+            <div className="met-gantt-row" role="row" key={x.id}>
+                <span role="rowheader" title={x.fase}>{x.actividad}</span>
+                {Array.from({ length: periodos }, (_, i) => (
+                    <span role="cell" key={i} data-on={i + 1 >= Number(x.inicio) && i + 1 <= Number(x.fin) ? FASES.indexOf(x.fase) + 1 || 1 : undefined} />
+                ))}
+            </div>
+        ))}
+    </div>
+);
+
+const Constructor = ({ intro, onNavigate }) => {
+    const s = useMetState();
+    const { f, update, setters, enfoque, setEnfoque, tipo, setTipo, diseno, setDiseno, calc, setCalc, unidad, setUnidad, periodos, setPeriodos, presupuesto, setPresupuesto, especificos, quien, donde, tipoEsperado } = s;
+    const [tab, setTab] = useState('enfoque');
+    const [saved, setSaved] = useState(false);
+    const prefilled = useRef(false);
+    const touch = () => setSaved(false);
+    const set = (key) => (value) => { touch(); update({ [key]: value }); };
+    const setPob = (patch) => { touch(); update({ poblacion: { ...f.poblacion, ...patch } }); };
+
+    // La primera vez: tipo según los alcances, población del título, una fila de análisis por específico y un cronograma base.
+    useEffect(() => {
+        if (prefilled.current) return;
+        prefilled.current = true;
+        const patch = {};
+        if (!tipo && tipoEsperado) setTipo(tipoEsperado);
+        if (!clean(f.poblacion.descripcion) && quien) patch.poblacion = { ...f.poblacion, descripcion: `${lower(quien)}${donde ? ` de ${donde}` : ''}` };
+        if (f.analisis.length === 0 && especificos.length) patch.analisis = especificos.map((obj) => ({ id: uid(), objetivo: obj.replace(/\.$/, ''), tecnica: '', software: '' }));
+        if (f.cronograma.length === 0) patch.cronograma = CRONO_BASE.map((x) => ({ ...x, id: uid() }));
+        if (Object.keys(patch).length) update(patch);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const partes = redactarTodo(s);
+    const totalPresupuesto = presupuesto.reduce((sum, item) => sum + (Number(item.costo) || 0), 0);
+    const cuenta = {
+        enfoque: enfoque ? 1 : 0,
+        tipo: tipo ? 1 : 0,
+        diseno: diseno && (DISENOS[enfoque] || []).some((d) => d.id === diseno) ? 1 : 0,
+        poblacion: clean(partes.poblacionSugerida) ? 1 : 0,
+        analisis: f.analisis.filter((x) => clean(x.tecnica)).length,
+        instrumentos: f.instrumentos.filter((x) => clean(x.instrumento)).length,
+        cronograma: f.cronograma.filter((x) => clean(x.actividad)).length,
+        presupuesto: presupuesto.length,
+    };
+    const save = () => {
+        Object.entries(partes).forEach(([field, value]) => setters[field](value));
+        setters.cronogramaItems(f.cronograma.filter((x) => clean(x.actividad)).map(({ fase, actividad, inicio, fin }) => ({ fase, actividad, inicio: Number(inicio), fin: Number(fin) })));
+        setters.metodologia([partes.metEnfoque, partes.metTipo, partes.metDiseno].filter(Boolean).join('\n\n'));
+        setSaved(true);
+    };
+    // Guardado automático: lo redactado pasa a Mi proyecto sin tener que tocar «Guardar».
+    useAutoGuardar(JSON.stringify([partes, f.cronograma]), save);
+    const setFila = (key, list, index, patch) => { touch(); update({ [key]: list.map((x, i) => (i === index ? { ...x, ...patch } : x)) }); };
+    const [modal, setModal] = useState(null);
+    const toggleValidacion = (index, id) => {
+        const actual = validacionesDe(f.instrumentos[index]);
+        const next = actual.includes(id) ? actual.filter((x) => x !== id) : [...actual, id];
+        setFila('instrumentos', f.instrumentos, index, { validaciones: next, validez: next[0] || '' });
     };
 
     return (
-        <div style={{ maxWidth: '100%', paddingBottom: '3rem' }}>
-
-            {/* Main Theory Card */}
-            <div className="responsive-banner" style={{
-                background: 'linear-gradient(to right, #ecfeff, #cffafe)',
-                border: '1px solid #a5f3fc',
-                borderRadius: '1rem',
-                padding: '2rem',
-                marginBottom: '2.5rem',
-                display: 'flex',
-                gap: '2rem',
-                alignItems: 'start'
-            }}>
-                <div style={{ flex: 1 }}>
-                    <h2 style={{ fontSize: '1.5rem', color: '#083344', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <Microscope size={28} />
-                        Metodología
-                    </h2>
-                    <p style={{ color: '#164e63', lineHeight: '1.7', fontSize: '1.05rem', marginBottom: '1rem' }}>
-                        La metodología contiene en forma organizada y precisa, cómo se proyecta que será alcanzado cada uno de los objetivos específicos propuestos. <strong>Debe reflejar la estructura lógica y el rigor científico del proceso de investigación.</strong>
-                    </p>
+        <div className="pla-builder-wrap">
+            <header className="pla-builder-head">
+                <div>{intro}</div>
+                <div className="pla-status">
+                    <p className="obj-count"><b>{SUBTITULOS.filter((x) => cuenta[x.key] > 0).length} de 8 subtítulos</b> · muestra de {tamanoMuestra(calc)} · {money(totalPresupuesto)}</p>
+                    <button type="button" className="ide-btn ide-btn--primary" onClick={save}>
+                        <CheckCircle2 size={17} /> Guardar mi metodología
+                    </button>
+                    {saved && <p className="ide-feedback ide-feedback--ok" role="status"><CheckCircle2 size={16} /><span>Guardada. Ya aparece en Mi proyecto con sus ocho subtítulos.</span></p>}
                 </div>
-            </div>
+            </header>
 
-            {/* Enfoque de investigación Section */}
-            <h3 style={{ fontSize: '1.3rem', color: '#1e293b', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Eye size={24} color="#0ea5e9" /> Enfoque de investigación
-            </h3>
-            <p style={{ color: '#475569', lineHeight: '1.6', marginBottom: '1.5rem', fontSize: '1rem' }}>
-                El enfoque de investigación determina la perspectiva epistemológica y metodológica desde la cual se abordará el problema de investigación. En términos generales, se pueden distinguir dos enfoques principales: cuantitativo y cualitativo, si bien la investigación contemporánea admite la posibilidad de un enfoque mixto que integra elementos de ambos.
-            </p>
-
-            <div className="responsive-flex-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem', marginBottom: '3rem' }}>
-                {/* Cuantitativo */}
-                <div style={{
-                    background: 'linear-gradient(to bottom right, #eff6ff, #dbeafe)',
-                    border: '1px solid #bfdbfe',
-                    borderRadius: '0.75rem',
-                    padding: '1.5rem'
-                }}>
-                    <h4 style={{ fontSize: '1.1rem', color: '#1e3a8a', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <LineChart size={20} color="#2563eb" />
-                        Enfoque cuantitativo
-                    </h4>
-                    <p style={{ color: '#1e40af', fontSize: '0.95rem', lineHeight: '1.6', margin: 0 }}>
-                        Este enfoque se sustenta en el paradigma positivista y se caracteriza por la búsqueda de la objetividad y la generalización de los resultados. Se centra en la recolección y análisis de datos numéricos, empleando métodos estadísticos para establecer relaciones causales entre variables y probar hipótesis. Su finalidad es describir, explicar y predecir fenómenos, buscando la precisión y el rigor en la medición.
-                    </p>
-                </div>
-
-                {/* Cualitativo */}
-                <div style={{
-                    background: 'linear-gradient(to bottom right, #fdf4ff, #fae8ff)',
-                    border: '1px solid #f5d0fe',
-                    borderRadius: '0.75rem',
-                    padding: '1.5rem'
-                }}>
-                    <h4 style={{ fontSize: '1.1rem', color: '#701a75', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <Users size={20} color="#c026d3" />
-                        Enfoque cualitativo
-                    </h4>
-                    <p style={{ color: '#86198f', fontSize: '0.95rem', lineHeight: '1.6', margin: 0 }}>
-                        Este enfoque se enmarca en el paradigma interpretativo y se caracteriza por la búsqueda de la comprensión profunda de los fenómenos desde la perspectiva de los actores involucrados. Se centra en la exploración de significados, experiencias y perspectivas, empleando métodos como la observación participante, entrevistas en profundidad y análisis de discurso. Su finalidad es comprender la complejidad de los fenómenos sociales en su contexto natural.
-                    </p>
-                </div>
-
-                {/* Mixto */}
-                <div style={{
-                    background: 'linear-gradient(to bottom right, #f5f3ff, #ede9fe)',
-                    border: '1px solid #ddd6fe',
-                    borderRadius: '0.75rem',
-                    padding: '1.5rem'
-                }}>
-                    <h4 style={{ fontSize: '1.1rem', color: '#4c1d95', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <GitMerge size={20} color="#7c3aed" />
-                        Enfoque mixto
-                    </h4>
-                    <p style={{ color: '#5b21b6', fontSize: '0.95rem', lineHeight: '1.6', margin: 0 }}>
-                        Este enfoque representa la integración de los enfoques cuantitativo y cualitativo, combinando sus fortalezas para obtener una comprensión más integral del fenómeno de estudio. Implica la recolección y análisis de datos tanto cuantitativos como cualitativos, así como la triangulación de métodos y perspectivas.
-                    </p>
-                </div>
-            </div>
-
-            {/* Toggle Button Enfoque */}
-            <div style={{ marginBottom: showGuiaEnfoque ? '1rem' : '3rem' }}>
-                <button
-                    onClick={() => setShowGuiaEnfoque(!showGuiaEnfoque)}
-                    style={{
-                        background: 'white',
-                        border: '1px solid #bfdbfe',
-                        color: '#0284c7',
-                        padding: '0.75rem 1.25rem',
-                        borderRadius: '0.5rem',
-                        fontWeight: '600',
-                        fontSize: '0.95rem',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)',
-                        transition: 'all 0.2s ease'
-                    }}
-                >
-                    <span style={{ fontSize: '1.2rem' }}>💡</span>
-                    {showGuiaEnfoque ? 'Ocultar Guía y Ejemplo' : 'Ver Guía y Ejemplo de Redacción'}
-                </button>
-            </div>
-
-            {/* Guía de redacción Enfoque */}
-            {showGuiaEnfoque && (
-                <div className="fade-in" style={{
-                    background: '#f8fafc',
-                    borderLeft: '4px solid #0284c7',
-                    padding: '1.25rem',
-                    borderRadius: '0 0.5rem 0.5rem 0',
-                    marginBottom: '3rem'
-                }}>
-                    <h5 style={{ color: '#0369a1', fontSize: '1.05rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{ fontSize: '1.2rem' }}>📝</span> ¿Cómo redactar esta subsección?
-                    </h5>
-                    <p style={{ color: '#334155', fontSize: '0.95rem', lineHeight: '1.6', margin: '0 0 1rem 0' }}>
-                        Inicia definiendo el enfoque elegido (Cuantitativo, Cualitativo o Mixto) citando a un autor metodológico (como Hernández Sampieri, Tamayo, etc.). Luego, elabora al menos un párrafo justificando de manera clara por qué este enfoque es el más apropiado para tu problema de investigación, cómo responde a tus objetivos y qué perspectiva te permitirá adoptar.
-                    </p>
-                    <div style={{ background: '#f1f5f9', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
-                        <strong style={{ color: '#475569', fontSize: '0.85rem', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>📌 Ejemplo de redacción (Enfoque Cuantitativo)</strong>
-                        <p style={{ color: '#475569', fontSize: '0.95rem', lineHeight: '1.6', margin: 0, fontStyle: 'italic' }}>
-                            "La presente investigación se enmarcó bajo un enfoque cuantitativo, ya que, como afirma Sampieri (2014), este utiliza la recolección de datos para probar hipótesis con base en la medición numérica. En el contexto de este proyecto, este paradigma permitirá medir el impacto exacto de la nueva herramienta digital sobre el rendimiento académico de los estudiantes de tercer grado, cuantificando los resultados mediante análisis estadístico para asegurar la neutralidad y precisión del estudio."
-                        </p>
+            <div className="pla-builder">
+                <div className="obj-form">
+                    <div className="mar-tabs" role="tablist" aria-label="Subtítulos de la metodología">
+                        {SUBTITULOS.map((x) => {
+                            const Icon = x.icon;
+                            return (
+                                <button key={x.key} type="button" role="tab" aria-selected={tab === x.key} onClick={() => setTab(x.key)}>
+                                    <Icon size={15} aria-hidden="true" /> {x.label}
+                                    <span className="mar-tab-count" data-ok={cuenta[x.key] > 0 || undefined}>{cuenta[x.key] > 0 ? '✓' : '·'}</span>
+                                </button>
+                            );
+                        })}
                     </div>
-                </div>
-            )}
 
-            {/* Tipos de investigación Section */}
-            <h3 style={{ fontSize: '1.3rem', color: '#1e293b', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <FileSearch size={24} color="#f59e0b" /> Tipos de investigación
-            </h3>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginBottom: '3rem' }}>
-                {/* Exploratoria */}
-                <div className="card" style={{ borderLeft: '4px solid #fbbf24' }}>
-                    <h4 style={{ fontSize: '1.1rem', color: '#b45309', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        Investigación exploratoria
-                    </h4>
-                    <p style={{ color: '#475569', fontSize: '0.95rem', lineHeight: '1.6', margin: 0 }}>
-                        Es aquella que se realiza cuando el objetivo es examinar un tema o problema de investigación poco estudiado o que no ha sido abordado antes. Se caracteriza por ser flexible y abierta, donde el investigador se adentra en un territorio desconocido con el fin de obtener una primera aproximación al fenómeno, identificar variables relevantes, formular preguntas de investigación y generar hipótesis que puedan ser posteriormente sometidas a prueba. En este tipo de investigación, la recolección de datos suele ser cualitativa, a través de entrevistas a expertos, revisión de documentos, estudios de casos, etc. El objetivo principal no es llegar a conclusiones definitivas, sino abrir caminos para futuras investigaciones.
-                    </p>
-                </div>
-
-                {/* Descriptiva */}
-                <div className="card" style={{ borderLeft: '4px solid #34d399' }}>
-                    <h4 style={{ fontSize: '1.1rem', color: '#047857', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        Investigación descriptiva
-                    </h4>
-                    <p style={{ color: '#475569', fontSize: '0.95rem', lineHeight: '1.6', margin: 0 }}>
-                        Su propósito central es describir de forma detallada las características de un fenómeno, situación o población. Se centra en responder preguntas como ¿qué?, ¿cómo?, ¿dónde? y ¿cuándo?, proporcionando una "fotografía" precisa del objeto de estudio. Para ello, se recopilan datos cuantitativos o cualitativos mediante técnicas como encuestas, entrevistas, observación y análisis de documentos. La investigación descriptiva no busca explicar las causas de los fenómenos, sino simplemente presentar una imagen completa y detallada de los mismos.
-                    </p>
-                </div>
-
-                {/* Explicativa */}
-                <div className="card" style={{ borderLeft: '4px solid #f87171' }}>
-                    <h4 style={{ fontSize: '1.1rem', color: '#b91c1c', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        Investigación explicativa
-                    </h4>
-                    <p style={{ color: '#475569', fontSize: '0.95rem', lineHeight: '1.6', margin: 0 }}>
-                        Busca comprender las causas y consecuencias de un fenómeno, explicando por qué ocurre y cómo se relaciona con otros factores. Va más allá de la simple descripción, buscando establecer relaciones de causa-efecto entre las variables. Se basa en la investigación descriptiva, pero incorpora análisis más profundos para identificar los factores que determinan un fenómeno y predecir su comportamiento. Puede utilizar métodos cuantitativos, como análisis estadísticos, o cualitativos, buscando patrones y conexiones en los datos.
-                    </p>
-                </div>
-            </div>
-
-            {/* Toggle Button Tipo */}
-            <div style={{ marginBottom: showGuiaTipo ? '1rem' : '3rem' }}>
-                <button
-                    onClick={() => setShowGuiaTipo(!showGuiaTipo)}
-                    style={{
-                        background: 'white',
-                        border: '1px solid #fed7aa',
-                        color: '#d97706',
-                        padding: '0.75rem 1.25rem',
-                        borderRadius: '0.5rem',
-                        fontWeight: '600',
-                        fontSize: '0.95rem',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)',
-                        transition: 'all 0.2s ease'
-                    }}
-                >
-                    <span style={{ fontSize: '1.2rem' }}>💡</span>
-                    {showGuiaTipo ? 'Ocultar Guía y Ejemplo' : 'Ver Guía y Ejemplo de Redacción'}
-                </button>
-            </div>
-
-            {/* Guía de redacción Tipo */}
-            {showGuiaTipo && (
-                <div className="fade-in" style={{
-                    background: '#f8fafc',
-                    borderLeft: '4px solid #d97706',
-                    padding: '1.25rem',
-                    borderRadius: '0 0.5rem 0.5rem 0',
-                    marginBottom: '3rem'
-                }}>
-                    <h5 style={{ color: '#b45309', fontSize: '1.05rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{ fontSize: '1.2rem' }}>📝</span> ¿Cómo redactar esta subsección?
-                    </h5>
-                    <p style={{ color: '#334155', fontSize: '0.95rem', lineHeight: '1.6', margin: '0 0 1rem 0' }}>
-                        Empieza con la definición teórica del alcance de la investigación (Exploratoria, Descriptiva o Explicativa) apoyado en un referente de metodología de investigación. Posteriormente, argumenta cómo el nivel de profundidad de tu proyecto coincide con este tipo en específico, detallando qué dimensiones precisas del fenómeno pretendes alcanzar o describir.
-                    </p>
-                    <div style={{ background: '#f1f5f9', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
-                        <strong style={{ color: '#475569', fontSize: '0.85rem', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>📌 Ejemplo de redacción (Tipo Descriptivo)</strong>
-                        <p style={{ color: '#475569', fontSize: '0.95rem', lineHeight: '1.6', margin: 0, fontStyle: 'italic' }}>
-                            "El alcance o tipo de investigación empleado en este trabajo es de carácter descriptivo. Según Hernández Sampieri et al. (2014), los estudios descriptivos buscan especificar las propiedades, características y perfiles de personas, grupos, comunidades o cualquier otro fenómeno que se someta a un análisis. En alineación con esto, el presente estudio se centrará en detallar minuciosamente las estrategias didácticas empleadas actualmente por el cuerpo docente en el aula virtual, caracterizando su frecuencia y tipología, sin buscar inicialmente establecer relaciones de causalidad causalidad entre ellas."
-                        </p>
-                    </div>
-                </div>
-            )}
-
-            {/* Diseños de Investigación Section */}
-            <h3 style={{ fontSize: '1.3rem', color: '#1e293b', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Settings size={24} color="#6366f1" /> Diseños de Investigación
-            </h3>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-                {/* Experimental */}
-                <div style={{
-                    background: 'linear-gradient(to bottom right, #fdf2f8, #fce7f3)',
-                    border: '1px solid #fbcfe8',
-                    borderRadius: '0.75rem',
-                    padding: '1.5rem'
-                }}>
-                    <h4 style={{ fontSize: '1.1rem', color: '#be185d', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <Sliders size={20} color="#ec4899" />
-                        Investigación experimental
-                    </h4>
-                    <p style={{ color: '#9d174d', fontSize: '0.95rem', lineHeight: '1.6', margin: 0 }}>
-                        Se caracteriza por la manipulación intencional de una o más variables independientes para analizar su efecto en una o más variables dependientes, buscando establecer relaciones de causa-efecto. Para asegurar la validez de los resultados, se implementa un control riguroso de las variables extrañas y se asignan los participantes aleatoriamente a grupos (experimental y control). Un ejemplo clásico es el estudio del efecto de un nuevo medicamento, donde un grupo recibe el fármaco y otro un placebo, manteniendo constantes otros factores que puedan influir en la salud.
-                    </p>
-                </div>
-
-                {/* Cuasi-experimental */}
-                <div style={{
-                    background: 'linear-gradient(to bottom right, #ffedd5, #ffedd5)',
-                    border: '1px solid #fed7aa',
-                    borderRadius: '0.75rem',
-                    padding: '1.5rem'
-                }}>
-                    <h4 style={{ fontSize: '1.1rem', color: '#c2410c', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <Activity size={20} color="#f97316" />
-                        Investigación cuasi-experimental
-                    </h4>
-                    <p style={{ color: '#9a3412', fontSize: '0.95rem', lineHeight: '1.6', margin: 0 }}>
-                        Comparte similitudes con la experimental en cuanto a la manipulación de la variable independiente, pero se diferencia por un menor control sobre las variables y la ausencia de asignación aleatoria de los participantes. Esto se debe a que, a menudo, se trabaja con grupos ya formados en contextos naturales, como escuelas o empresas. Un ejemplo sería analizar el impacto de un programa educativo en dos colegios, donde no es posible asignar aleatoriamente a los estudiantes a cada grupo.
-                    </p>
-                </div>
-
-                {/* No experimental */}
-                <div style={{
-                    background: 'linear-gradient(to bottom right, #f1f5f9, #e2e8f0)',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '0.75rem',
-                    padding: '1.5rem'
-                }}>
-                    <h4 style={{ fontSize: '1.1rem', color: '#334155', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <Eye size={20} color="#64748b" />
-                        Investigación no experimental
-                    </h4>
-                    <p style={{ color: '#1e293b', fontSize: '0.95rem', lineHeight: '1.6', margin: 0 }}>
-                        En este tipo de investigación, el investigador se limita a observar y analizar los fenómenos en su contexto natural, sin intervenir ni manipular las variables. Se centra en la descripción de las variables y el análisis de sus relaciones, pero no busca establecer causalidad. Puede ser descriptiva, correlacional o comparativa, entre otras. Un ejemplo sería un estudio que analiza la relación entre el nivel de ingresos y la satisfacción laboral en una población determinada, sin intervenir en ninguno de los dos factores.
-                    </p>
-                </div>
-            </div>
-
-            {/* Toggle Button Diseño */}
-            <div style={{ marginBottom: showGuiaDiseno ? '1rem' : '3rem' }}>
-                <button
-                    onClick={() => setShowGuiaDiseno(!showGuiaDiseno)}
-                    style={{
-                        background: 'white',
-                        border: '1px solid #c7d2fe',
-                        color: '#4338ca',
-                        padding: '0.75rem 1.25rem',
-                        borderRadius: '0.5rem',
-                        fontWeight: '600',
-                        fontSize: '0.95rem',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)',
-                        transition: 'all 0.2s ease'
-                    }}
-                >
-                    <span style={{ fontSize: '1.2rem' }}>💡</span>
-                    {showGuiaDiseno ? 'Ocultar Guía y Ejemplo' : 'Ver Guía y Ejemplo de Redacción'}
-                </button>
-            </div>
-
-            {/* Guía de redacción Diseño */}
-            {showGuiaDiseno && (
-                <div className="fade-in" style={{
-                    background: '#f8fafc',
-                    borderLeft: '4px solid #4f46e5',
-                    padding: '1.25rem',
-                    borderRadius: '0 0.5rem 0.5rem 0',
-                    marginBottom: '3rem'
-                }}>
-                    <h5 style={{ color: '#4338ca', fontSize: '1.05rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{ fontSize: '1.2rem' }}>📝</span> ¿Cómo redactar esta subsección?
-                    </h5>
-                    <p style={{ color: '#334155', fontSize: '0.95rem', lineHeight: '1.6', margin: '0 0 1rem 0' }}>
-                        Define teóricamente tu diseño (Experimental, Cuasi-experimental o No experimental). Es indispensable que detalles el procedimiento: describe paso a paso cómo se recolectarán los datos en el contexto de tu tema, especifica si existirá o no manipulación voluntaria de las variables independientes, la temporalidad (transversal o longitudinal) y cómo se ejecutará físicamente el estudio en el escenario real.
-                    </p>
-                    <div style={{ background: '#f1f5f9', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
-                        <strong style={{ color: '#475569', fontSize: '0.85rem', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>📌 Ejemplo de redacción (Diseño No Experimental Transversal)</strong>
-                        <p style={{ color: '#475569', fontSize: '0.95rem', lineHeight: '1.6', margin: 0, fontStyle: 'italic' }}>
-                            "El diseño seleccionado para este trabajo corresponde a una investigación no experimental de corte transversal. Según los autores consultados, los estudios no experimentales son aquellos que se realizan sin la manipulación deliberada de variables. Por lo tanto, en este estudio no se construirán situaciones de experimentación artificial, sino que se observarán los índices y factores de deserción universitaria del período 2023 tal y como se dieron en su contexto natural dentro de la institución. Además, es transversal debido a que el proceso de recolección de los datos y aplicación de la encuesta a los docentes se efectuó en un solo instante y en un tiempo único durante el mes de mayo de dicho año."
-                        </p>
-                    </div>
-                </div>
-            )}
-
-            {/* AI Generator Section */}
-            <div style={{ maxWidth: '1200px', marginTop: '3rem' }}>
-                <div className="card">
-                    <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Sugerencia y Justificación Metodológica</h2>
-                    <p style={{ marginBottom: '1.5rem', color: '#64748b' }}>
-                        Define el título de tu proyecto para que la IA proponga o justifique la estructura metodológica.
-                    </p>
-
-                    <div style={{ marginBottom: '1rem', padding: '1.5rem', background: 'linear-gradient(to right, #ecfeff, #cffafe)', borderRadius: '0.75rem', border: '1px solid #a5f3fc' }}>
-                        <h3 style={{ fontSize: '1.1rem', color: '#083344', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <Sparkles size={20} color="#0284c7" /> Asistente Metodológico con IA
-                        </h3>
-
-                        <div className="input-group" style={{ marginBottom: '1rem' }}>
-                            <label>Título de tu Investigación</label>
-                            <input
-                                type="text"
-                                className="input-field"
-                                placeholder="Ej: Impacto de las redes sociales en el rendimiento académico..."
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                                style={{ padding: '0.75rem' }}
-                            />
+                    {tab === 'enfoque' && (
+                        <div className="input-group pla-part">
+                            <span className="alc-label">Elige el enfoque</span>
+                            <Chips options={ENFOQUES.map((e) => e.id)} value={enfoque} label="Enfoque" onPick={(v) => { touch(); setEnfoque(v); if (!(DISENOS[v] || []).some((d) => d.id === diseno)) setDiseno(''); }} />
+                            <small className="ide-field-hint">{ENFOQUES.find((e) => e.id === enfoque)?.def ? `Un enfoque ${enfoque.toLowerCase()} es el ${ENFOQUES.find((e) => e.id === enfoque).def}.` : 'Cuantitativo si mides y relacionas; cualitativo si comprendes; mixto si haces ambas cosas.'}</small>
+                            <Campo id="met-enf-txt" label="Por qué este enfoque (con tus objetivos)" rows={3} value={f.enfoqueTexto} onChange={set('enfoqueTexto')} placeholder="Ej: Este enfoque permite medir la frecuencia de la inasistencia y su relación con los factores identificados en los pacientes" />
                         </div>
+                    )}
 
-                        <div className="input-group" style={{ marginBottom: '1rem' }}>
-                            <label>
-                                Objetivos Específicos
-                                <span style={{ fontSize: '0.85rem', color: '#64748b', marginLeft: '0.5rem', fontWeight: 'normal' }}>(Recomendado para Generar Fases)</span>
+                    {tab === 'tipo' && (
+                        <div className="input-group pla-part">
+                            <span className="alc-label">Elige el tipo de investigación</span>
+                            <Chips options={TIPOS.map((t) => t.id)} value={tipo} label="Tipo de investigación" sugerido={tipoEsperado} onPick={(v) => { touch(); setTipo(v); }} />
+                            <small className="ide-field-hint">{tipoEsperado ? `★ Según lo que quieres lograr (y tus alcances), el tuyo es ${tipoEsperado.toLowerCase()}.` : 'Debe coincidir con el alcance que declaraste.'}</small>
+                            <Campo id="met-tipo-txt" label="Por qué este tipo" rows={3} value={f.tipoTexto} onChange={set('tipoTexto')} placeholder="Ej: El estudio busca establecer la relación entre el olvido de la cita y la inasistencia, sin manipular las variables" />
+                        </div>
+                    )}
+
+                    {tab === 'diseno' && (
+                        <div className="input-group pla-part">
+                            <span className="alc-label">Elige el diseño {enfoque ? `(${enfoque.toLowerCase()})` : ''}</span>
+                            {enfoque
+                                ? <Chips options={DISENOS[enfoque].map((d) => d.id)} value={diseno} label="Diseño" onPick={(v) => { touch(); setDiseno(v); }} />
+                                : <p className="obj-warn"><AlertTriangle size={14} aria-hidden="true" /> Primero elige el enfoque: los diseños dependen de él.</p>}
+                            {diseno && <small className="ide-field-hint">Un diseño {diseno} es aquel {(DISENOS[enfoque] || []).find((d) => d.id === diseno)?.def}.</small>}
+                            <Campo id="met-dis-txt" label="Cómo se aplica en tu estudio" rows={3} value={f.disenoTexto} onChange={set('disenoTexto')} placeholder="Ej: Los datos se recogerán una sola vez, entre febrero y abril de 2026, sin intervenir en la atención de los pacientes" />
+                        </div>
+                    )}
+
+                    {tab === 'poblacion' && (
+                        <div className="input-group pla-part mar-grid">
+                            <Campo className="mar-wide" id="met-pob" label="Población" rows={2} value={f.poblacion.descripcion} onChange={(v) => setPob({ descripcion: v })} placeholder={`Ej: ${quien || 'los pacientes de consulta externa'}${donde ? ` de ${donde}` : ''} atendidos en el primer semestre de 2026`} />
+                            <Campo id="met-uni" label="Unidad de análisis" value={f.poblacion.unidad} onChange={(v) => setPob({ unidad: v })} placeholder="Ej: pacientes" />
+                            <label className="mar-campo">
+                                <span>Muestreo</span>
+                                <select className="input-field" value={f.poblacion.muestreo} onChange={(e) => setPob({ muestreo: e.target.value })}>
+                                    <option value="">Elige…</option>
+                                    <optgroup label="Probabilístico">{MUESTREOS.filter((m) => m.probabilistico).map((m) => <option key={m.id} value={m.id}>{m.id}</option>)}</optgroup>
+                                    <optgroup label="No probabilístico">{MUESTREOS.filter((m) => !m.probabilistico).map((m) => <option key={m.id} value={m.id}>{m.id}</option>)}</optgroup>
+                                </select>
                             </label>
-                            <textarea
-                                className="input-field"
-                                placeholder="- Objetivo 1&#10;- Objetivo 2&#10;- Objetivo 3..."
-                                value={objetivos}
-                                onChange={(e) => setObjetivos(e.target.value)}
-                                style={{ padding: '0.75rem', minHeight: '80px', resize: 'vertical' }}
-                            />
+                            <Campo className="mar-wide" id="met-inc" label="Criterios de inclusión" rows={2} value={f.poblacion.inclusion} onChange={(v) => setPob({ inclusion: v })} placeholder="Ej: mayores de 18 años, con al menos una cita programada en el periodo, que acepten participar" />
+                            <Campo className="mar-wide" id="met-exc" label="Criterios de exclusión" rows={2} value={f.poblacion.exclusion} onChange={(v) => setPob({ exclusion: v })} placeholder="Ej: pacientes de urgencias u hospitalización, o con limitaciones para responder" />
+                            {MUESTREOS.find((m) => m.id === f.poblacion.muestreo)?.probabilistico
+                                ? <div className="mar-wide"><Calculadora calc={calc} onChange={(patch) => { touch(); setCalc(patch); }} compacta /></div>
+                                : <Campo className="mar-wide" id="met-mtx" label="Cómo se eligen los participantes" rows={2} value={f.poblacion.muestraTexto} onChange={(v) => setPob({ muestraTexto: v })} placeholder="Ej: se entrevistará a 12 pacientes hasta alcanzar la saturación de la información" />}
                         </div>
+                    )}
 
-                        <div className="grid-cols-3 responsive-flex-grid" style={{ marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
-                            <div className="input-group" style={{ marginBottom: 0 }}>
-                                <label>Enfoque</label>
-                                <select className="input-field" value={enfoque} onChange={(e) => setEnfoque(e.target.value)} style={{ padding: '0.75rem', cursor: 'pointer' }}>
-                                    <option value="Cuantitativo">Cuantitativo</option>
-                                    <option value="Cualitativo">Cualitativo</option>
-                                    <option value="Mixto">Mixto</option>
-                                </select>
-                            </div>
-                            <div className="input-group" style={{ marginBottom: 0 }}>
-                                <label>Tipo de investigación</label>
-                                <select className="input-field" value={tipo} onChange={(e) => setTipo(e.target.value)} style={{ padding: '0.75rem', cursor: 'pointer' }}>
-                                    <option value="Exploratoria">Exploratoria</option>
-                                    <option value="Descriptiva">Descriptiva</option>
-                                    <option value="Explicativa">Explicativa</option>
-                                </select>
-                            </div>
-                            <div className="input-group" style={{ marginBottom: 0 }}>
-                                <label>Diseño</label>
-                                <select className="input-field" value={diseno} onChange={(e) => setDiseno(e.target.value)} style={{ padding: '0.75rem', cursor: 'pointer' }}>
-                                    <option value="Experimental">Experimental</option>
-                                    <option value="Cuasi-experimental">Cuasi-experimental</option>
-                                    <option value="No experimental">No experimental</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                            <button
-                                onClick={handleSuggest}
-                                disabled={isGenerating || !title.trim()}
-                                style={{
-                                    flex: 1,
-                                    padding: '0.875rem',
-                                    background: isGenerating || !title.trim() ? '#94a3b8' : 'linear-gradient(to right, #0284c7, #0369a1)',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '0.5rem',
-                                    fontWeight: '600',
-                                    cursor: isGenerating || !title.trim() ? 'not-allowed' : 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '0.5rem',
-                                    fontSize: '1rem',
-                                    transition: 'all 0.2s'
-                                }}
-                            >
-                                {isGenerating ? 'Generando...' : '💡 Sugerir Metodología'}
-                            </button>
-
-                            <button
-                                onClick={handleJustify}
-                                disabled={isGenerating || !title.trim()}
-                                style={{
-                                    flex: 1,
-                                    padding: '0.875rem',
-                                    background: isGenerating || !title.trim() ? '#e2e8f0' : 'white',
-                                    color: isGenerating || !title.trim() ? '#64748b' : '#0369a1',
-                                    border: '1px solid',
-                                    borderColor: isGenerating || !title.trim() ? '#cbd5e1' : '#0284c7',
-                                    borderRadius: '0.5rem',
-                                    fontWeight: '600',
-                                    cursor: isGenerating || !title.trim() ? 'not-allowed' : 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '0.5rem',
-                                    fontSize: '1rem',
-                                    transition: 'all 0.2s'
-                                }}
-                            >
-                                📝 Justificar Selección
-                            </button>
-
-                            <button
-                                onClick={handleGuide}
-                                disabled={isGenerating || !title.trim()}
-                                style={{
-                                    flex: 1,
-                                    padding: '0.875rem',
-                                    background: isGenerating || !title.trim() ? '#f1f5f9' : '#f0f9ff',
-                                    color: isGenerating || !title.trim() ? '#64748b' : '#0369a1',
-                                    border: '1px solid',
-                                    borderColor: isGenerating || !title.trim() ? '#e2e8f0' : '#bae6fd',
-                                    borderRadius: '0.5rem',
-                                    fontWeight: '600',
-                                    cursor: isGenerating || !title.trim() ? 'not-allowed' : 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '0.5rem',
-                                    fontSize: '1rem',
-                                    transition: 'all 0.2s'
-                                }}
-                            >
-                                📑 Guía de Redacción
-                            </button>
-
-                            <button
-                                onClick={handlePhases}
-                                disabled={isGenerating || !title.trim()}
-                                style={{
-                                    flex: 1,
-                                    padding: '0.875rem',
-                                    background: isGenerating || !title.trim() ? '#f8fafc' : '#f5f3ff',
-                                    color: isGenerating || !title.trim() ? '#64748b' : '#6d28d9',
-                                    border: '1px solid',
-                                    borderColor: isGenerating || !title.trim() ? '#e2e8f0' : '#ddd6fe',
-                                    borderRadius: '0.5rem',
-                                    fontWeight: '600',
-                                    cursor: isGenerating || !title.trim() ? 'not-allowed' : 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '0.5rem',
-                                    fontSize: '1rem',
-                                    transition: 'all 0.2s'
-                                }}
-                            >
-                                📋 Generar Fases
-                            </button>
-                        </div>
-
-                        {explicacion && (
-                            <div className="fade-in" style={{
-                                marginTop: '1.5rem',
-                                padding: '1.25rem',
-                                background: 'white',
-                                border: '2px solid #67e8f9',
-                                borderRadius: '0.75rem',
-                                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
-                            }}>
-                                <h5 style={{
-                                    margin: '0 0 1rem 0',
-                                    color: '#083344',
-                                    fontSize: '1rem',
-                                    fontWeight: '700',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.5rem'
-                                }}>
-                                    <span style={{ fontSize: '1.3rem' }}>✔️</span> Resultado
-                                </h5>
-                                <div style={{
-                                    color: '#164e63',
-                                    fontSize: '0.95rem',
-                                    lineHeight: '1.8',
-                                    whiteSpace: 'pre-wrap',
-                                    fontFamily: 'inherit'
-                                }}>
-                                    {explicacion}
+                    {tab === 'analisis' && (
+                        <div className="mar-fichas">
+                            {f.analisis.length === 0 && <p className="obj-warn"><AlertTriangle size={14} aria-hidden="true" /> Guarda tus objetivos específicos para tener una fila por objetivo, o agrega una.</p>}
+                            {f.analisis.map((fila, i) => (
+                                <div className="input-group pla-part mar-grid" key={fila.id || i}>
+                                    <Campo className="mar-wide" id={`an-obj-${i}`} label={`Objetivo específico ${i + 1}`} value={fila.objetivo} onChange={(v) => setFila('analisis', f.analisis, i, { objetivo: v })} placeholder="Ej: Caracterizar la inasistencia…" />
+                                    <label className="mar-campo">
+                                        <span>Técnica de análisis</span>
+                                        <select className="input-field" value={fila.tecnica} onChange={(e) => setFila('analisis', f.analisis, i, { tecnica: e.target.value })}>
+                                            <option value="">Elige…</option>
+                                            {TECNICAS_ANALISIS.map((t) => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                    </label>
+                                    <label className="mar-campo">
+                                        <span>Software</span>
+                                        <select className="input-field" value={fila.software} onChange={(e) => setFila('analisis', f.analisis, i, { software: e.target.value })}>
+                                            <option value="">Elige…</option>
+                                            {SOFTWARE.map((t) => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                    </label>
+                                    {f.analisis.length > 1 && <button type="button" className="ide-link" onClick={() => { touch(); update({ analisis: f.analisis.filter((_, k) => k !== i) }); }}><Trash2 size={13} /> Quitar</button>}
                                 </div>
-                            </div>
-                        )}
+                            ))}
+                            <button type="button" className="ide-btn ide-btn--ghost obj-add" onClick={() => { touch(); update({ analisis: [...f.analisis, { id: uid(), objetivo: '', tecnica: '', software: '' }] }); }}><Plus size={15} /> Agregar fila</button>
+                        </div>
+                    )}
 
-                        {error && (
-                            <div style={{
-                                marginTop: '1rem',
-                                padding: '1rem',
-                                background: '#fef2f2',
-                                border: '1px solid #fecaca',
-                                borderRadius: '0.5rem'
-                            }}>
-                                <p style={{ margin: 0, color: '#991b1b', fontSize: '0.9rem' }}>⚠️ {error}</p>
+                    {tab === 'instrumentos' && (
+                        <div className="mar-fichas">
+                            {f.instrumentos.map((it, i) => (
+                                <div className="input-group pla-part mar-grid" key={it.id || i}>
+                                    <label className="mar-campo">
+                                        <span>Técnica</span>
+                                        <select className="input-field" value={it.tecnica} onChange={(e) => setFila('instrumentos', f.instrumentos, i, { tecnica: e.target.value, instrumento: TECNICAS.find((t) => t.tecnica === e.target.value)?.instrumento || it.instrumento })}>
+                                            {TECNICAS.map((t) => <option key={t.tecnica}>{t.tecnica}</option>)}
+                                        </select>
+                                    </label>
+                                    <Campo id={`in-ins-${i}`} label="Instrumento" value={it.instrumento} onChange={(v) => setFila('instrumentos', f.instrumentos, i, { instrumento: v })} placeholder="Ej: cuestionario de 20 preguntas" />
+                                    <Campo id={`in-a-${i}`} label="Se aplica a" value={it.aplicaA} onChange={(v) => setFila('instrumentos', f.instrumentos, i, { aplicaA: v })} placeholder={`Ej: ${quien || 'los pacientes'} de la muestra`} />
+                                    <label className="mar-campo">
+                                        <span>Para el objetivo</span>
+                                        <select className="input-field" value={it.objetivo} onChange={(e) => setFila('instrumentos', f.instrumentos, i, { objetivo: e.target.value })}>
+                                            <option value="">Elige…</option>
+                                            {especificos.map((o, k) => <option key={o} value={`el objetivo específico ${k + 1}`}>Objetivo específico {k + 1}</option>)}
+                                            <option value="todos los objetivos específicos">Todos</option>
+                                        </select>
+                                    </label>
+                                    <div className="mar-campo mar-wide met-val">
+                                        <span>Validez y confiabilidad (puedes elegir varios)</span>
+                                        <div className="met-val-chips" role="group" aria-label={`Métodos de validación del instrumento ${i + 1}`}>
+                                            {VALIDACION_DETALLE.map((v) => {
+                                                const on = validacionesDe(it).includes(v.id);
+                                                return (
+                                                    <button key={v.id} type="button" className="ide-chip" aria-pressed={on} onClick={() => toggleValidacion(i, v.id)}>
+                                                        {on ? '✓ ' : '+ '}{v.titulo}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                        <button type="button" className="ide-link" onClick={() => setModal({ index: i, metodo: validacionesDe(it)[0] || VALIDACION_DETALLE[0].id })}>
+                                            <BookOpenCheck size={14} aria-hidden="true" /> ¿Cómo se hace? Paso a paso, ejemplo y calculadora
+                                        </button>
+                                    </div>
+                                    {f.instrumentos.length > 1 && <button type="button" className="ide-link" onClick={() => { touch(); update({ instrumentos: f.instrumentos.filter((_, k) => k !== i) }); }}><Trash2 size={13} /> Quitar</button>}
+                                </div>
+                            ))}
+                            <button type="button" className="ide-btn ide-btn--ghost obj-add" onClick={() => { touch(); update({ instrumentos: [...f.instrumentos, { id: uid(), tecnica: 'Entrevista', instrumento: 'guía de entrevista semiestructurada', aplicaA: '', objetivo: '', validez: 'juicio de expertos', validaciones: ['juicio de expertos'] }] }); }}><Plus size={15} /> Agregar instrumento</button>
+                        </div>
+                    )}
+
+                    {tab === 'cronograma' && (
+                        <div className="mar-fichas">
+                            <div className="met-crono-opts">
+                                <label className="mar-campo"><span>Unidad</span>
+                                    <select className="input-field" value={unidad} onChange={(e) => { touch(); setUnidad(e.target.value); }}>
+                                        <option value="mensual">Meses</option><option value="semanal">Semanas</option>
+                                    </select>
+                                </label>
+                                <label className="mar-campo"><span>Duración</span>
+                                    <input className="input-field" type="number" min="1" max="24" value={periodos} onChange={(e) => { touch(); setPeriodos(Math.max(1, Math.min(24, Number(e.target.value) || 1))); }} />
+                                </label>
                             </div>
-                        )}
-                    </div>
+                            {f.cronograma.map((x, i) => (
+                                <div className="met-crono-row" key={x.id || i}>
+                                    <select className="input-field" aria-label="Fase" value={x.fase} onChange={(e) => setFila('cronograma', f.cronograma, i, { fase: e.target.value })}>
+                                        {FASES.map((fase) => <option key={fase}>{fase}</option>)}
+                                    </select>
+                                    <input className="input-field" aria-label="Actividad" value={x.actividad} onChange={(e) => setFila('cronograma', f.cronograma, i, { actividad: e.target.value })} placeholder="Actividad" />
+                                    <input className="input-field" aria-label={`${periodoLabel(unidad)} de inicio`} type="number" min="1" max={periodos} value={x.inicio} onChange={(e) => setFila('cronograma', f.cronograma, i, { inicio: Number(e.target.value) })} />
+                                    <input className="input-field" aria-label={`${periodoLabel(unidad)} de fin`} type="number" min="1" max={periodos} value={x.fin} onChange={(e) => setFila('cronograma', f.cronograma, i, { fin: Number(e.target.value) })} />
+                                    <button type="button" className="obj-remove" onClick={() => { touch(); update({ cronograma: f.cronograma.filter((_, k) => k !== i) }); }} aria-label={`Quitar ${x.actividad || 'actividad'}`}><Trash2 size={16} /></button>
+                                </div>
+                            ))}
+                            <button type="button" className="ide-btn ide-btn--ghost obj-add" onClick={() => { touch(); update({ cronograma: [...f.cronograma, { id: uid(), fase: 'Recolección de datos', actividad: '', inicio: 1, fin: 1 }] }); }}><Plus size={15} /> Agregar actividad</button>
+                            <Gantt filas={f.cronograma} periodos={periodos} unidad={unidad} />
+                        </div>
+                    )}
+
+                    {tab === 'presupuesto' && (
+                        <div className="mar-fichas">
+                            {presupuesto.map((it, i) => (
+                                <div className="met-pres-row" key={it.id || i}>
+                                    <select className="input-field" aria-label="Rubro" value={it.categoria} onChange={(e) => { touch(); setPresupuesto(presupuesto.map((x, k) => (k === i ? { ...x, categoria: e.target.value } : x))); }}>
+                                        {[...new Set([...CATEGORIAS, it.categoria].filter(Boolean))].map((c) => <option key={c}>{c}</option>)}
+                                    </select>
+                                    <input className="input-field" aria-label="Descripción" value={it.descripcion} onChange={(e) => { touch(); setPresupuesto(presupuesto.map((x, k) => (k === i ? { ...x, descripcion: e.target.value } : x))); }} placeholder="Descripción" />
+                                    <select className="input-field" aria-label="Fuente" value={it.fuente} onChange={(e) => { touch(); setPresupuesto(presupuesto.map((x, k) => (k === i ? { ...x, fuente: e.target.value } : x))); }}>
+                                        {[...new Set([...FUENTES, it.fuente].filter(Boolean))].map((c) => <option key={c}>{c}</option>)}
+                                    </select>
+                                    <input className="input-field" aria-label="Costo en pesos" type="number" min="0" step="1000" value={it.costo} onChange={(e) => { touch(); setPresupuesto(presupuesto.map((x, k) => (k === i ? { ...x, costo: Number(e.target.value) } : x))); }} />
+                                    <button type="button" className="obj-remove" onClick={() => { touch(); setPresupuesto(presupuesto.filter((_, k) => k !== i)); }} aria-label={`Quitar ${it.descripcion || 'rubro'}`}><Trash2 size={16} /></button>
+                                </div>
+                            ))}
+                            <button type="button" className="ide-btn ide-btn--ghost obj-add" onClick={() => { touch(); setPresupuesto([...presupuesto, { id: Date.now(), categoria: 'Recursos Humanos', descripcion: '', justificacion: '', fuente: 'Personal', costo: 0 }]); }}><Plus size={15} /> Agregar rubro</button>
+                            <p className="met-total">Total: <b>{money(totalPresupuesto)}</b></p>
+                            <small className="ide-field-hint">El presupuesto se guarda al momento. Incluye los aportes propios y de la institución, aunque no impliquen pagos.</small>
+                        </div>
+                    )}
+                    {onNavigate && tab === 'instrumentos' && <button type="button" className="ide-link" onClick={() => onNavigate('alcances')}>Revisa que el método respete tus alcances y limitaciones</button>}
                 </div>
-            </div>
 
+                <aside className="pla-side" aria-label="Tu metodología">
+                    <p className="ide-synth-label">Así queda tu metodología</p>
+                    <div className="pla-preview mar-preview" aria-live="polite">
+                        {[['enfoque', partes.metEnfoque], ['tipo', partes.metTipo], ['diseno', partes.metDiseno], ['poblacion', partes.poblacionSugerida], ['analisis', partes.metPlanAnalisis], ['instrumentos', partes.instrumentos]].map(([key, text]) => (clean(text) ? (
+                            <section key={key} data-active={tab === key}>
+                                <h4>{SUBTITULOS.find((x) => x.key === key).label}</h4>
+                                {text.split('\n').filter(Boolean).map((line) => <p key={line}>{line.replace(/\*\*/g, '').replace(/^- /, '• ')}</p>)}
+                            </section>
+                        ) : null))}
+                        {cuenta.cronograma > 0 && <section data-active={tab === 'cronograma'}><h4>Cronograma</h4><p>{cuenta.cronograma} actividades en {periodos} {unidad === 'semanal' ? 'semanas' : 'meses'}.</p></section>}
+                        {presupuesto.length > 0 && <section data-active={tab === 'presupuesto'}><h4>Presupuesto</h4><p>{presupuesto.length} rubros · {money(totalPresupuesto)}</p></section>}
+                    </div>
+                </aside>
+            </div>
+            <ValidacionModal
+                open={Boolean(modal)}
+                inicial={modal?.metodo}
+                instrumento={modal ? clean(f.instrumentos[modal.index]?.instrumento) : ''}
+                seleccionados={modal ? validacionesDe(f.instrumentos[modal.index]) : []}
+                onToggle={(id) => modal && toggleValidacion(modal.index, id)}
+                datos={modal ? f.instrumentos[modal.index]?.validacionDatos || {} : {}}
+                onGuardar={(id, datos) => {
+                    if (!modal) return;
+                    const it = f.instrumentos[modal.index];
+                    const actual = validacionesDe(it);
+                    const next = actual.includes(id) ? actual : [...actual, id];
+                    setFila('instrumentos', f.instrumentos, modal.index, { validaciones: next, validez: next[0] || '', validacionDatos: { ...(it.validacionDatos || {}), [id]: datos } });
+                }}
+                onClose={() => setModal(null)}
+            />
         </div>
+    );
+};
+
+/* ---------- Revisión ---------- */
+
+const checkMetodologia = (s) => {
+    const { enfoque, tipo, diseno, f, calc, especificos, presupuesto, quien, tipoEsperado, alcancesTexto } = s;
+    const partes = redactarTodo(s);
+    const m = MUESTREOS.find((x) => x.id === f.poblacion.muestreo);
+    const n = tamanoMuestra(calc);
+    const tipoAlcance = TIPOS.find((t) => alcancesTexto.toLowerCase().includes(`alcance ${t.alcance}`))?.id;
+    const actividades = f.cronograma.filter((x) => clean(x.actividad));
+    const fasesUsadas = new Set(actividades.map((x) => x.fase));
+    const enfoqueTipo = !(enfoque === 'Cualitativo' && ['Correlacional', 'Explicativa'].includes(tipo));
+    const total = presupuesto.reduce((sum, item) => sum + (Number(item.costo) || 0), 0);
+    return [
+        { id: 'enfoque', ok: Boolean(enfoque) && clean(f.enfoqueTexto).length > 20, label: 'Declara y justifica el enfoque', detail: 'Elige el enfoque y explica por qué corresponde a tus objetivos.' },
+        { id: 'tipo', ok: Boolean(tipo) && (!tipoEsperado || tipo === tipoEsperado || tipo === tipoAlcance), label: 'El tipo coincide con lo que quieres lograr', detail: tipoEsperado ? `Según tu idea y tus alcances, el tipo es ${tipoEsperado.toLowerCase()}.` : 'Elige el tipo de investigación.' },
+        { id: 'coherencia', ok: enfoqueTipo, label: 'El tipo es compatible con el enfoque', detail: 'Un enfoque cualitativo no mide correlaciones ni causas: revisa el enfoque o el tipo.' },
+        { id: 'diseno', ok: Boolean(diseno) && (DISENOS[enfoque] || []).some((d) => d.id === diseno), label: 'El diseño pertenece al enfoque', detail: 'Elige un diseño de la lista de tu enfoque.' },
+        { id: 'poblacion', ok: clean(f.poblacion.descripcion).length > 10 && (!quien || f.poblacion.descripcion.toLowerCase().includes(clean(quien).toLowerCase().split(/\s+/)[0])), label: 'Delimita la población', detail: quien ? `Tu población es «${clean(quien)}».` : 'Di quiénes, dónde y cuándo.' },
+        { id: 'criterios', ok: clean(f.poblacion.inclusion).length > 5 && clean(f.poblacion.exclusion).length > 5, label: 'Tiene criterios de inclusión y exclusión', detail: 'Di quiénes entran al estudio y quiénes no.' },
+        { id: 'muestra', ok: Boolean(m) && (m.probabilistico ? n > 0 && (!calc.finita || calc.N > n) : clean(f.poblacion.muestraTexto).length > 10 || m.id.startsWith('censo')), label: 'Justifica la muestra', detail: m?.probabilistico ? 'Revisa el tamaño de la población en la calculadora.' : 'Elige el muestreo y explica cómo se eligen los participantes.' },
+        { id: 'analisis', ok: especificos.length > 0 && f.analisis.filter((x) => clean(x.tecnica)).length >= especificos.length, label: 'Hay un análisis para cada objetivo específico', detail: `Tienes ${especificos.length} específicos y ${f.analisis.filter((x) => clean(x.tecnica)).length} con técnica de análisis.` },
+        { id: 'instrumentos', ok: f.instrumentos.some((x) => clean(x.instrumento) && clean(x.aplicaA)), label: 'Define los instrumentos y a quién se aplican', detail: 'Para cada técnica, el instrumento y a quiénes se aplica.' },
+        { id: 'validez', ok: f.instrumentos.every((x) => !clean(x.instrumento) || validacionesDe(x).length > 0), label: 'Asegura la validez de los instrumentos', detail: 'Juicio de expertos, prueba piloto, alfa de Cronbach o un instrumento ya validado.' },
+        { id: 'cronograma', ok: actividades.length >= 5 && FASES.every((fase) => fasesUsadas.has(fase)), label: 'El cronograma cubre todas las fases', detail: `Tiene ${actividades.length} actividades; incluye preparación, recolección, análisis e informe.` },
+        { id: 'presupuesto', ok: presupuesto.length >= 3 && total > 0, label: 'El presupuesto tiene al menos tres rubros', detail: `Tiene ${presupuesto.length} rubros por ${money(total)}.` },
+        { id: 'textos', ok: Object.values(partes).filter((x) => clean(x)).length >= 6, label: 'Todos los subtítulos tienen texto', detail: 'Completa enfoque, tipo, diseño, población, plan de análisis e instrumentos.' },
+    ];
+};
+
+const CRITERIOS = [
+    { label: 'Coherente', text: 'Enfoque, tipo y diseño responden a tus objetivos y alcances.' },
+    { label: 'Delimitada', text: 'Población con criterios y una muestra justificada.' },
+    { label: 'Válida', text: 'Instrumentos con su validez y un análisis por objetivo.' },
+    { label: 'Viable', text: 'Cronograma por fases y presupuesto realista.' },
+];
+
+const Revision = ({ intro }) => {
+    const s = useMetState();
+    const checks = checkMetodologia(s);
+    const passed = checks.filter((item) => item.ok).length;
+    return (
+        <>
+            <div className="ide-synth-left">
+                {intro}
+                <ul className="tit-criteria">
+                    {CRITERIOS.map((item) => <li key={item.label}><b>{item.label}</b> {item.text}</li>)}
+                </ul>
+                <p className="ide-hint">La revisión se hace sobre lo que construiste en «Construye tu metodología».</p>
+            </div>
+            <div className="ide-panel">
+                <h3>Cumple {passed} de {checks.length} criterios</h3>
+                <ul className="tit-checks">
+                    {checks.map((item) => (
+                        <li key={item.id} data-ok={item.ok}>
+                            {item.ok ? <CheckCircle2 size={18} aria-hidden="true" /> : <AlertTriangle size={18} aria-hidden="true" />}
+                            <span><b>{item.label}</b>{!item.ok && item.detail}</span>
+                        </li>
+                    ))}
+                </ul>
+                <p className="ide-hint">Que el método sea viable en tu contexto lo confirma tu asesor.</p>
+            </div>
+        </>
+    );
+};
+
+/* ---------- Clase ---------- */
+
+const Metodologia = ({ onNavigate }) => {
+    const { data } = useProject();
+    const { especificos } = partesObjetivos(data.objetivos);
+    const [demo, setDemo] = useState({ finita: true, N: 1200, Z: 1.96, e: 0.05 });
+    const [verValidacion, setVerValidacion] = useState(false);
+
+    const renderSlide = ({ slide, heading, goToSection, sectionMinutes, totalMinutes }) => ({
+        portada: (
+            <>
+                <div>
+                    {heading}
+                    <p>La metodología explica cómo vas a lograr tus objetivos: con qué enfoque, de qué tipo, con qué diseño, con quiénes, con qué instrumentos, cómo analizarás los datos, en cuánto tiempo y con qué recursos.</p>
+                    <p><strong>Al terminar esta clase podrás:</strong></p>
+                    <ul className="ide-bullets">
+                        <li>Elegir el enfoque, el tipo y el diseño acordes con tus objetivos.</li>
+                        <li>Delimitar la población y calcular o justificar la muestra.</li>
+                        <li>Escoger técnicas e instrumentos válidos.</li>
+                        <li>Planear el análisis de cada objetivo.</li>
+                        <li>Armar el cronograma y el presupuesto.</li>
+                    </ul>
+                    {especificos.length > 0 && (
+                        <div className="tit-from-idea">
+                            <span>Tus objetivos específicos</span>
+                            {especificos.map((o) => <p key={o}>{o}</p>)}
+                        </div>
+                    )}
+                </div>
+                <div className="ide-panel">
+                    <h3>Plan de la clase · {totalMinutes} minutos</h3>
+                    <ol className="ide-agenda">
+                        {SECTIONS.map((section) => (
+                            <li key={section.id}>
+                                <button type="button" onClick={() => goToSection(section.id)}>
+                                    <span>{section.label}</span>
+                                    <small>{SLIDES.filter((item) => item.section === section.id).map((item) => item.title).join(' · ')}</small>
+                                    <b>{sectionMinutes(section.id)} min</b>
+                                </button>
+                            </li>
+                        ))}
+                    </ol>
+                </div>
+            </>
+        ),
+        muestra: (
+            <>
+                <div>
+                    {heading}
+                    <p>Con un muestreo probabilístico, el tamaño de la muestra se calcula. Prueba la calculadora: cambia la población, la confianza y el error, y mira cómo cambia la muestra.</p>
+                    <ul className="ide-bullets">
+                        <li><b>Confianza</b>: qué tan seguro quieres estar (lo usual, 95 %).</li>
+                        <li><b>Error</b>: cuánto te puedes equivocar (lo usual, 5 %).</li>
+                        <li>A más confianza o menos error, más grande la muestra.</li>
+                    </ul>
+                </div>
+                <Calculadora calc={demo} onChange={(patch) => setDemo((prev) => ({ ...prev, ...patch }))} />
+            </>
+        ),
+        gantt: (
+            <>
+                <div>
+                    {heading}
+                    <p>El cronograma organiza las actividades en el tiempo, por fases: preparación, recolección, análisis e informe. Se presenta como un diagrama de Gantt.</p>
+                    <p className="ide-hint">Deja tiempo para imprevistos: la recolección casi siempre toma más de lo previsto.</p>
+                </div>
+                <div className="ide-panel">
+                    <h3>Ejemplo de diagrama de Gantt</h3>
+                    <Gantt filas={CRONO_BASE.map((x, i) => ({ ...x, id: i }))} periodos={6} unidad="mensual" />
+                </div>
+            </>
+        ),
+        construye: (
+            <Constructor
+                onNavigate={onNavigate}
+                intro={(
+                    <>
+                        {heading}
+                        <p>Completa cada subtítulo en su pestaña. El texto se redacta solo; el cronograma se dibuja como diagrama de Gantt y el presupuesto suma el total.</p>
+                    </>
+                )}
+            />
+        ),
+        revision: (
+            <Revision
+                intro={(
+                    <>
+                        {heading}
+                        <p>Último paso: revisa que tu metodología sea coherente, válida y viable antes de llevarla a tu asesor.</p>
+                    </>
+                )}
+            />
+        ),
+    })[slide.id] || (
+        <Generica
+            slide={slide}
+            heading={heading}
+            onNavigate={onNavigate}
+            extra={slide.id === 'ins-validez' ? (
+                <>
+                    <button type="button" className="ide-btn ide-btn--primary" onClick={() => setVerValidacion(true)}>
+                        <BookOpenCheck size={16} /> Ver cada método paso a paso
+                    </button>
+                    <ValidacionModal open={verValidacion} onClose={() => setVerValidacion(false)} />
+                </>
+            ) : null}
+            aside={slide.status ? (
+                <div className="ide-panel">
+                    <h3>Siguiente paso</h3>
+                    <p>En la construcción completarás los ocho subtítulos: el tipo de investigación y la población ya vienen de tu proyecto, y hay una fila de análisis por cada objetivo específico.</p>
+                </div>
+            ) : null}
+        />
+    );
+
+    return (
+        <SlideDeck
+            sections={SECTIONS}
+            slides={SLIDES}
+            storageKey={SLIDE_KEY}
+            label="Metodología"
+            renderSlide={renderSlide}
+            finish={onNavigate ? { label: 'Desarrollar las fases del proyecto', onClick: () => onNavigate('fases') } : null}
+        />
     );
 };
 
