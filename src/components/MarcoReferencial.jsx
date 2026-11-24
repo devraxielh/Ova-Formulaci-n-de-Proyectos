@@ -192,6 +192,9 @@ const normaDeCita = (cita, anio) => {
 };
 
 // Qué ficha se arma en cada apartado que tiene búsqueda, y qué se le pide a la IA que saque del resumen.
+// Pocos conceptos y bien definidos: solo los fundamentales del proyecto.
+const MAX_CONCEPTOS = 6;
+
 const FICHA_DE = {
     antecedentes: {
         tipo: 'antecedente', nombre: 'antecedente', buscar: 'Buscar artículos sobre tu tema', lista: 'antecedentes', max: 10,
@@ -209,7 +212,7 @@ const FICHA_DE = {
         base: (ref) => ({ ...VACIO.norma, ...normaDeCita(ref.cita, ref.anio) }),
     },
     conceptual: {
-        tipo: 'concepto', nombre: 'concepto', buscar: 'Buscar definiciones en artículos', lista: 'conceptos', max: 12,
+        tipo: 'concepto', nombre: 'concepto', lista: 'conceptos', max: MAX_CONCEPTOS,
         campos: ['termino', 'definicion'],
         base: (ref) => ({ ...VACIO.concepto, autor: autorCita(ref), anio: ref.anio }),
     },
@@ -313,19 +316,19 @@ Responde exactamente con este JSON: {"postulado": "…", "relacion": "…"}` },
 
 // Definición de un concepto según el resumen de una obra. Si el resumen no lo define, queda vacía: no se le
 // atribuye al autor una definición que no es suya.
-const conceptoDesdeObra = async ({ termino, ref, resumen }) => {
+const conceptoDesdeObra = async ({ termino, ref, resumen, proyecto }) => {
     const r = await groq.chat.completions.create({
         messages: [
             { role: 'system', content: 'Ayudas a un estudiante a fichar la definición de un concepto para su marco conceptual. Te basas únicamente en el resumen (abstract) que recibes: la definición debe ser la que el resumen da o la forma en que el resumen entiende el concepto. No completas con lo que tú sabes ni inventas. La definición debe ser general: válida para el concepto en cualquier estudio, no la descripción del caso, la muestra o el procedimiento particular de ese artículo. Si el resumen no permite decir qué es el concepto en general, dejas "definicion" como cadena vacía. Escribes en español. Respondes solo JSON válido.' },
-            { role: 'user', content: `CONCEPTO: ${termino}\nOBRA: ${ref.titulo} (${ref.autores || 's. a.'}, ${ref.anio || 's. f.'})\nResumen: ${String(resumen).slice(0, 3500)}\n\n- "definicion": qué es ese concepto según el resumen. Una o dos frases que empiecen en minúscula, sin repetir el término al comienzo. Ejemplo solo de forma: «abandono de los estudios antes de obtener el título». Cadena vacía si el resumen no lo define ni lo explica.\nEl ejemplo solo muestra la forma: no copies su contenido. Sin punto final.\n\nResponde exactamente con este JSON: {"definicion": "…"}` },
+            { role: 'user', content: `CONCEPTO: ${termino}\nOBRA: ${ref.titulo} (${ref.autores || 's. a.'}, ${ref.anio || 's. f.'})\nResumen: ${String(resumen).slice(0, 3500)}\n\nPROYECTO DEL ESTUDIANTE (solo para saber en qué sentido se usa el concepto; no lo menciones en la definición)\nTítulo: ${proyecto?.titulo || '(sin título)'}\nProblema: ${proyecto?.problema || '(sin definir)'}\n\n- "definicion": una definición completa del concepto según el resumen, de dos o tres frases (entre 40 y 80 palabras). Primera frase: qué es, de forma precisa (a qué clase de cosa pertenece y qué lo distingue). Después: sus características, dimensiones, componentes o la forma en que se reconoce o se mide, SOLO si el resumen las menciona. Empieza en minúscula y no repitas el término al comienzo. No incluyas cifras ni resultados del estudio. Ejemplo solo de forma: «abandono de los estudios antes de obtener el título, sea de manera voluntaria o forzada. Comprende factores individuales, académicos, institucionales y socioeconómicos, y suele medirse por cohorte o por periodo». Cadena vacía si el resumen no lo define ni lo explica.\nEl ejemplo solo muestra la forma: no copies su contenido. Sin punto final.\n\nResponde exactamente con este JSON: {"definicion": "…"}` },
         ],
         temperature: 0.2,
-        max_tokens: 400,
+        max_tokens: 700,
         response_format: { type: 'json_object' },
     });
     const content = r.choices?.[0]?.message?.content || '';
     const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
-    return clean(String(json.definicion ?? '')).replace(/[.\s]+$/, '').replace(/^(?:se define como|es|son|se entiende como)\s+/i, '').slice(0, 600);
+    return clean(String(json.definicion ?? '')).replace(/[.\s]+$/, '').replace(/^(?:se define como|es|son|se entiende como)\s+/i, '').replace(/([.!?]\s+)(\p{Ll})/gu, (_, p, l) => p + l.toUpperCase()).slice(0, 900);
 };
 
 const useMarcoState = () => {
@@ -470,10 +473,10 @@ const Constructor = ({ intro, onNavigate }) => {
     const usarConcepto = async ({ nombre, ref, resumen }) => {
         const fuente = `${clean(nombre)}|${clean(ref.titulo)}`;
         const ficha = { ...VACIO.concepto, termino: clean(nombre), autor: autorCita(ref), anio: ref.anio, fuente };
-        ponerFicha('conceptos', ficha, 12, (x) => !clean(x.termino) && !clean(x.definicion) && !clean(x.autor));
+        ponerFicha('conceptos', ficha, MAX_CONCEPTOS, (x) => !clean(x.termino) && !clean(x.definicion) && !clean(x.autor));
         if (clean(resumen).length < 80) return 'vacia';
         try {
-            const definicion = await conceptoDesdeObra({ termino: nombre, ref, resumen });
+            const definicion = await conceptoDesdeObra({ termino: nombre, ref, resumen, proyecto: { titulo, problema: clean(idea.problema) } });
             if (!definicion) return 'vacia';
             setForm((prev) => {
                 const base = { ...MARCO_FORM, ...(prev || {}) };
@@ -552,6 +555,7 @@ const Constructor = ({ intro, onNavigate }) => {
                             tipo="concepto"
                             proyecto={{ titulo, problema: clean(idea.problema), pregunta: clean(pregunta), quien, donde }}
                             yaTiene={f.conceptos.map((c) => clean(c.termino)).filter(Boolean)}
+                            cupo={MAX_CONCEPTOS - f.conceptos.filter((c) => clean(c.termino) || clean(c.definicion) || clean(c.autor)).length}
                             onUsar={usarConcepto}
                         />
                     )}
@@ -605,13 +609,13 @@ const Constructor = ({ intro, onNavigate }) => {
                         <Fichas
                             items={f.conceptos}
                             vacio={VACIO.concepto}
-                            max={12}
-                            agregar="Agregar concepto (define al menos tres)"
+                            max={MAX_CONCEPTOS}
+                            agregar={`Agregar concepto (entre tres y ${MAX_CONCEPTOS}: solo los fundamentales)`}
                             onChange={set('conceptos')}
                             render={(c, change, i) => (
                                 <div className="mar-grid">
                                     <Campo className="mar-wide" id={`con-term-${i}`} label="Término" value={c.termino} onChange={(v) => change({ termino: v })} placeholder={`Ej: ${capital(problema)}`} />
-                                    <Campo className="mar-wide" id={`con-def-${i}`} label="Definición" value={c.definicion} onChange={(v) => change({ definicion: v })} rows={2} placeholder="Ej: ausencia del paciente a una cita programada sin cancelación previa" />
+                                    <Campo className="mar-wide" id={`con-def-${i}`} label="Definición" value={c.definicion} onChange={(v) => change({ definicion: v })} rows={4} placeholder="Ej: ausencia del paciente a una cita programada sin cancelación previa" />
                                     <Campo id={`con-autor-${i}`} label="Autor" value={c.autor} onChange={(v) => change({ autor: v })} placeholder="Ej: Pérez" />
                                     <Campo id={`con-anio-${i}`} label="Año" value={c.anio} onChange={(v) => change({ anio: v })} placeholder={`Ej: ${ANIO_ACTUAL - 4}`} />
                                 </div>

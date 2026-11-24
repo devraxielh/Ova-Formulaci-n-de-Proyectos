@@ -20,10 +20,11 @@ const ACCIONES = [
     { id: 'mejorar', label: 'Mejorar la redacción', pide: 'Mejora la redacción: frases claras y bien conectadas, sin muletillas ni repeticiones, con ortografía y puntuación correctas. Conserva el registro académico.' },
     { id: 'tercera', label: 'Pasar a tercera persona', pide: 'Pasa el texto a tercera persona o a forma impersonal («se realizó», «el estudio analiza»), como exige la escritura académica. No cambies nada más.' },
     { id: 'acortar', label: 'Acortar', pide: 'Acorta el texto alrededor de un tercio: quita relleno y repeticiones, y conserva todas las ideas, datos y citas.' },
+    { id: 'expandir', label: 'Expandir', amplia: true, pide: 'Amplía el texto hasta una vez y media o, como mucho, el doble de su extensión: desarrolla y explica mejor las ideas que ya tiene, agrega las transiciones que falten y precisa lo que quedó dicho a medias. Conserva el orden, todas las ideas, los datos y las citas tal como están, y los saltos de párrafo. No agregues cifras, autores, citas, ejemplos con datos ni afirmaciones de hecho nuevas: donde haría falta un dato o una fuente para sostener lo que se amplía, deja una marca entre corchetes, como [dato] o [cita], para que el estudiante la complete.' },
     { id: 'citas', label: 'Detectar frases sin cita', detectar: true },
 ];
 
-const REGLAS = 'Reglas estrictas: no agregues información, datos, cifras, autores ni citas que no estén en el texto; no quites ni cambies las citas (Autor, año), las marcas entre corchetes dobles como [[abc123]] ni los asteriscos de formato (**negrita**, *cursiva*); conserva el significado y el idioma (español); no uses viñetas ni títulos si el original no los tiene.';
+const REGLAS = 'Reglas estrictas: no agregues información, datos, cifras, autores ni citas que no estén en el texto ni en los datos del proyecto del estudiante; no quites ni cambies las citas (Autor, año), las marcas entre corchetes dobles (un código entre [[ y ]]) que el texto ya tenga, y no agregues marcas de ese tipo; tampoco quites los asteriscos de formato (**negrita**, *cursiva*); conserva el significado y el idioma (español); no uses viñetas ni títulos si el original no los tiene.';
 
 // De qué trata el campo: su etiqueta visible (o la más cercana) y su texto de ayuda.
 const rotuloDe = (el) => {
@@ -59,6 +60,12 @@ const itemsDelProyecto = (d) => {
     ].filter(([, valor]) => valor);
 };
 
+// Las marcas [[…]] enlazan figuras y tablas del proyecto: la IA no puede crear ninguna. Se quitan las que no estaban.
+const sinMarcasNuevas = (propuesta, original) => {
+    const estaban = new Set(String(original || '').match(/\[\[[^\]]*\]\]/g) || []);
+    return propuesta.replace(/\s*\[\[[^\]]*\]\]/g, (m) => (estaban.has(m.trim()) ? m : '')).replace(/\s+([.,;])/g, '$1').trim();
+};
+
 const pedirLlenar = async ({ rotulo, clase, ayuda, actual, items }) => {
     const r = await groq.chat.completions.create({
         messages: [
@@ -70,15 +77,22 @@ const pedirLlenar = async ({ rotulo, clase, ayuda, actual, items }) => {
     });
     const propuesta = String(r.choices?.[0]?.message?.content || '').trim().replace(/^["«]|["»]$/g, '').trim();
     if (!propuesta) throw new Error('La IA no devolvió texto. Inténtalo de nuevo.');
-    return { propuesta };
+    return { propuesta: sinMarcasNuevas(propuesta, actual) };
 };
 
-const pedir = async (accion, texto) => {
+// El contexto que acompaña a toda petición: de qué proyecto es el texto y a qué parte pertenece.
+const contextoDe = ({ items = [], rotulo = '', clase = '' } = {}) => (items.length
+    ? `PROYECTO DEL ESTUDIANTE (contexto)\nSección: ${clase || '(sin nombre)'}${rotulo ? ` · Parte: ${rotulo}` : ''}\n${items.map(([k, v]) => `- ${k}: ${v}`).join('\n')}\n\n`
+    : '');
+const USA_CONTEXTO = 'Usa el contexto del proyecto para entender de qué trata el texto y mantenerlo coherente con él: los mismos términos, la misma población y el mismo lugar del título, la pregunta y los objetivos. Si el texto contradice al proyecto en uno de esos puntos, ajústalo al proyecto.';
+
+const pedir = async (accion, texto, ctx) => {
+    const contexto = contextoDe(ctx);
     if (accion.detectar) {
         const r = await groq.chat.completions.create({
             messages: [
                 { role: 'system', content: 'Eres revisor de escritura académica en formato APA. Identificas afirmaciones que necesitan respaldo de una fuente. Respondes solo JSON válido en español.' },
-                { role: 'user', content: `En este texto, señala las frases que necesitan una cita y no la tienen: cifras, porcentajes, datos, definiciones, afirmaciones sobre lo que «se ha demostrado» o «los estudios indican», teorías y leyes. No señales opiniones propias del autor, descripciones de su propio estudio ni frases que ya tienen cita (Autor, año).\n\nTEXTO:\n${texto}\n\nResponde exactamente: {"frases": [{"frase": "copia textual de la frase, máximo 25 palabras", "porque": "qué tipo de respaldo necesita y dónde buscarlo"}]}. Si todas están respaldadas, devuelve {"frases": []}.` },
+                { role: 'user', content: `${contexto}En este texto, señala las frases que necesitan una cita y no la tienen: cifras, porcentajes, datos, definiciones, afirmaciones sobre lo que «se ha demostrado» o «los estudios indican», teorías y leyes. No señales opiniones propias del autor, descripciones de su propio estudio (lo que aparece en el contexto del proyecto: su título, pregunta, objetivos, población, lugar y método) ni frases que ya tienen cita (Autor, año). En «porque», sugiere qué buscar según el tema del proyecto.\n\nTEXTO:\n${texto}\n\nResponde exactamente: {"frases": [{"frase": "copia textual de la frase, máximo 25 palabras", "porque": "qué tipo de respaldo necesita y dónde buscarlo"}]}. Si todas están respaldadas, devuelve {"frases": []}.` },
             ],
             temperature: 0.2,
             max_tokens: 1500,
@@ -90,15 +104,15 @@ const pedir = async (accion, texto) => {
     }
     const r = await groq.chat.completions.create({
         messages: [
-            { role: 'system', content: `Eres corrector de estilo académico en español. ${REGLAS} Devuelves únicamente el texto corregido, sin comillas, sin explicaciones y sin frases de introducción.` },
-            { role: 'user', content: `${accion.pide}\n\nTEXTO:\n${texto}` },
+            { role: 'system', content: `Eres corrector de estilo académico en español. ${REGLAS} ${contexto ? USA_CONTEXTO : ''} Devuelves únicamente el texto corregido, sin comillas, sin explicaciones y sin frases de introducción.` },
+            { role: 'user', content: `${contexto}${accion.pide}${accion.amplia ? ` El texto tiene ${texto.trim().split(/\s+/).length} palabras: la versión ampliada debe tener entre ${Math.max(60, Math.round(texto.trim().split(/\s+/).length * 1.5))} y ${Math.max(90, texto.trim().split(/\s+/).length * 2)} palabras, no más.` : ''}${contexto && accion.amplia ? ' Para desarrollar las ideas apóyate en los datos del proyecto (problema, causas, efectos, objetivos, población, lugar y método) que tengan que ver con esta parte.' : ''}\n\nTEXTO:\n${texto}` },
         ],
         temperature: 0.3,
-        max_tokens: Math.min(4000, Math.max(400, Math.round(texto.length / 2))),
+        max_tokens: Math.min(4000, Math.max(accion.amplia ? 700 : 400, Math.round(texto.length * (accion.amplia ? 0.9 : 0.5)))),
     });
     const propuesta = String(r.choices?.[0]?.message?.content || '').trim().replace(/^["«]|["»]$/g, '').trim();
     if (!propuesta) throw new Error('La IA no devolvió texto. Inténtalo de nuevo.');
-    return { propuesta };
+    return { propuesta: sinMarcasNuevas(propuesta, texto) };
 };
 
 // Citas y marcas que deben sobrevivir al cambio; si falta alguna, se avisa antes de aceptar.
@@ -144,7 +158,7 @@ const Redactar = ({ stageRef }) => {
             // «Llenar con mi proyecto» trabaja sobre el campo completo, aunque esté vacío o haya una parte seleccionada.
             const r = accion.llenar
                 ? await pedirLlenar({ rotulo: trabajo.rotulo, clase: stageRef.current?.getAttribute('aria-label') || '', ayuda: placeholderDe(trabajo.el).replace(/^Ej:\s*/, ''), actual: valorDe(trabajo.el).trim(), items })
-                : await pedir(accion, trabajo.original);
+                : await pedir(accion, trabajo.original, { items, rotulo: trabajo.rotulo, clase: stageRef.current?.getAttribute('aria-label') || '' });
             setTrabajo((t) => ({ ...t, accion, ...r }));
         } catch (err) {
             setError(err?.message?.includes('JSON') ? 'La IA respondió en un formato inesperado. Inténtalo de nuevo.' : (err.message || 'No se pudo completar.'));
@@ -219,7 +233,7 @@ const Redactar = ({ stageRef }) => {
                         )}
                     </div>
                     <footer className="ria-foot">
-                        <small>{trabajo?.accion?.llenar ? 'Es un borrador armado con tu proyecto: no trae cifras ni fuentes. Complétalo donde veas corchetes, léelo completo y ajústalo antes de aceptarlo.' : 'La IA no agrega datos ni fuentes; solo cambia la forma. Lee la propuesta completa antes de aceptarla: el texto sigue siendo tuyo.'}</small>
+                        <small>{trabajo?.accion?.llenar ? 'Es un borrador armado con tu proyecto: no trae cifras ni fuentes. Complétalo donde veas corchetes, léelo completo y ajústalo antes de aceptarlo.' : trabajo?.accion?.amplia ? 'La IA desarrolla las ideas que ya escribiste con lo que hay en tu proyecto, sin agregar cifras ni fuentes: donde hagan falta deja corchetes para que los completes. Lee la propuesta completa antes de aceptarla.' : 'La IA tiene en cuenta tu proyecto, pero no agrega datos ni fuentes; solo cambia la forma. Lee la propuesta completa antes de aceptarla: el texto sigue siendo tuyo.'}</small>
                         {trabajo?.propuesta && estado !== 'pensando' && (
                             <span className="red-decidir">
                                 <button type="button" className="red-rechazar" onClick={() => setTrabajo((t) => ({ ...t, propuesta: '', accion: null }))}>Rechazar</button>

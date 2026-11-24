@@ -32,15 +32,15 @@ const TIPOS = {
     },
     concepto: {
         titulo: 'Sugerir conceptos para tu tema',
-        nota: 'La IA propone qué conceptos debe definir tu proyecto. La definición no la inventa: sale del resumen de un artículo sobre cada concepto en OpenAlex, y se cita con su autor y su año.',
+        nota: 'La IA propone los conceptos fundamentales de tu proyecto (máximo 6 en total). La definición no la inventa: sale del resumen de un artículo sobre cada concepto en OpenAlex, y se cita con su autor y su año.',
         boton: ' Sugerir conceptos para mi tema', buscando: ' Buscando obras que los definan…',
         campo: 'Concepto', placeholder: '¿Ya sabes cuál? Escribe el concepto, mejor en inglés. Ej: treatment adherence',
         nada: 'La IA no propuso conceptos. Inténtalo de nuevo o escribe un concepto.',
         sinObra: 'Sin obra encontrada con ese término. Búscalo con otras palabras o en inglés.',
         usar: 'Usar la definición de esta obra',
-        llena: 'Ficha llena con la definición que da el resumen y obra agregada a tus referencias: revísala abajo',
+        llena: 'Ficha llena con la definición que da el resumen y obra agregada a tus referencias: revísala y amplíala abajo',
         vacia: 'El resumen de esta obra no define el concepto: quedó la ficha con el término, el autor y el año. Prueba con otra obra o escribe la definición al leerla',
-        pie: 'La definición se toma del resumen: confírmala leyendo la obra antes de citarla. Si ninguna obra lo define bien, usa «Buscar definiciones en artículos».',
+        pie: 'La definición se toma del resumen: confírmala leyendo la obra antes de citarla. Si ninguna obra lo define bien, prueba con otra o escribe la definición a mano con su autor y año.',
         prestar: false,
     },
 };
@@ -49,22 +49,22 @@ const PIDE_IA = {
     teoria: {
         sistema: 'Propones teorías o modelos teóricos que EXISTEN, están publicados y tienen un nombre establecido en la literatura académica, y que sirven para sustentar el proyecto del estudiante. No inventas teorías ni nombres. Si dudas de que una teoría exista con ese nombre, no la propones.',
         ya: 'Ya tiene estas teorías, no las repitas',
-        tarea: `Propón cuatro teorías o modelos distintos que expliquen este problema, de la más a la menos pertinente. Para cada una:\n- "nombre": su nombre habitual en español, con artículo si lo lleva. Ejemplo solo de forma: «La teoría del apego».\n- "ingles": su nombre habitual en inglés, en minúsculas, tal como aparece en los títulos de los artículos, sin autor ni año. Ejemplo solo de forma: «attachment theory».\n- "autor": solo el apellido del autor que la propuso; cadena vacía si no estás seguro.\n- "porque": una frase corta que diga por qué sirve para este proyecto, que empiece con un verbo en tercera persona en minúscula. Sin punto final.`,
+        tarea: () => `Propón cuatro teorías o modelos distintos que expliquen este problema, de la más a la menos pertinente. Para cada una:\n- "nombre": su nombre habitual en español, con artículo si lo lleva. Ejemplo solo de forma: «La teoría del apego».\n- "ingles": su nombre habitual en inglés, en minúsculas, tal como aparece en los títulos de los artículos, sin autor ni año. Ejemplo solo de forma: «attachment theory».\n- "autor": solo el apellido del autor que la propuso; cadena vacía si no estás seguro.\n- "porque": una frase corta que diga por qué sirve para este proyecto, que empiece con un verbo en tercera persona en minúscula. Sin punto final.`,
     },
     concepto: {
         sistema: 'Propones los conceptos o variables clave que el proyecto del estudiante debe definir en su marco conceptual: términos técnicos reales y de uso establecido en la literatura académica. No propones palabras comunes, nombres de lugares ni expresiones genéricas que sirven para cualquier estudio (como «factores asociados», «impacto» o «análisis»).',
         ya: 'Ya definió estos conceptos, no los repitas',
-        tarea: `Propón cinco conceptos o variables clave distintos que este proyecto debe definir, empezando por los que aparecen en el título y la pregunta. Para cada uno:\n- "nombre": el término en español, de una a cinco palabras, con mayúscula inicial. Ejemplo solo de forma: «Deserción estudiantil».\n- "ingles": el término habitual en inglés, en minúsculas, tal como aparece en los títulos de los artículos de este campo, lo bastante específico para que la búsqueda no traiga otros temas. Ejemplo solo de forma: «student dropout».\n- "autor": cadena vacía.\n- "porque": una frase corta que diga por qué hay que definirlo en este proyecto, que empiece con un verbo en tercera persona en minúscula. Sin punto final.`,
+        tarea: (n) => `Propón ${n === 1 ? 'el concepto fundamental' : `los ${n} conceptos fundamentales`} que este proyecto debe definir: sus variables y el fenómeno que estudia, tal como aparecen en el título y la pregunta. Sé preciso: ${n === 1 ? 'el' : 'solo los'} imprescindible${n === 1 ? '' : 's'}, sin conceptos accesorios, sin dos que signifiquen casi lo mismo y sin una lista de variantes de la misma palabra (no «Factores de…» varias veces: si el proyecto estudia factores, nombra el fenómeno y, como mucho, un concepto que los agrupe). Para cada uno:\n- "nombre": el término en español, de una a cinco palabras, con mayúscula inicial. Ejemplo solo de forma: «Deserción estudiantil».\n- "ingles": el término habitual en inglés, en minúsculas, tal como aparece en los títulos de los artículos de este campo, lo bastante específico para que la búsqueda no traiga otros temas. Ejemplo solo de forma: «student dropout».\n- "autor": cadena vacía.\n- "porque": una frase corta que diga por qué hay que definirlo en este proyecto, que empiece con un verbo en tercera persona en minúscula. Sin punto final.`,
     },
 };
 
 // La IA propone teorías reconocidas para el proyecto. No da referencias: esas se buscan después.
-const proponer = async (proyecto, yaTiene, tipo) => {
+const proponer = async (proyecto, yaTiene, tipo, cuantos) => {
     const pide = PIDE_IA[tipo];
     const r = await groq.chat.completions.create({
         messages: [
             { role: 'system', content: `Eres asesor de proyectos de investigación. ${pide.sistema} Respondes solo JSON válido.` },
-            { role: 'user', content: `PROYECTO\nTítulo: ${proyecto.titulo || '(sin título)'}\nProblema: ${proyecto.problema || '(sin definir)'}\nPregunta de investigación: ${proyecto.pregunta || '(sin definir)'}\nPoblación: ${proyecto.quien || '(sin definir)'}\nLugar: ${proyecto.donde || '(sin definir)'}\n${yaTiene.length ? `\n${pide.ya}: ${yaTiene.join('; ')}\n` : ''}\n${pide.tarea}\nLos ejemplos solo muestran la forma: no los propongas salvo que de verdad apliquen.\n\nResponde exactamente con este JSON: {"teorias": [{"nombre": "…", "ingles": "…", "autor": "…", "porque": "…"}]}` },
+            { role: 'user', content: `PROYECTO\nTítulo: ${proyecto.titulo || '(sin título)'}\nProblema: ${proyecto.problema || '(sin definir)'}\nPregunta de investigación: ${proyecto.pregunta || '(sin definir)'}\nPoblación: ${proyecto.quien || '(sin definir)'}\nLugar: ${proyecto.donde || '(sin definir)'}\n${yaTiene.length ? `\n${pide.ya}: ${yaTiene.join('; ')}\n` : ''}\n${pide.tarea(cuantos)}\nLos ejemplos solo muestran la forma: no los propongas salvo que de verdad apliquen.\n\nResponde exactamente con este JSON: {"teorias": [{"nombre": "…", "ingles": "…", "autor": "…", "porque": "…"}]}` },
         ],
         temperature: 0.3,
         max_tokens: 900,
@@ -75,10 +75,10 @@ const proponer = async (proyecto, yaTiene, tipo) => {
     return (Array.isArray(json.teorias) ? json.teorias : [])
         .map((t) => ({ nombre: limpio(t.nombre), ingles: limpio(t.ingles), autor: limpio(t.autor, 60), porque: limpio(t.porque, 300).replace(/[.\s]+$/, '') }))
         .filter((t) => t.nombre && t.ingles)
-        .slice(0, 5);
+        .slice(0, cuantos);
 };
 
-const SugerirTeorias = ({ proyecto, yaTiene = [], onUsar, tipo = 'teoria' }) => {
+const SugerirTeorias = ({ proyecto, yaTiene = [], onUsar, tipo = 'teoria', cupo = 6 }) => {
     const tx = TIPOS[tipo];
     const [refs, setRefs] = useProjectField('referencias', []);
     const [estado, setEstado] = useState('');
@@ -99,7 +99,7 @@ const SugerirTeorias = ({ proyecto, yaTiene = [], onUsar, tipo = 'teoria' }) => 
         setEstado('pensando');
         setError('');
         try {
-            const propuestas = await proponer(proyecto, yaTiene, tipo);
+            const propuestas = await proponer(proyecto, yaTiene, tipo, tipo === 'concepto' ? Math.min(cupo, 4) : 4);
             if (!propuestas.length) throw new Error(tx.nada);
             setEstado('buscando');
             setTeorias(await conObras(propuestas));
@@ -139,16 +139,18 @@ const SugerirTeorias = ({ proyecto, yaTiene = [], onUsar, tipo = 'teoria' }) => 
     };
 
     const ocupado = Boolean(estado);
+    const lleno = tipo === 'concepto' && cupo <= 0;
     return (
         <section className="bus-panel">
             <h3><Lightbulb size={17} aria-hidden="true" /> {tx.titulo}</h3>
             <p className="bus-base-nota">{tx.nota}</p>
             <div className="bus-acciones">
-                <button type="button" className="ide-btn ide-btn--primary" disabled={ocupado} onClick={sugerir}>
+                <button type="button" className="ide-btn ide-btn--primary" disabled={ocupado || lleno} onClick={sugerir}>
                     {estado === 'pensando' || estado === 'buscando' ? <Loader2 size={16} className="bus-spin" /> : <Sparkles size={16} />}
                     {estado === 'pensando' ? ' Pensando en tu proyecto…' : estado === 'buscando' ? tx.buscando : teorias ? (tipo === 'teoria' ? ' Sugerir otras' : ' Sugerir otros') : tx.boton}
                 </button>
             </div>
+            {lleno && <p className="bus-meta"><span className="bus-pre">Ya tienes 6 conceptos, el máximo: son pocos para que cada uno quede bien definido. Quita uno abajo si quieres cambiarlo.</span></p>}
             <form className="bus-form bus-form--corta" onSubmit={buscarNombre}>
                 <input className="input-field" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder={tx.placeholder} aria-label={tx.campo} />
                 <button type="submit" className="ide-btn ide-btn--ghost" disabled={ocupado || limpio(nombre).length < 3}>
@@ -177,7 +179,7 @@ const SugerirTeorias = ({ proyecto, yaTiene = [], onUsar, tipo = 'teoria' }) => 
                                         </p>
                                         {abierto === item.clave && <p className="bus-resumen">{item.resumen}</p>}
                                         <div className="bus-acciones">
-                                            {!e && <button type="button" className="ide-btn ide-btn--ghost" onClick={() => usar(t, item)}>{tx.usar}</button>}
+                                            {!e && <button type="button" className="ide-btn ide-btn--ghost" disabled={lleno} onClick={() => usar(t, item)}>{tx.usar}</button>}
                                             {e === 'llenando' && <span className="bus-ok"><Loader2 size={15} className="bus-spin" /> Llenando la ficha…</span>}
                                             {e === 'llena' && <span className="bus-ok"><CheckCircle2 size={15} /> {tx.llena}</span>}
                                             {e === 'prestada' && <span className="bus-ok"><CheckCircle2 size={15} /> Ficha llena. Esta obra no trae resumen: «Qué plantea» sale del resumen de otra obra sobre la teoría. Verifícalo</span>}
