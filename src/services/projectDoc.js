@@ -2,6 +2,7 @@ import { arbolCompleto, arbolSvg, explicacionArbol, leerArbol, leerArbolObjetivo
 import { ordenarReferencias, referenciaAPA } from './apa.js';
 import { partesObjetivos } from './coherencia.js';
 import { bloquesInstrumento, preguntasDe, ubicacionDe } from './instrumentos.js';
+import { LEYENDA_MUESTRA, ecuacionEnLinea, ecuacionesMuestreo } from '../data/muestreoEcuaciones.js';
 
 // Arma el documento del proyecto a partir de lo guardado en cada herramienta.
 // Cada sección produce "bloques" neutros que se pintan en pantalla o se exportan a Word.
@@ -87,6 +88,23 @@ const ideaBlocks = (idea) => {
 };
 
 // Los títulos escritos dentro del texto (### o **Algo:**) quedan como subtítulos en negrita, fuera del índice.
+// Ecuaciones del muestreo elegido, resueltas con los datos del proyecto: van después del texto de la población.
+// `text` lleva la ecuación en una línea para todo lo que lee los bloques como texto (revisión, conteo, exportes simples).
+const ecuacion = (partes) => ({ type: 'equation', partes, linea: ecuacionEnLinea(partes), text: ecuacionEnLinea(partes) });
+const bloquesEcuaciones = (d) => {
+    const p = d.metodologiaForm?.poblacion || {};
+    if (!text(d.poblacionSugerida) || !p.muestreo) return [];
+    const calc = { finita: d.poblacionTipo !== 'infinita', N: Number(d.poblacionTamano ?? 1000) || 0, Z: Number(d.muestraConfianza) || 1.96, e: Number(d.muestraError) || 0.05 };
+    const ecuaciones = ecuacionesMuestreo({ muestreo: p.muestreo, calc, conglomerados: p.conglomerados }).filter((e) => !e.soloVentana);
+    return ecuaciones.flatMap((e) => [
+        { type: 'paragraph', text: `${e.titulo}:` },
+        ecuacion(e.general),
+        ...(e.con ? [ecuacion(e.con)] : []),
+        // Las notas de cada ecuación ya están dichas en el párrafo de la población: aquí solo va la leyenda.
+        ...(e.leyenda ? [{ type: 'paragraph', text: `Donde ${LEYENDA_MUESTRA}.` }] : []),
+    ]);
+};
+
 const cuerpo = (raw) => parseBlocks(raw).map((b) => (b.type === 'heading' ? { type: 'sub', text: b.text } : b));
 // Subsección del índice (nivel 2 o 3), p. ej. «6.1 Antecedentes».
 const titled = (label, raw, level = 2) => (text(raw) ? [{ type: 'heading', level, text: label }, ...cuerpo(raw)] : []);
@@ -398,6 +416,7 @@ export const SECTIONS = [
                 ...titled('Tipos de investigación', d.metTipo),
                 ...titled('Diseños de Investigación', d.metDiseno),
                 ...titled('Población y muestra', d.poblacionSugerida),
+                ...bloquesEcuaciones(d),
                 ...conElementos(d, 'metodologia', BASE_ELEMENTOS.metodologia(d)),
                 ...cronoBlocks,
                 ...(crono.length ? ganttBlock(d) : []),

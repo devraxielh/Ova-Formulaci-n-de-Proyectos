@@ -42,6 +42,15 @@ export const Block = ({ block, fileUrl }) => {
             </figure>
         );
     }
+    if (block.type === 'equation') {
+        return (
+            <p className="pro-ecuacion" aria-label={block.linea}>
+                {block.partes.map((parte, i) => (typeof parte === 'string'
+                    ? <span key={i}>{parte}</span>
+                    : <span key={i} className="pro-frac"><span>{parte.num}</span><span>{parte.den}</span></span>))}
+            </p>
+        );
+    }
     if (block.type === 'heading') return <h4 className={block.level === 3 ? 'pro-h3' : undefined}>{block.titulo || block.text}</h4>;
     if (block.type === 'sub') return <p className="pro-sub"><strong>{block.text}</strong></p>;
     if (block.type === 'list') {

@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle2, Plus, Save, Trash2, X } from 'lucide-react';
-import { CONFIANZAS, MUESTREOS, tamanoMuestra } from '../data/metodologia';
+import { MUESTREOS, tamanoMuestra } from '../data/metodologia';
+import { LEYENDA_MUESTRA, ecuacionesMuestreo } from '../data/muestreoEcuaciones';
 import { MUESTREO_DETALLE, repartoEstratos } from '../data/muestreo';
 import './ValidacionModal.css';
 import './MuestreoModal.css';
@@ -18,17 +19,22 @@ const num = (v) => Number(v).toLocaleString('es-CO', { maximumFractionDigits: 2 
 const Frac = ({ arriba, abajo }) => (
     <span className="mue-frac"><span>{arriba}</span><span>{abajo}</span></span>
 );
-// Una ecuación con su título y, debajo, la misma ecuación con los números del estudiante.
-const Ecuacion = ({ titulo, children, con, nota }) => (
+// Una ecuación como lista de partes (texto o fracción).
+const Partes = ({ partes }) => partes.map((parte, i) => (typeof parte === 'string'
+    ? <span key={i}>{parte}</span>
+    : <Frac key={i} arriba={parte.num} abajo={parte.den} />));
+// La ecuación general y, debajo, la misma con los números del estudiante.
+const Ecuacion = ({ ec }) => (
     <div className="mue-ecuacion">
-        <b>{titulo}</b>
-        <p className="mue-formula">{children}</p>
-        {con && <p className="mue-formula mue-formula--con">{con}</p>}
-        {nota && <small>{nota}</small>}
+        <b>{ec.titulo}</b>
+        <p className="mue-formula"><Partes partes={ec.general} /></p>
+        {ec.con && <p className="mue-formula mue-formula--con"><Partes partes={ec.con} /></p>}
+        {ec.nota && <small>{ec.nota}</small>}
     </div>
 );
 
-const MuestreoModal = ({ open, inicial, poblacion, calc, unidad = 'personas', onUsar, onClose }) => {
+// `calculadora`: los controles del cálculo de la muestra (población, confianza, error), que viven en la pestaña.
+const MuestreoModal = ({ open, inicial, poblacion, calc, unidad = 'persona', calculadora, onUsar, onClose }) => {
     const ref = useRef(null);
     const [actual, setActual] = useState(inicial || MUESTREOS[0].id);
     const [estratos, setEstratos] = useState([]);
@@ -54,15 +60,10 @@ const MuestreoModal = ({ open, inicial, poblacion, calc, unidad = 'personas', on
     const m = MUESTREOS.find((x) => x.id === actual) || MUESTREOS[0];
     const d = MUESTREO_DETALLE[m.id];
     const N = Number(calc.N) || 0;
-    const Z = Number(calc.Z) || 1.96;
-    const e = Number(calc.e) || 0.05;
     const n = tamanoMuestra(calc);
-    const conf = CONFIANZAS.find((c) => c.z === Z)?.label || '95 %';
-    const k = calc.finita && n > 0 ? Math.max(1, Math.floor(N / n)) : 0;
     const reparto = repartoEstratos(estratos, n);
     const M = Math.round(Number(cong.total) || 0);
     const promedio = Number(cong.promedio) || 0;
-    const mCong = M > 0 && promedio > 0 ? Math.min(M, Math.ceil(n / promedio)) : 0;
     const enUso = poblacion?.muestreo === m.id;
 
     const usar = () => {
@@ -75,29 +76,7 @@ const MuestreoModal = ({ open, inicial, poblacion, calc, unidad = 'personas', on
     };
     const cambiar = (id) => { setActual(id); setGuardado(false); };
 
-    // Tamaño de la muestra: la misma fórmula de la calculadora, con sus números.
-    const tamano = (
-        <>
-            {calc.finita ? (
-                <Ecuacion
-                    titulo="Tamaño de la muestra (población finita)"
-                    con={<>n = <Frac arriba={`${num(N)} · ${num(Z)}² · 0,5 · 0,5`} abajo={`${num(e)}² · (${num(N)} − 1) + ${num(Z)}² · 0,5 · 0,5`} /> = <strong>{num(n)}</strong></>}
-                    nota={`Con tus datos: población de ${num(N)}, confianza del ${conf} y error del ${Math.round(e * 100)} %. Cámbialos en la calculadora de la pestaña.`}
-                >
-                    n = <Frac arriba="N · Z² · p · q" abajo="e² · (N − 1) + Z² · p · q" />
-                </Ecuacion>
-            ) : (
-                <Ecuacion
-                    titulo="Tamaño de la muestra (población infinita o desconocida)"
-                    con={<>n = <Frac arriba={`${num(Z)}² · 0,5 · 0,5`} abajo={`${num(e)}²`} /> = <strong>{num(n)}</strong></>}
-                    nota={`Con tus datos: confianza del ${conf} y error del ${Math.round(e * 100)} %. Cámbialos en la calculadora de la pestaña.`}
-                >
-                    n = <Frac arriba="Z² · p · q" abajo="e²" />
-                </Ecuacion>
-            )}
-            <p className="mue-leyenda"><b>N</b> población · <b>n</b> muestra · <b>Z</b> valor de la confianza (1,96 para 95 %) · <b>p</b> y <b>q</b> proporción esperada y su complemento (0,5 cuando no se conoce) · <b>e</b> margen de error</p>
-        </>
-    );
+    const ecuaciones = ecuacionesMuestreo({ muestreo: m.id, calc, conglomerados: { total: M, promedio }, unidad });
 
     return createPortal(
         <dialog ref={ref} className="val-modal" aria-labelledby="mue-titulo" onClose={onClose} onClick={(event) => { if (event.target === ref.current) onClose(); }}>
@@ -138,30 +117,21 @@ const MuestreoModal = ({ open, inicial, poblacion, calc, unidad = 'personas', on
                     </div>
                     <div className="val-col">
                         <section className="val-calc">
-                            <h3>Ecuaciones con tus datos</h3>
-                            {m.probabilistico && tamano}
-
-                            {m.id === 'aleatorio simple' && calc.finita && N > 0 && (
-                                <Ecuacion titulo="Probabilidad de que una persona sea elegida" con={<>P = <Frac arriba={num(n)} abajo={num(N)} /> = <strong>{num((n / N) * 100)} %</strong></>}>
-                                    P = <Frac arriba="n" abajo="N" />
-                                </Ecuacion>
+                            {m.probabilistico && (
+                                <>
+                                    <h3>Calcula tu muestra</h3>
+                                    {calculadora}
+                                </>
                             )}
+                            <h3>{m.probabilistico ? 'Ecuaciones con tus datos' : 'Cómo se decide el tamaño'}</h3>
+                            {ecuaciones.map((ec) => <Ecuacion key={ec.titulo} ec={ec} />)}
+                            {m.probabilistico && <p className="mue-leyenda">Donde {LEYENDA_MUESTRA}.</p>}
 
-                            {m.id === 'sistemático' && (calc.finita && N > 0 ? (
-                                <Ecuacion
-                                    titulo="Intervalo de selección"
-                                    con={<>k = <Frac arriba={num(N)} abajo={num(n)} /> ≈ <strong>{k}</strong></>}
-                                    nota={`Se sortea un arranque entre 1 y ${k} y se toma un ${unidad} cada ${k} de la lista.`}
-                                >
-                                    k = <Frac arriba="N" abajo="n" />
-                                </Ecuacion>
-                            ) : <p className="mue-aviso">Para calcular el intervalo k se necesita conocer el total de la población: en la calculadora elige «Finita» y escribe el total.</p>)}
+                            {m.id === 'sistemático' && !(calc.finita && N > 0) && <p className="mue-aviso">Para calcular el intervalo k se necesita conocer el total de la población: arriba elige «Finita» y escribe el total.</p>}
 
                             {m.id === 'aleatorio estratificado' && (
                                 <>
-                                    <Ecuacion titulo="Muestra de cada estrato (afijación proporcional)" nota="Escribe tus estratos y cuántas personas tiene cada uno: la muestra se reparte sola.">
-                                        <span>n<sub>h</sub></span> = n · <Frac arriba={<>N<sub>h</sub></>} abajo="N" />
-                                    </Ecuacion>
+                                    <p className="mue-leyenda">Escribe tus estratos y cuántas personas tiene cada uno: la muestra se reparte sola.</p>
                                     <div className="mue-tabla">
                                         <div className="mue-fila mue-fila--head"><span>Estrato</span><span>Personas (N<sub>h</sub>)</span><span>Muestra (n<sub>h</sub>)</span><span /></div>
                                         {estratos.map((fila, i) => {
@@ -178,35 +148,15 @@ const MuestreoModal = ({ open, inicial, poblacion, calc, unidad = 'personas', on
                                         <div className="mue-fila mue-fila--total"><span>Total</span><span>{num(reparto.total)}</span><span>{num(reparto.filas.reduce((s, r) => s + r.n, 0))}</span><span /></div>
                                     </div>
                                     {estratos.length < 8 && <button type="button" className="ide-link" onClick={() => setEstratos([...estratos, { nombre: '', N: '' }])}><Plus size={13} /> Agregar estrato</button>}
-                                    {calc.finita && reparto.total > 0 && reparto.total !== N && <p className="mue-aviso">Tus estratos suman {num(reparto.total)}, pero en la calculadora la población es {num(N)}: deja el mismo total en los dos lados.</p>}
+                                    {calc.finita && reparto.total > 0 && reparto.total !== N && <p className="mue-aviso">Tus estratos suman {num(reparto.total)}, pero arriba la población es {num(N)}: deja el mismo total en los dos lados.</p>}
                                 </>
                             )}
 
                             {m.id === 'por conglomerados' && (
-                                <>
-                                    <Ecuacion
-                                        titulo="Conglomerados que se sortean"
-                                        con={mCong ? <>m = <Frac arriba={num(n)} abajo={num(promedio)} /> ≈ <strong>{mCong}</strong> de {num(M)}</> : null}
-                                        nota="Escribe cuántos conglomerados hay y cuántas personas tiene cada uno en promedio."
-                                    >
-                                        m = <Frac arriba="n" abajo="tamaño promedio del conglomerado" />
-                                    </Ecuacion>
-                                    <div className="mue-dos">
-                                        <label className="mar-campo"><span>Conglomerados en total (M)</span><input className="input-field" type="number" min="0" value={cong.total} onChange={(ev) => { setGuardado(false); setCong({ ...cong, total: ev.target.value }); }} placeholder="Ej: 40 cursos" /></label>
-                                        <label className="mar-campo"><span>Personas por conglomerado (promedio)</span><input className="input-field" type="number" min="0" value={cong.promedio} onChange={(ev) => { setGuardado(false); setCong({ ...cong, promedio: ev.target.value }); }} placeholder="Ej: 30" /></label>
-                                    </div>
-                                </>
-                            )}
-
-                            {m.id.startsWith('censo') && (
-                                <Ecuacion titulo="Tamaño" con={calc.finita && N > 0 ? <>n = <strong>{num(N)}</strong></> : null} nota="No se calcula muestra ni margen de error: se estudia a todos. Informa la tasa de respuesta.">
-                                    n = N
-                                </Ecuacion>
-                            )}
-                            {m.id.startsWith('censo') && (
-                                <Ecuacion titulo="Tasa de respuesta">
-                                    Tasa = <Frac arriba="personas que respondieron" abajo="N" /> · 100
-                                </Ecuacion>
+                                <div className="mue-dos">
+                                    <label className="mar-campo"><span>Conglomerados en total (M)</span><input className="input-field" type="number" min="0" value={cong.total} onChange={(ev) => { setGuardado(false); setCong({ ...cong, total: ev.target.value }); }} placeholder="Ej: 40 cursos" /></label>
+                                    <label className="mar-campo"><span>Personas por conglomerado (promedio)</span><input className="input-field" type="number" min="0" value={cong.promedio} onChange={(ev) => { setGuardado(false); setCong({ ...cong, promedio: ev.target.value }); }} placeholder="Ej: 30" /></label>
+                                </div>
                             )}
 
                             {!m.probabilistico && !m.id.startsWith('censo') && (
@@ -217,8 +167,8 @@ const MuestreoModal = ({ open, inicial, poblacion, calc, unidad = 'personas', on
                 </div>
                 <footer className="val-foot">
                     <div className="val-foot-left">
-                        <button type="button" className="ide-btn ide-btn--primary" onClick={usar}><Save size={16} /> {enUso ? 'Guardar los datos de este muestreo' : 'Usar este muestreo'}</button>
-                        {guardado && <span className="val-ok"><CheckCircle2 size={15} /> Guardado: ya está en tu metodología</span>}
+                        <button type="button" className="ide-btn ide-btn--primary" onClick={usar}><Save size={16} /> {enUso ? 'Guardar este muestreo y su cálculo' : 'Elegir este muestreo'}</button>
+                        {guardado && <span className="val-ok"><CheckCircle2 size={15} /> Guardado: ya está en tu metodología y sus ecuaciones salen en el documento</span>}
                         {!guardado && enUso && <span className="val-nota">Es el muestreo de tu proyecto</span>}
                     </div>
                     <button type="button" className="ide-btn ide-btn--ghost" onClick={onClose}>Cerrar</button>

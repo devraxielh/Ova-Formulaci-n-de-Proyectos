@@ -6,7 +6,7 @@
  */
 import { estimatePageNumbers } from 'docx/layout';
 import {
-    AlignmentType, BorderStyle, Document, Header, HeadingLevel, ImageRun, LineRuleType, Packer, PageBreak, PageNumber,
+    AlignmentType, BorderStyle, Document, Header, HeadingLevel, ImageRun, LineRuleType, Math as Ecuacion, MathFraction, MathRun, Packer, PageBreak, PageNumber,
     Paragraph, SequentialIdentifier, ShadingType, Table, TableCell, TableOfContents, TableRow, TextRun, WidthType,
 } from 'docx';
 import { documentoNumerado } from './projectDoc.js';
@@ -113,6 +113,18 @@ const figura = (block, imagenes) => {
 
 const bloque = (block, imagenes) => {
     if (block.type === 'gantt') return gantt(block);
+    // Ecuación de Word (editable con el editor de ecuaciones), centrada.
+    if (block.type === 'equation') {
+        return [new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 120, after: 120, line: 360 },
+            children: [new Ecuacion({
+                children: block.partes.map((parte) => (typeof parte === 'string'
+                    ? new MathRun(parte)
+                    : new MathFraction({ numerator: [new MathRun(parte.num)], denominator: [new MathRun(parte.den)] }))),
+            })],
+        })];
+    }
     if (block.type === 'figure') return figura(block, imagenes);
     if (block.type === 'heading') {
         return [new Paragraph({ heading: block.level === 3 ? HeadingLevel.HEADING_3 : HeadingLevel.HEADING_2, children: [new TextRun({ text: block.titulo || block.text })] })];

@@ -176,6 +176,7 @@ const recomendarDiseno = async ({ tipo, ...proyecto }) => {
 
 const clean = (text) => String(text || '').trim().replace(/[\s.,;:]+$/, '');
 const lower = (text) => (text ? text.charAt(0).toLowerCase() + text.slice(1) : '');
+const capital = (text) => (text ? text.charAt(0).toUpperCase() + text.slice(1) : '');
 const money = (value) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number(value) || 0);
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -711,31 +712,30 @@ const Constructor = ({ intro, onNavigate }) => {
                         <div className="input-group pla-part mar-grid">
                             <Campo className="mar-wide" id="met-pob" label="Población" rows={2} value={f.poblacion.descripcion} onChange={(v) => setPob({ descripcion: v })} placeholder={`Ej: ${quien || 'los pacientes de consulta externa'}${donde ? ` de ${donde}` : ''} atendidos en el primer semestre de 2026`} />
                             <Campo id="met-uni" label="Unidad de análisis" value={f.poblacion.unidad} onChange={(v) => setPob({ unidad: v })} placeholder="Ej: pacientes" />
-                            <label className="mar-campo">
+                            <div className="mar-campo">
                                 <span>Muestreo</span>
-                                <select className="input-field" value={f.poblacion.muestreo} onChange={(e) => setPob({ muestreo: e.target.value })}>
-                                    <option value="">Elige…</option>
-                                    <optgroup label="Probabilístico">{MUESTREOS.filter((m) => m.probabilistico).map((m) => <option key={m.id} value={m.id}>{m.id}</option>)}</optgroup>
-                                    <optgroup label="No probabilístico">{MUESTREOS.filter((m) => !m.probabilistico).map((m) => <option key={m.id} value={m.id}>{m.id}</option>)}</optgroup>
-                                </select>
-                                <span className="mue-abrir">
-                                    <button type="button" className="ide-btn ide-btn--ghost" onClick={() => setVerMuestreo(true)}><BookOpenCheck size={15} /> Ver cada muestreo y sus ecuaciones</button>
-                                </span>
-                            </label>
+                                <div className="mue-elegido">
+                                    {f.poblacion.muestreo
+                                        ? <p><strong>{capital(f.poblacion.muestreo)}</strong> · {MUESTREOS.find((m) => m.id === f.poblacion.muestreo)?.probabilistico ? `probabilístico · muestra de ${tamanoMuestra(calc)}` : f.poblacion.muestreo.startsWith('censo') ? 'toda la población' : 'no probabilístico'}</p>
+                                        : <p>Todavía no has elegido el muestreo.</p>}
+                                    <button type="button" className="ide-btn ide-btn--ghost" onClick={() => setVerMuestreo(true)}><BookOpenCheck size={15} /> {f.poblacion.muestreo ? 'Cambiar el muestreo o su cálculo' : 'Elegir el muestreo y calcular la muestra'}</button>
+                                </div>
+                            </div>
                             <MuestreoModal
                                 open={verMuestreo}
                                 inicial={f.poblacion.muestreo}
                                 poblacion={f.poblacion}
                                 calc={calc}
-                                unidad={lower(clean(f.poblacion.unidad)) || 'persona'}
+                                unidad={lower(clean(f.poblacion.unidad)).replace(/s$/, '') || 'persona'}
+                                calculadora={<Calculadora calc={calc} onChange={(patch) => { touch(); setCalc(patch); }} compacta />}
                                 onUsar={(patch) => setPob(patch)}
                                 onClose={() => setVerMuestreo(false)}
                             />
                             <Campo className="mar-wide" id="met-inc" label="Criterios de inclusión" rows={2} value={f.poblacion.inclusion} onChange={(v) => setPob({ inclusion: v })} placeholder="Ej: mayores de 18 años, con al menos una cita programada en el periodo, que acepten participar" />
                             <Campo className="mar-wide" id="met-exc" label="Criterios de exclusión" rows={2} value={f.poblacion.exclusion} onChange={(v) => setPob({ exclusion: v })} placeholder="Ej: pacientes de urgencias u hospitalización, o con limitaciones para responder" />
-                            {MUESTREOS.find((m) => m.id === f.poblacion.muestreo)?.probabilistico
-                                ? <div className="mar-wide"><Calculadora calc={calc} onChange={(patch) => { touch(); setCalc(patch); }} compacta /></div>
-                                : <Campo className="mar-wide" id="met-mtx" label="Cómo se eligen los participantes" rows={2} value={f.poblacion.muestraTexto} onChange={(v) => setPob({ muestraTexto: v })} placeholder="Ej: se entrevistará a 12 pacientes hasta alcanzar la saturación de la información" />}
+                            {f.poblacion.muestreo && !MUESTREOS.find((m) => m.id === f.poblacion.muestreo)?.probabilistico && (
+                                <Campo className="mar-wide" id="met-mtx" label="Cómo se eligen los participantes" rows={2} value={f.poblacion.muestraTexto} onChange={(v) => setPob({ muestraTexto: v })} placeholder="Ej: se entrevistará a 12 pacientes hasta alcanzar la saturación de la información" />
+                            )}
                         </div>
                     )}
 

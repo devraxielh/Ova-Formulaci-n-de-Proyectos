@@ -1369,3 +1369,9 @@
 .pro-temas-modal footer small { color: #64748b; font-size: 0.88rem; }
 .pro-temas-modal footer span { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .pro-coh-sube { margin: 0; font-size: 0.88rem; color: #15803d; }
+
+/* Ecuaciones en el documento */
+.pro-paper p.pro-ecuacion { text-indent: 0; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.3rem; margin: 0.5rem 0; font-family: 'Cambria Math', Cambria, 'Times New Roman', serif; font-style: italic; }
+.pro-frac { display: inline-flex; flex-direction: column; align-items: center; text-align: center; }
+.pro-frac > span { padding: 0.05rem 0.4rem; white-space: nowrap; }
+.pro-frac > span:first-child { border-bottom: 1.2px solid currentColor; }

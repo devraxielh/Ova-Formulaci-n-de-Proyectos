@@ -40,6 +40,8 @@ const bloque = (block, imagenes) => {
     if (block.type === 'heading') {
         return [{ text: block.titulo || block.text, bold: true, italics: block.level === 3, alignment: 'left', margin: [0, 10, 0, 6], tocItem: 'indice', tocMargin: [block.level === 3 ? 24 : 12, 0, 0, 0], headlineLevel: block.level }];
     }
+    // En PDF la ecuación va en una sola línea, centrada (la fracción dibujada es de la pantalla y de Word).
+    if (block.type === 'equation') return [{ text: block.linea, alignment: 'center', italics: true, margin: [0, 4, 0, 4] }];
     if (block.type === 'sub') return [{ text: block.text, bold: true, alignment: 'left', headlineLevel: 9 }];
     if (block.type === 'list' && block.nums) return block.items.map((item, i) => ({ columns: [{ width: 22, text: `${block.nums[i]}.`, alignment: 'left' }, { width: '*', text: tramos(item) }], margin: [SANGRIA, 0, 0, 0] }));
     if (block.type === 'list') return [{ ul: block.items.map((item) => ({ text: tramos(item) })), margin: [SANGRIA, 0, 0, 0] }];
