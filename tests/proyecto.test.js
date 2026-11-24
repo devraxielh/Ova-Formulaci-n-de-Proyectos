@@ -246,6 +246,11 @@ test('el árbol del problema entra como figura al final del planteamiento y se c
     const i = plan.content.indexOf(figura);
     assert.match(plan.content[i - 1].text, /^La Figura 1 presenta el árbol del problema.*problema central: alta inasistencia a citas\. .*aparece la causa que lo origina: olvido de la fecha\. .*el efecto que produce: se pierden cupos\.$/);
     assert.equal(plan.content.find((b) => b.text?.startsWith('Segundo')).text, 'Segundo párrafo.');
+    // Sin «Párrafo de cierre» en el constructor, va al final del texto; con cierre, justo antes de él.
+    assert.equal(plan.content[i - 2].text, 'Segundo párrafo.');
+    const conCierre = documentoNumerado(buildDocument({ ...datos, planteamiento: 'Contexto.\n\nCausas.\n\nPor lo anterior, resulta necesario investigar.', planteamientoForm: { cierre: 'Por lo anterior, resulta necesario investigar.' } })).find((s) => s.id === 'planteamiento');
+    const tipos = conCierre.content.map((b) => (b.type === 'figure' ? 'FIGURA' : b.type === 'heading' ? 'TITULO' : b.text.slice(0, 12)));
+    assert.deepEqual(tipos.slice(0, 5), ['Contexto.', 'Causas.', 'La Figura 1 ', 'FIGURA', 'Por lo anter']);
     // Si el estudiante escribe su propio párrafo, se usa ese y se le pone el número de la figura.
     const propio = documentoNumerado(buildDocument({ ...datos, arbol: { ...datos.arbol, explicacion: 'Como muestra la figura, el olvido es la raíz.' } })).find((s) => s.id === 'planteamiento');
     assert.ok(propio.content.some((b) => b.text === 'Como muestra la Figura 1, el olvido es la raíz.'));

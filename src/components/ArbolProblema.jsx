@@ -194,7 +194,7 @@ const Constructor = ({ heading }) => {
                     <h2>Tu árbol del problema</h2>
                     <img className="arb-figura" src={figura} alt={completo ? `Árbol del problema. Problema central: ${base.problema}. Causas: ${base.causas.join('; ')}. Efectos: ${base.efectos.join('; ')}.` : 'Árbol del problema, aún incompleto'} />
                     {completo
-                        ? <p className="arb-estado" data-ok="true">Esta figura ya entra en el <strong>Planteamiento del problema</strong> de tu documento (vista previa, Word y PDF), después de su texto y con un párrafo que la explica.</p>
+                        ? <p className="arb-estado" data-ok="true">Esta figura ya entra en el <strong>Planteamiento del problema</strong> de tu documento (vista previa, Word y PDF), antes de su párrafo de cierre y con un párrafo que la explica.</p>
                         : <p className="arb-estado">Para que entre en tu documento falta {faltan.join(', ').replace(/, ([^,]*)$/, ' y $1')}.</p>}
                     {completo && (
                         <label className="arb-explica" htmlFor="arb-explica">

@@ -112,7 +112,9 @@ const money = (value) => new Intl.NumberFormat('es-CO', { style: 'currency', cur
 // Identificador de la figura del árbol: sirve para citarla («ver Figura 1») y para entregar su imagen a Word y PDF.
 export const ARBOL_ID = 'arbolfig';
 
-// La figura va al final del texto del planteamiento, precedida por un párrafo que la presenta y la explica
+// La figura va dentro del planteamiento, justo antes de su «Párrafo de cierre» (la parte 5 del constructor):
+// así el texto cierra con la necesidad de investigar y no con una figura. Si el planteamiento no tiene cierre
+// (o se escribió de otra forma), va al final del texto. La precede un párrafo que la presenta y la explica
 // (la marca [[arbolfig]] se cambia por su número: «La Figura 1 presenta…»). Si el estudiante escribió su propio
 // párrafo sin nombrar la figura, ese párrafo la cita solo («ver Figura 1»).
 // Solo entra cuando hay texto (una figura sola no da el planteamiento por hecho) y el árbol está completo.
@@ -122,7 +124,12 @@ const conArbol = (d, blocks) => {
     const { w, h } = arbolSvg(arbol);
     const propia = Boolean(arbol.explicacion);
     const presentacion = { type: 'paragraph', text: propia ? arbol.explicacion.replace(/\b[Ll]a figura\b(?! \d)/, (m) => `${m.charAt(0)}a [[${ARBOL_ID}]]`) : explicacionArbol(arbol, `La [[${ARBOL_ID}]]`), citaDe: [ARBOL_ID] };
-    return [...blocks, presentacion, { type: 'figure', elementoId: ARBOL_ID, fileId: ARBOL_ID, arbol: { problema: arbol.problema, causas: arbol.causas, efectos: arbol.efectos }, caption: 'Árbol del problema', nota: 'Elaboración propia.', w, h }];
+    const figura = { type: 'figure', elementoId: ARBOL_ID, fileId: ARBOL_ID, arbol: { problema: arbol.problema, causas: arbol.causas, efectos: arbol.efectos }, caption: 'Árbol del problema', nota: 'Elaboración propia.', w, h };
+    // El cierre son los últimos párrafos del texto, tantos como tenga la parte «cierre» del constructor.
+    const parrafosCierre = text(d.planteamientoForm?.cierre).split(/\n\s*\n/).filter((p) => p.trim()).length;
+    const indices = blocks.map((b, k) => (b.type === 'paragraph' ? k : -1)).filter((k) => k >= 0);
+    const corte = parrafosCierre > 0 && indices.length > parrafosCierre ? indices[indices.length - parrafosCierre] : blocks.length;
+    return [...blocks.slice(0, corte), presentacion, figura, ...blocks.slice(corte)];
 };
 
 // Avance de la página «Árbol del problema»: cuenta cuando el estudiante lo armó allí y está completo.
