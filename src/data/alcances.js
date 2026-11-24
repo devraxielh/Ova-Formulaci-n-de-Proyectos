@@ -20,9 +20,9 @@ export const ALCANCES = [
         verbs: ['Cálculo', 'Generación'] },
     { id: 'evaluar', questionForm: '¿Cuál es el efecto de… en…? o ¿Qué tan efectivo es…?', method: 'medición antes y después, o comparación con un grupo que no recibe la intervención', label: 'Evaluar', hint: 'Si algo funciona o da resultado', pregunta: 'Evaluativa', tipo: '',
         verbs: ['Evaluación', 'Validación', 'Verificación', 'Comprobación'] },
-    { id: 'proponer', questionForm: '¿Cómo debería diseñarse… para…?', method: 'diagnóstico del problema y diseño de una propuesta validada con expertos o usuarios', label: 'Proponer', hint: 'Diseñar una solución o modelo', pregunta: 'Normativa', tipo: '',
+    { id: 'proponer', questionForm: '¿Cómo debería diseñarse… para…?', method: 'diagnóstico del problema y diseño de una propuesta validada con expertos o usuarios', label: 'Proponer', hint: 'Diseñar una solución o modelo', pregunta: 'Propositiva', tipo: '',
         verbs: ['Diseño', 'Propuesta', 'Formulación', 'Planificación', 'Programación', 'Construcción', 'Desarrollo'] },
-    { id: 'mejorar', questionForm: '¿Cómo puede optimizarse… para…?', method: 'diagnóstico del proceso actual, implementación de mejoras y medición de resultados', label: 'Mejorar', hint: 'Aplicar u optimizar un proceso', pregunta: 'Normativa', tipo: '',
+    { id: 'mejorar', questionForm: '¿Cómo puede optimizarse… para…?', method: 'diagnóstico del proceso actual, implementación de mejoras y medición de resultados', label: 'Mejorar', hint: 'Aplicar u optimizar un proceso', pregunta: 'Propositiva', tipo: '',
         verbs: ['Implementación', 'Optimización', 'Sistematización', 'Estandarización', 'Organización', 'Producción', 'Establecimiento', 'Moderación'] },
 ];
 

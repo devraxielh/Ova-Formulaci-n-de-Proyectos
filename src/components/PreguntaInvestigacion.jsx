@@ -82,6 +82,38 @@ const TIPOS = [
         claves: ['caracter', 'nivel', 'cómo es', 'cómo se presenta', 'cuáles son', 'estado actual', 'frecuencia', 'distribuye', 'rasgos', 'componentes', 'comporta'],
     },
     {
+        id: 'Diagnóstica', desc: 'Establece el estado actual de una situación y sus necesidades, como base para actuar después.',
+        ejemplo: '¿Cuál es el estado actual de las competencias digitales de los dueños de microempresas de Montería?',
+        empieza: '¿Cuál es el estado actual de…? ¿Qué necesidades presentan…? ¿Qué debilidades tiene…?',
+        inicios: [
+            { text: '¿Cuál es el estado actual de' },
+            { text: '¿Cuál es la situación actual de' },
+            { text: '¿Qué necesidades presentan' },
+            { text: '¿Qué debilidades y fortalezas tiene' },
+            { text: '¿Qué problemas presenta' },
+            { text: '¿En qué condiciones se encuentra' },
+            { text: '¿Qué brechas existen en' },
+            { text: '¿Qué limitaciones enfrentan' },
+        ],
+        claves: ['estado actual', 'situación actual', 'necesidades', 'debilidades', 'fortalezas', 'brechas', 'condiciones', 'problemas presenta', 'preparados', 'diagnóstic'],
+    },
+    {
+        id: 'Interpretativa', desc: 'Comprende cómo las personas viven, entienden o dan sentido a una experiencia (enfoque cualitativo).',
+        ejemplo: '¿Cómo viven los pacientes de consulta externa de un hospital de Sincelejo el proceso de solicitar y cumplir una cita médica?',
+        empieza: '¿Cómo viven…? ¿Qué significado tiene… para…? ¿Cómo interpretan…?',
+        inicios: [
+            { text: '¿Cómo viven' },
+            { text: '¿Cómo comprenden' },
+            { text: '¿Cómo interpretan' },
+            { text: '¿Qué significado tiene', conector: 'para', var2: 'Para quiénes', var2Ej: 'los docentes rurales' },
+            { text: '¿Qué sentido le dan a' },
+            { text: '¿Cómo construyen su experiencia de' },
+            { text: '¿Cuáles son las vivencias en torno a' },
+            { text: '¿Cómo describen su experiencia con' },
+        ],
+        claves: ['cómo viven', 'comprenden', 'interpretan', 'significado', 'sentido', 'vivencia', 'experiencia', 'narran', 'describen su'],
+    },
+    {
         id: 'Comparativa', desc: 'Compara grupos, lugares, momentos o métodos para encontrar diferencias.',
         ejemplo: '¿Qué diferencias existen en el aprendizaje entre estudiantes de modalidad presencial y virtual de una universidad de Montería?',
         empieza: '¿Qué diferencias existen en… entre… y…?',
@@ -161,7 +193,8 @@ const TIPOS = [
         claves: ['efectiv', 'efecto', 'impacto', 'eficacia', 'resultado', 'eficiencia', 'contribuye', 'eficien', 'cumplen', 'beneficios'],
     },
     {
-        id: 'Normativa', desc: 'Propone cómo deberían ser las cosas o qué acciones tomar.',
+        // Antes se llamaba «Normativa», nombre que se confundía con lo legal o lo ético. Es la del proyecto que propone algo.
+        id: 'Propositiva', desc: 'Propone un diseño, un plan o un modelo para resolver el problema (también se llama proyectiva).',
         ejemplo: '¿Cómo debería diseñarse una estrategia de marketing digital para aumentar la interacción con clientes de emprendimientos turísticos del Golfo de Morrosquillo?',
         empieza: '¿Cómo debería…? ¿Qué estrategias deberían…? ¿Cómo puede optimizarse…?',
         inicios: [
@@ -173,12 +206,35 @@ const TIPOS = [
             { text: '¿Qué modelo debería adoptarse para mejorar' },
             { text: '¿Qué propuesta permitiría mejorar' },
             { text: '¿Cómo debería organizarse', conector: 'para', var2: 'Para qué', var2Ej: 'atender a más usuarios' },
+            { text: '¿Qué características debería tener', conector: 'para', var2: 'Para qué', var2Ej: 'responder a las necesidades de los usuarios' },
+            { text: '¿Cómo debería estructurarse', conector: 'para', var2: 'Para qué', var2Ej: 'fortalecer las competencias digitales' },
+            { text: '¿Qué componentes debería incluir', conector: 'para', var2: 'Para qué', var2Ej: 'mejorar la competitividad' },
+            { text: '¿Qué plan de acción permitiría fortalecer' },
+            { text: '¿Qué alternativa de solución es viable para' },
         ],
-        claves: ['debería', 'deben', 'estrategia', 'optimiz', 'diseñ', 'mejorar', 'propuesta', 'lineamientos', 'acciones', 'modelo', 'propuesta', 'organizarse', 'permitiría'],
+        claves: ['debería', 'deben', 'estrategia', 'optimiz', 'diseñ', 'mejorar', 'propuesta', 'lineamientos', 'acciones', 'modelo', 'organizarse', 'permitiría', 'estructurarse', 'componentes', 'características debería', 'plan de acción', 'alternativa'],
+    },
+    {
+        id: 'Aplicada', desc: 'Pregunta cómo desarrollar o poner en marcha una solución y qué resulta al aplicarla (desarrollo tecnológico, intervención).',
+        ejemplo: '¿Cómo implementar un sistema de recordatorios por mensaje de texto para reducir la inasistencia a citas en un hospital de Sincelejo?',
+        empieza: '¿Cómo implementar…? ¿Cómo desarrollar…? ¿Qué cambios produce la aplicación de…?',
+        inicios: [
+            { text: '¿Cómo implementar', conector: 'para', var2: 'Para qué', var2Ej: 'reducir la inasistencia a citas' },
+            { text: '¿Cómo desarrollar', conector: 'para', var2: 'Para qué', var2Ej: 'agilizar el registro de inventario' },
+            { text: '¿Cómo aplicar', conector: 'para', var2: 'Para qué', var2Ej: 'disminuir los tiempos de entrega' },
+            { text: '¿Cómo construir', conector: 'para', var2: 'Para qué', var2Ej: 'monitorear la calidad del agua' },
+            { text: '¿Cómo automatizar', conector: 'para', var2: 'Para qué', var2Ej: 'reducir los errores de facturación' },
+            { text: '¿Cómo integrar', conector: 'en', var2: 'Dónde se integra', var2Ej: 'el proceso de matrícula' },
+            { text: '¿Qué cambios produce la aplicación de', conector: 'en', var2: 'Qué cambia', var2Ej: 'la productividad' },
+            { text: '¿De qué manera la implementación de', conector: 'mejora', var2: 'Qué mejora', var2Ej: 'la atención al usuario' },
+        ],
+        claves: ['implementa', 'desarroll', 'aplicar', 'aplicación de', 'construir', 'automatiz', 'integrar', 'puesta en marcha'],
     },
 ];
 
-const tipoDe = (id) => TIPOS.find((item) => item.id === id) || null;
+// Proyectos guardados antes del cambio de nombre conservan «Normativa»: se leen como «Propositiva».
+const TIPO_ANTERIOR = { Normativa: 'Propositiva' };
+const tipoDe = (id) => TIPOS.find((item) => item.id === (TIPO_ANTERIOR[id] || id)) || null;
 const objetivosDe = (tipoId) => ALCANCES.filter((item) => item.pregunta === tipoId).map((item) => item.label);
 
 /* ---------- Armado de la pregunta ---------- */
@@ -258,10 +314,10 @@ const CAMINO = [
 ];
 
 const INTERROGATIVAS_QUIZ = [
-    { text: '¿Qué diferencias existen en el rendimiento entre estudiantes de jornada diurna y nocturna?', options: ['Descriptiva', 'Comparativa', 'Normativa'], answer: 1, why: '«Qué diferencias existen… entre» es la forma de una pregunta comparativa.' },
+    { text: '¿Qué diferencias existen en el rendimiento entre estudiantes de jornada diurna y nocturna?', options: ['Descriptiva', 'Comparativa', 'Propositiva'], answer: 1, why: '«Qué diferencias existen… entre» es la forma de una pregunta comparativa.' },
     { text: '¿Qué tan efectivo es un programa de tutorías para reducir la deserción?', options: ['Evaluativa', 'Exploratoria', 'Correlacional'], answer: 0, why: 'Valora si una intervención funciona.' },
     { text: '¿Cuáles son las características del consumo de agua en hogares rurales?', options: ['Predictiva', 'Descriptiva', 'Explicativa'], answer: 1, why: 'Busca describir cómo es algo.' },
-    { text: '¿Qué factores permiten predecir el abandono de los estudios?', options: ['Predictiva', 'Normativa', 'Comparativa'], answer: 0, why: 'Busca anticipar un resultado.' },
+    { text: '¿Qué factores permiten predecir el abandono de los estudios?', options: ['Predictiva', 'Propositiva', 'Comparativa'], answer: 0, why: 'Busca anticipar un resultado.' },
 ];
 
 const VARIABLES_QUIZ = [
@@ -323,9 +379,9 @@ const COHERENCIA_QUIZ = [
     },
     {
         text: 'Título: «Diseño de una aplicación de recordatorios para reducir la inasistencia a citas en un hospital de Sincelejo». ¿Qué tipo de pregunta le corresponde?',
-        options: ['Normativa', 'Correlacional', 'Exploratoria'],
+        options: ['Propositiva', 'Correlacional', 'Exploratoria'],
         answer: 0,
-        why: '«Diseño» propone una solución: la pregunta pregunta cómo debería ser.',
+        why: '«Diseño» propone una solución: la pregunta indaga cómo debería ser.',
     },
 ];
 
@@ -692,7 +748,7 @@ const PreguntaInvestigacion = ({ onNavigate }) => {
                 <div>
                     {heading}
                     <p>Tu título ya tiene casi todo: las variables, la población y el lugar. Para pasar a la pregunta, dilo primero con tus palabras y luego elige el tipo.</p>
-                    <p className="ide-hint">El verbo del título anticipa el tipo: «Comparación» lleva a una pregunta comparativa; «Diseño», a una normativa.</p>
+                    <p className="ide-hint">El verbo del título anticipa el tipo: «Comparación» lleva a una pregunta comparativa; «Diseño», a una propositiva.</p>
                 </div>
                 <Camino />
             </>
@@ -703,10 +759,10 @@ const PreguntaInvestigacion = ({ onNavigate }) => {
                     {heading}
                     <p>El tipo de pregunta depende de lo que quieres lograr. Son los mismos objetivos que elegiste en la Ideación.</p>
                     <ul className="ide-list">
-                        <li><ListChecks size={18} /><span><b>Conocer o describir</b>Exploratoria, descriptiva.</span></li>
+                        <li><ListChecks size={18} /><span><b>Conocer o describir</b>Exploratoria, descriptiva, diagnóstica, interpretativa.</span></li>
                         <li><Users size={18} /><span><b>Comparar o relacionar</b>Comparativa, correlacional.</span></li>
                         <li><Target size={18} /><span><b>Explicar, predecir o evaluar</b>Explicativa, predictiva, evaluativa.</span></li>
-                        <li><Compass size={18} /><span><b>Proponer o mejorar</b>Normativa.</span></li>
+                        <li><Compass size={18} /><span><b>Proponer o aplicar</b>Propositiva (proyectiva), aplicada.</span></li>
                     </ul>
                 </div>
                 <TiposExplorer initial={sugerido} />
