@@ -1260,3 +1260,22 @@
 .adm-cupo button:disabled { opacity: 0.35; cursor: default; }
 .adm-cupo b { min-width: 1.6rem; text-align: center; padding: 0.1rem 0.3rem; border-radius: 6px; background: #dcfce7; color: #166534; }
 .adm-cupo[data-cero="true"] b { background: #fee2e2; color: #991b1b; }
+
+/* «Eliminar proyecto», en la fila de Equipo · Historial · Anexos */
+.pro-paneles-extra { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: 0.88rem; color: #7f1d1d; }
+.pro-paneles-tabs .pro-paneles-eliminar { color: #b91c1c; border-color: #fecaca; background: #fff; }
+.pro-paneles-tabs .pro-paneles-eliminar:hover { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
+
+/* Coherencia: la tarjeta muestra el resultado y el detalle va en una ventana */
+.pro-coh-abrir { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-align: left; text-decoration: underline; text-decoration-color: #c7d2fe; text-underline-offset: 0.25em; }
+.pro-coh-abrir:hover { color: #4338ca; text-decoration-color: currentColor; }
+.pro-coh-modal { position: fixed; inset: 0; margin: auto; width: min(64rem, calc(100vw - 1.5rem)); max-width: none; max-height: calc(100dvh - 1.5rem); padding: 1.25rem; border: 0; border-radius: 1rem; background: #fff; color: #1e293b; box-shadow: 0 24px 60px -20px rgb(15 23 42 / 0.5); overflow-y: auto; }
+.pro-coh-modal[open] { display: grid; gap: 1rem; align-content: start; }
+.pro-coh-modal::backdrop { background: rgb(15 23 42 / 0.55); }
+.pro-coh-modal header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.pro-coh-modal header h2 { display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 1.15rem; }
+.pro-coh-modal header h2 svg { color: #4f46e5; }
+.pro-coh-cerrar { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border: 1px solid #e2e8f0; border-radius: 0.6rem; background: #fff; color: #475569; cursor: pointer; }
+.pro-coh-cerrar:hover { background: #f1f5f9; color: #0f172a; }
+.pro-paneles-tabs .pro-paneles-extra .pro-btn--danger { background: #dc2626; border-color: #dc2626; color: #fff; }
+.pro-paneles-tabs .pro-paneles-extra .pro-btn--danger:hover { background: #b91c1c; border-color: #b91c1c; }

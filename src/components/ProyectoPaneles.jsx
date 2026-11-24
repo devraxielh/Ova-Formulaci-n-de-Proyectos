@@ -227,7 +227,8 @@ const PANELES = [
     { id: 'anexos', label: 'Anexos', icon: Paperclip, Comp: Anexos },
 ];
 
-const ProyectoPaneles = () => {
+// `extra`: acciones del proyecto que van en la misma fila, al final (p. ej. «Eliminar proyecto»).
+const ProyectoPaneles = ({ extra = null }) => {
     const [abierto, setAbierto] = useState('');
     return (
         <section className="pro-paneles" aria-label="Herramientas del proyecto">
@@ -237,6 +238,7 @@ const ProyectoPaneles = () => {
                         <p.icon size={16} aria-hidden="true" /> {p.label}
                     </button>
                 ))}
+                {extra && <div className="pro-paneles-extra">{extra}</div>}
             </div>
             {PANELES.filter((p) => p.id === abierto).map((p) => <p.Comp key={p.id} />)}
         </section>

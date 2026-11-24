@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, Circle, Clipboard, Link2 } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, Circle, Clipboard, Link2, X } from 'lucide-react';
 import { evaluarCoherencia } from '../services/coherencia';
 import './Proyecto.css';
 
@@ -12,11 +12,20 @@ const NOMBRE_TAB = {
  * Panel de coherencia entre secciones.
  * - onNavigate: si existe, cada relación débil ofrece ir a la sección (vista del estudiante).
  * - compacto: oculta el encabezado explicativo (vista del administrador).
+ * - enVentana: la tarjeta muestra solo el resultado; el detalle de cada relación se abre en una ventana al presionarla.
  */
-const Coherencia = ({ data, onNavigate, compacto = false, titulo = 'Coherencia entre secciones' }) => {
+const Coherencia = ({ data, onNavigate, compacto = false, enVentana = false, titulo = 'Coherencia entre secciones' }) => {
     const coherencia = useMemo(() => evaluarCoherencia(data || {}), [data]);
     const [abierto, setAbierto] = useState({});
     const [copiado, setCopiado] = useState('');
+    const [ventana, setVentana] = useState(false);
+    const dialog = useRef(null);
+    useEffect(() => {
+        const el = dialog.current;
+        if (!el) return;
+        if (ventana && !el.open) el.showModal();
+        if (!ventana && el.open) el.close();
+    }, [ventana]);
 
     const copiar = async (id, text) => {
         try {
@@ -28,24 +37,8 @@ const Coherencia = ({ data, onNavigate, compacto = false, titulo = 'Coherencia e
         }
     };
 
-    return (
-        <section className={`pro-coh ${compacto ? 'pro-coh--compacto' : ''}`} aria-label={titulo} data-nivel={coherencia.nivel || 'pendiente'}>
-            <div className="pro-coh-head">
-                <div>
-                    <h2><Link2 size={18} aria-hidden="true" /> {titulo}</h2>
-                    {!compacto && <p>Compara cada sección con las que dependen de ella: los mismos términos, población, lugar y un tipo de alcance acorde con los objetivos. Toca «Revisar» para ver por qué y cómo arreglarlo.</p>}
-                </div>
-                {coherencia.score !== null ? (
-                    <div className="pro-coh-score">
-                        <b>{coherencia.score} %</b>
-                        <span>Coherencia {coherencia.nivel}</span>
-                        <div className="pro-bar" aria-hidden="true"><span style={{ width: `${coherencia.score}%` }} /></div>
-                        <small>{coherencia.evaluados} de {coherencia.checks.length} relaciones evaluadas</small>
-                    </div>
-                ) : (
-                    <p className="pro-coh-empty">Se necesitan al menos el título y la pregunta para evaluar la coherencia.</p>
-                )}
-            </div>
+    const detalle = (
+        <>
             <ul className="pro-coh-list">
                 {coherencia.checks.map((check) => {
                     const debil = check.score !== null && check.score < 80;
@@ -94,7 +87,7 @@ const Coherencia = ({ data, onNavigate, compacto = false, titulo = 'Coherencia e
                                         </div>
                                     )}
                                     {onNavigate && (
-                                        <button type="button" className="pro-btn pro-btn--ghost pro-coh-go" onClick={() => onNavigate(check.tab)}>
+                                        <button type="button" className="pro-btn pro-btn--ghost pro-coh-go" onClick={() => { setVentana(false); onNavigate(check.tab); }}>
                                             Ir a {NOMBRE_TAB[check.tab] || 'la sección'} <ArrowRight size={14} aria-hidden="true" />
                                         </button>
                                     )}
@@ -105,6 +98,38 @@ const Coherencia = ({ data, onNavigate, compacto = false, titulo = 'Coherencia e
                 })}
             </ul>
             <p className="pro-coh-note">Revisión automática de la forma; la coherencia de fondo la valida el asesor.</p>
+        </>
+    );
+
+    return (
+        <section className={`pro-coh ${compacto ? 'pro-coh--compacto' : ''}`} aria-label={titulo} data-nivel={coherencia.nivel || 'pendiente'}>
+            <div className="pro-coh-head">
+                <div>
+                    {enVentana
+                        ? <h2><button type="button" className="pro-coh-abrir" onClick={() => setVentana(true)}><Link2 size={18} aria-hidden="true" /> {titulo}</button></h2>
+                        : <h2><Link2 size={18} aria-hidden="true" /> {titulo}</h2>}
+                    {!compacto && <p>Compara cada sección con las que dependen de ella: los mismos términos, población, lugar y un tipo de alcance acorde con los objetivos. {enVentana ? 'Presiona el título para ver cada relación, por qué falla y cómo arreglarla.' : 'Toca «Revisar» para ver por qué y cómo arreglarlo.'}</p>}
+                </div>
+                {coherencia.score !== null ? (
+                    <div className="pro-coh-score">
+                        <b>{coherencia.score} %</b>
+                        <span>Coherencia {coherencia.nivel}</span>
+                        <div className="pro-bar" aria-hidden="true"><span style={{ width: `${coherencia.score}%` }} /></div>
+                        <small>{coherencia.evaluados} de {coherencia.checks.length} relaciones evaluadas</small>
+                    </div>
+                ) : (
+                    <p className="pro-coh-empty">Se necesitan al menos el título y la pregunta para evaluar la coherencia.</p>
+                )}
+            </div>
+            {enVentana ? (
+                <dialog ref={dialog} className="pro-coh-modal" data-nivel={coherencia.nivel || 'pendiente'} aria-label={titulo} onClose={() => setVentana(false)}>
+                    <header>
+                        <h2><Link2 size={18} aria-hidden="true" /> {titulo}{coherencia.score !== null && <span className="pro-coh-badge">{coherencia.score} %</span>}</h2>
+                        <button type="button" className="pro-coh-cerrar" aria-label="Cerrar" onClick={() => setVentana(false)}><X size={18} /></button>
+                    </header>
+                    {ventana && detalle}
+                </dialog>
+            ) : detalle}
         </section>
     );
 };

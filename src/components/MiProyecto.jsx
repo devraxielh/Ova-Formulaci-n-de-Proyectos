@@ -258,9 +258,21 @@ const MiProyecto = ({ onNavigate }) => {
 
             {error && <p className="pro-alert" role="alert">{error}</p>}
 
-            <ProyectoPaneles />
+            <ProyectoPaneles
+                extra={user && !project.shared && (confirmDelete ? (
+                    <>
+                        <span>¿Eliminar «{project.name}»? No se puede deshacer.</span>
+                        <button type="button" className="pro-btn pro-btn--danger" onClick={() => run(() => deleteProject(project.id))}>Sí, eliminar</button>
+                        <button type="button" className="pro-btn pro-btn--ghost" onClick={() => setConfirmDelete(false)}>Cancelar</button>
+                    </>
+                ) : (
+                    <button type="button" className="pro-paneles-eliminar" onClick={() => setConfirmDelete(true)}>
+                        <Trash2 size={16} aria-hidden="true" /> Eliminar proyecto
+                    </button>
+                ))}
+            />
 
-            <Coherencia data={data} onNavigate={onNavigate} />
+            <Coherencia data={data} onNavigate={onNavigate} enVentana />
 
             <div className="pro-grid">
                 <section className="pro-progress" aria-labelledby="pro-progress-title">
@@ -337,21 +349,11 @@ const MiProyecto = ({ onNavigate }) => {
                 </section>
             </div>
 
+            {/* «Eliminar proyecto» está arriba, junto a Anexos. Aquí queda solo lo demás. */}
+            {!(user && !project.shared) && (
             <section className="pro-danger">
                 {user && project.shared ? (
                     <span className="pro-panel-hint">Este proyecto es de {project.ownerName}. Para dejar de verlo, usa «Salir del proyecto» en Equipo.</span>
-                ) : user ? (
-                    confirmDelete ? (
-                        <>
-                            <span>¿Eliminar «{project.name}»? No se puede deshacer.</span>
-                            <button type="button" className="pro-btn pro-btn--danger" onClick={() => run(() => deleteProject(project.id))}>Sí, eliminar</button>
-                            <button type="button" className="pro-btn pro-btn--ghost" onClick={() => setConfirmDelete(false)}>Cancelar</button>
-                        </>
-                    ) : (
-                        <button type="button" className="pro-link pro-link--danger" onClick={() => setConfirmDelete(true)}>
-                            <Trash2 size={15} /> Eliminar este proyecto
-                        </button>
-                    )
                 ) : (
                     confirmDelete ? (
                         <>
@@ -366,6 +368,7 @@ const MiProyecto = ({ onNavigate }) => {
                     )
                 )}
             </section>
+            )}
         </div>
     );
 };
