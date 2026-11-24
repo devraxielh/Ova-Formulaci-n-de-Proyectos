@@ -27,6 +27,16 @@ const haceCuanto = (fecha) => {
     return `Editado el ${new Date(t).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}`;
 };
 
+// Nombre del archivo descargado: el título de la investigación (o el nombre del proyecto si aún no hay título),
+// sin signos que los sistemas no aceptan y cortado en una palabra completa para que no quede demasiado largo.
+const nombreArchivo = (titulo, nombreProyecto) => {
+    const limpio = (t) => String(t || '').replace(/[^\p{L}\p{N} _-]/gu, ' ').replace(/\s+/g, ' ').trim();
+    const base = limpio(titulo) || limpio(nombreProyecto) || 'proyecto';
+    if (base.length <= 110) return base;
+    const corte = base.slice(0, 110);
+    return corte.slice(0, Math.max(corte.lastIndexOf(' '), 60)).trim();
+};
+
 const SAVE_LABEL = {
     local: 'Guardado solo en este navegador',
     saved: 'Guardado en tu cuenta',
@@ -117,7 +127,7 @@ const MiProyecto = ({ onNavigate }) => {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `${project.name.replace(/[^\p{L}\p{N} _-]/gu, '').trim() || 'proyecto'}.${extension}`;
+        link.download = `${nombreArchivo(data?.titulo, project.name)}.${extension}`;
         document.body.appendChild(link);
         link.click();
         link.remove();
