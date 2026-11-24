@@ -12,9 +12,10 @@ import './Planteamiento.css';
 import './Objetivos.css';
 import './Justificacion.css';
 import './Alcances.css';
+import { construccionPrimero } from './deck/orden';
 
 /* Clase de 60 minutos: la suma de `min` de todas las diapositivas. */
-const SECTIONS = [
+const SECTIONS = construccionPrimero([
     { id: 'apertura', label: 'Apertura' },
     { id: 'alcances', label: 'Alcances' },
     { id: 'limitaciones', label: 'Limitaciones' },
@@ -22,9 +23,9 @@ const SECTIONS = [
     { id: 'cierre', label: 'Cierre' },
     { id: 'construccion', label: 'Construcción' },
     { id: 'revision', label: 'Revisión final' },
-];
+]);
 
-const SLIDES = [
+const SLIDES = construccionPrimero([
     { id: 'portada', section: 'apertura', min: 3, title: 'Alcances y limitaciones: las fronteras de tu proyecto' },
     { id: 'quees', section: 'apertura', min: 3, title: 'Qué es cada uno' },
     { id: 'dossentidos', section: 'apertura', min: 3, title: 'Los dos sentidos de «alcance»' },
@@ -40,7 +41,7 @@ const SLIDES = [
     { id: 'cierre', section: 'cierre', min: 1, title: 'Lo que te llevas' },
     { id: 'construye', section: 'construccion', min: 10, title: 'Redacta tus alcances y limitaciones', layout: 'builder' },
     { id: 'revision', section: 'revision', min: 5, title: 'Qué hace buenos a unos alcances y limitaciones' },
-];
+]);
 
 const SLIDE_KEY = 'projectsia:alcances:diapositiva';
 

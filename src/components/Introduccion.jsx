@@ -9,18 +9,19 @@ import './Titulo.css';
 import './Planteamiento.css';
 import './Objetivos.css';
 import './Justificacion.css';
+import { construccionPrimero } from './deck/orden';
 
 /* Clase de 60 minutos: la suma de `min` de todas las diapositivas. */
-const SECTIONS = [
+const SECTIONS = construccionPrimero([
     { id: 'apertura', label: 'Apertura' },
     { id: 'estructura', label: 'Estructura' },
     { id: 'calidad', label: 'Calidad' },
     { id: 'cierre', label: 'Cierre' },
     { id: 'construccion', label: 'Construcción' },
     { id: 'revision', label: 'Revisión final' },
-];
+]);
 
-const SLIDES = [
+const SLIDES = construccionPrimero([
     { id: 'portada', section: 'apertura', min: 3, title: 'La introducción: la puerta de entrada a tu proyecto' },
     { id: 'quees', section: 'apertura', min: 3, title: 'Qué es y qué no es' },
     { id: 'alfinal', section: 'apertura', min: 3, title: 'Se escribe al final, se lee primero' },
@@ -36,7 +37,7 @@ const SLIDES = [
     { id: 'cierre', section: 'cierre', min: 1, title: 'Lo que te llevas' },
     { id: 'construye', section: 'construccion', min: 10, title: 'Redacta tu introducción', layout: 'builder' },
     { id: 'revision', section: 'revision', min: 6, title: 'Qué hace buena a una introducción' },
-];
+]);
 
 const SLIDE_KEY = 'projectsia:introduccion:diapositiva';
 const MIN_PALABRAS = 500;

@@ -1,9 +1,10 @@
+import { construccionPrimero } from '../components/deck/orden.js';
 /*
  * Clase «Resultados y discusión» (2 horas).
  * Las diapositivas 'portada', 'construye' y 'revision' se pintan aparte en el componente.
  */
 
-export const SECTIONS = [
+export const SECTIONS = construccionPrimero([
     { id: 'apertura', label: 'Apertura' },
     { id: 'resultados', label: 'Resultados' },
     { id: 'discusion', label: 'Discusión' },
@@ -11,11 +12,11 @@ export const SECTIONS = [
     { id: 'cierre', label: 'Cierre' },
     { id: 'construccion', label: 'Construcción' },
     { id: 'revision', label: 'Revisión final' },
-];
+]);
 
 const q = (text, options, answer, why) => ({ text, options, answer, why });
 
-export const SLIDES = [
+export const SLIDES = construccionPrimero([
     /* ---------- Apertura (12) ---------- */
     { id: 'portada', section: 'apertura', min: 3, title: 'Resultados y discusión: qué encontraste y qué significa' },
     {
@@ -295,4 +296,4 @@ export const SLIDES = [
     /* ---------- Construcción y revisión (20) ---------- */
     { id: 'construye', section: 'construccion', min: 15, title: 'Construye tus resultados y tu discusión', layout: 'builder' },
     { id: 'revision', section: 'revision', min: 5, title: 'Qué hace buenos a unos resultados y una discusión' },
-];
+]);

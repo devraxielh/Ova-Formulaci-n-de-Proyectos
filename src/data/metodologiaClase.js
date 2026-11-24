@@ -1,10 +1,11 @@
+import { construccionPrimero } from '../components/deck/orden.js';
 /*
  * Contenido de la clase larga de Metodología (4 horas).
  * Cada diapositiva: { id, section, min, title, lead[], bullets[], hint, panel, quiz }.
  * Las diapositivas 'portada', 'muestra', 'gantt', 'construye' y 'revision' se pintan aparte en el componente.
  */
 
-export const SECTIONS = [
+export const SECTIONS = construccionPrimero([
     { id: 'apertura', label: 'Apertura' },
     { id: 'enfoque', label: 'Enfoque' },
     { id: 'tipos', label: 'Tipos' },
@@ -18,11 +19,11 @@ export const SECTIONS = [
     { id: 'cierre', label: 'Cierre' },
     { id: 'construccion', label: 'Construcción' },
     { id: 'revision', label: 'Revisión final' },
-];
+]);
 
 const q = (text, options, answer, why) => ({ text, options, answer, why });
 
-export const SLIDES = [
+export const SLIDES = construccionPrimero([
     /* ---------- Apertura (12) ---------- */
     { id: 'portada', section: 'apertura', min: 3, title: 'La metodología: cómo vas a lograr tus objetivos' },
     {
@@ -594,4 +595,4 @@ export const SLIDES = [
     /* ---------- Construcción y revisión (30) ---------- */
     { id: 'construye', section: 'construccion', min: 25, title: 'Construye tu metodología', layout: 'builder' },
     { id: 'revision', section: 'revision', min: 5, title: 'Qué hace buena a una metodología' },
-];
+]);

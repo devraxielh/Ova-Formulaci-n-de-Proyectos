@@ -8,18 +8,19 @@ import { useAutoGuardar } from '../hooks/useAutoGuardar';
 import { ALCANCES } from '../data/alcances';
 import { conArticulo, segundaVariable } from '../data/ejemplos';
 import './Titulo.css';
+import { construccionPrimero } from './deck/orden';
 
 /* Clase de 60 minutos: la suma de `min` de todas las diapositivas. */
-const SECTIONS = [
+const SECTIONS = construccionPrimero([
     { id: 'apertura', label: 'Apertura' },
     { id: 'tipos', label: 'Tipos' },
     { id: 'calidad', label: 'Calidad' },
     { id: 'cierre', label: 'Cierre' },
     { id: 'construccion', label: 'Construcción' },
     { id: 'revision', label: 'Revisión final' },
-];
+]);
 
-const SLIDES = [
+const SLIDES = construccionPrimero([
     { id: 'portada', section: 'apertura', min: 3, title: 'La pregunta: el corazón de tu investigación' },
     { id: 'funcion', section: 'apertura', min: 3, title: 'Título, pregunta y objetivo' },
     { id: 'camino', section: 'apertura', min: 3, title: 'Del título a la pregunta' },
@@ -35,7 +36,7 @@ const SLIDES = [
     { id: 'cierre', section: 'cierre', min: 1, title: 'Lo que te llevas' },
     { id: 'construye', section: 'construccion', min: 12, title: 'Formula tu pregunta' },
     { id: 'revision', section: 'revision', min: 7, title: 'Qué hace buena a una pregunta' },
-];
+]);
 
 const SLIDE_KEY = 'projectsia:pregunta:diapositiva';
 

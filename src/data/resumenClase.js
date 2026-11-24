@@ -1,3 +1,4 @@
+import { construccionPrimero } from '../components/deck/orden.js';
 /*
  * Clase «Resumen» (1 hora).
  * Las diapositivas 'portada', 'construye' y 'revision' se pintan aparte en el componente.
@@ -6,7 +7,7 @@
 export const MIN_PALABRAS = 150;
 export const MAX_PALABRAS = 250;
 
-export const SECTIONS = [
+export const SECTIONS = construccionPrimero([
     { id: 'apertura', label: 'Apertura' },
     { id: 'estructura', label: 'Estructura' },
     { id: 'clave', label: 'Palabras clave' },
@@ -14,13 +15,13 @@ export const SECTIONS = [
     { id: 'cierre', label: 'Cierre' },
     { id: 'construccion', label: 'Construcción' },
     { id: 'revision', label: 'Revisión final' },
-];
+]);
 
 const q = (text, options, answer, why) => ({ text, options, answer, why });
 
 export const EJEMPLO_RESUMEN = 'La inasistencia a citas médicas reduce la oportunidad de la atención y genera pérdidas para los servicios de salud. Esta investigación tuvo como objetivo analizar los factores asociados a la inasistencia a citas médicas en los pacientes de consulta externa de un hospital de Sincelejo, Sucre. Se desarrolló un estudio cuantitativo, correlacional y de diseño no experimental transversal, con una muestra aleatoria de 278 pacientes, a quienes se aplicó un cuestionario validado por juicio de expertos (α = 0,81). Los resultados mostraron que el 22 % de las citas programadas se perdió; el olvido de la cita fue la causa más frecuente (41 %), seguido del costo del transporte (22 %), y se encontró una relación positiva moderada entre el olvido y la inasistencia (rho = 0,41; p < 0,001). La inasistencia fue mayor en los pacientes menores de 30 años y en los residentes de la zona rural. Se concluye que la inasistencia en esta población está asociada principalmente a factores organizacionales y económicos, más que a la voluntad del paciente, por lo que estrategias como los recordatorios automáticos y la flexibilización de horarios podrían reducirla.';
 
-export const SLIDES = [
+export const SLIDES = construccionPrimero([
     /* ---------- Apertura (9) ---------- */
     { id: 'portada', section: 'apertura', min: 3, title: 'El resumen: tu investigación en un párrafo' },
     {
@@ -186,4 +187,4 @@ export const SLIDES = [
     /* ---------- Construcción y revisión (12) ---------- */
     { id: 'construye', section: 'construccion', min: 9, title: 'Construye tu resumen', layout: 'builder' },
     { id: 'revision', section: 'revision', min: 3, title: 'Qué hace bueno a un resumen' },
-];
+]);

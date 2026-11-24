@@ -1,3 +1,4 @@
+import { construccionPrimero } from '../components/deck/orden.js';
 /*
  * Contenido de la clase larga de Marco Referencial (4 horas).
  * Cada diapositiva: { id, section, min, title, lead[], bullets[], hint, panel }.
@@ -5,7 +6,7 @@
  * Las diapositivas 'portada', 'construye' y 'revision' se pintan aparte en el componente.
  */
 
-export const SECTIONS = [
+export const SECTIONS = construccionPrimero([
     { id: 'apertura', label: 'Apertura' },
     { id: 'antecedentes', label: 'Antecedentes' },
     { id: 'teorico', label: 'Marco Teórico' },
@@ -17,11 +18,11 @@ export const SECTIONS = [
     { id: 'cierre', label: 'Cierre' },
     { id: 'construccion', label: 'Construcción' },
     { id: 'revision', label: 'Revisión final' },
-];
+]);
 
 const q = (text, options, answer, why) => ({ text, options, answer, why });
 
-export const SLIDES = [
+export const SLIDES = construccionPrimero([
     /* ---------- Apertura (12) ---------- */
     { id: 'portada', section: 'apertura', min: 3, title: 'El marco referencial: en qué se apoya tu investigación' },
     {
@@ -697,4 +698,4 @@ export const SLIDES = [
     /* ---------- Construcción y revisión (30) ---------- */
     { id: 'construye', section: 'construccion', min: 20, title: 'Construye tu marco referencial', layout: 'builder' },
     { id: 'revision', section: 'revision', min: 6, title: 'Qué hace bueno a un marco referencial' },
-];
+]);

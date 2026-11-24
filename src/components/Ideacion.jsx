@@ -8,18 +8,19 @@ import SlideDeck, { Opciones, Pestanas } from './deck/SlideDeck';
 import { useProjectField } from '../context/ProjectContext';
 import { ALCANCES, ALL_VERBS, findVerb } from '../data/alcances';
 import './Ideacion.css';
+import { construccionPrimero } from './deck/orden';
 
 /* La clase completa dura 60 minutos: la suma de `min` de todas las diapositivas. */
-const SECTIONS = [
+const SECTIONS = construccionPrimero([
     { id: 'apertura', label: 'Apertura' },
     { id: 'problema', label: 'Problema' },
     { id: 'delimitacion', label: 'Delimitación' },
     { id: 'sustento', label: 'Sustento' },
     { id: 'cierre', label: 'Cierre' },
-    { id: 'sintesis', label: 'Síntesis con IA' },
-];
+    { id: 'sintesis', label: 'Construcción' },
+]);
 
-const SLIDES = [
+const SLIDES = construccionPrimero([
     { id: 'portada', section: 'apertura', min: 3, title: '¿Cómo nace un proyecto?' },
     { id: 'fuentes', section: 'apertura', min: 4, title: '¿De dónde salen las ideas?' },
     { id: 'criterios', section: 'apertura', min: 3, title: 'Qué hace buena a una idea de investigación' },
@@ -37,7 +38,7 @@ const SLIDES = [
     { id: 'repaso', section: 'cierre', min: 3, title: 'Repaso: comprueba lo aprendido' },
     { id: 'cierre', section: 'cierre', min: 2, title: 'Lo que te llevas de esta clase' },
     { id: 'asistente', section: 'sintesis', min: 9, title: 'Tu idea de investigación' },
-];
+]);
 
 
 const SLIDE_KEY = 'projectsia:ideacion:diapositiva';

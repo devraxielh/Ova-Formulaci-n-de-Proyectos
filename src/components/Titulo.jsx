@@ -9,18 +9,19 @@ import { groq } from '../services/api';
 import { ALCANCES, ALL_VERBS, VERBS, alcanceOfVerb, findVerb, verbAtStart } from '../data/alcances';
 import { objetoTitulo, proposito } from '../data/ejemplos';
 import './Titulo.css';
+import { construccionPrimero } from './deck/orden';
 
 /* Clase de 60 minutos: la suma de `min` de todas las diapositivas. */
-const SECTIONS = [
+const SECTIONS = construccionPrimero([
     { id: 'apertura', label: 'Apertura' },
     { id: 'anatomia', label: 'Anatomía' },
     { id: 'calidad', label: 'Calidad' },
     { id: 'cierre', label: 'Cierre' },
     { id: 'construccion', label: 'Construcción' },
     { id: 'revision', label: 'Revisión final' },
-];
+]);
 
-const SLIDES = [
+const SLIDES = construccionPrimero([
     { id: 'portada', section: 'apertura', min: 3, title: 'El título: la puerta de tu investigación' },
     { id: 'funciones', section: 'apertura', min: 3, title: '¿Para qué sirve un título?' },
     { id: 'tema', section: 'apertura', min: 3, title: 'Del tema al título' },
@@ -36,7 +37,7 @@ const SLIDES = [
     { id: 'construye', section: 'construccion', min: 8, title: 'Construye tu título' },
     { id: 'ia', section: 'construccion', min: 4, title: 'Mejóralo con IA' },
     { id: 'prueba', section: 'revision', min: 7, title: 'Qué hace bueno a un título' },
-];
+]);
 
 const SLIDE_KEY = 'projectsia:titulo:diapositiva';
 

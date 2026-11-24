@@ -9,18 +9,19 @@ import { NIVELES, nivelDe, problemasEscalera, rangoPeldano, verbosEntre } from '
 import './Titulo.css';
 import './Planteamiento.css';
 import './Objetivos.css';
+import { construccionPrimero } from './deck/orden';
 
 /* Clase de 60 minutos: la suma de `min` de todas las diapositivas. */
-const SECTIONS = [
+const SECTIONS = construccionPrimero([
     { id: 'apertura', label: 'Apertura' },
     { id: 'estructura', label: 'Estructura' },
     { id: 'calidad', label: 'Calidad' },
     { id: 'cierre', label: 'Cierre' },
     { id: 'construccion', label: 'Construcción' },
     { id: 'revision', label: 'Revisión final' },
-];
+]);
 
-const SLIDES = [
+const SLIDES = construccionPrimero([
     { id: 'portada', section: 'apertura', min: 3, title: 'Los objetivos: lo que tu investigación va a lograr' },
     { id: 'quees', section: 'apertura', min: 3, title: 'General y específicos' },
     { id: 'origen', section: 'apertura', min: 3, title: 'De la pregunta al objetivo' },
@@ -35,7 +36,7 @@ const SLIDES = [
     { id: 'cierre', section: 'cierre', min: 1, title: 'Lo que te llevas' },
     { id: 'construye', section: 'construccion', min: 10, title: 'Redacta tus objetivos', layout: 'builder' },
     { id: 'revision', section: 'revision', min: 7, title: 'Qué hace buenos a unos objetivos' },
-];
+]);
 
 const SLIDE_KEY = 'projectsia:objetivos:diapositiva';
 

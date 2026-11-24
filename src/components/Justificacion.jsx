@@ -11,18 +11,19 @@ import './Titulo.css';
 import './Planteamiento.css';
 import './Objetivos.css';
 import './Justificacion.css';
+import { construccionPrimero } from './deck/orden';
 
 /* Clase de 60 minutos: la suma de `min` de todas las diapositivas. */
-const SECTIONS = [
+const SECTIONS = construccionPrimero([
     { id: 'apertura', label: 'Apertura' },
     { id: 'estructura', label: 'Argumentos' },
     { id: 'calidad', label: 'Calidad' },
     { id: 'cierre', label: 'Cierre' },
     { id: 'construccion', label: 'Construcción' },
     { id: 'revision', label: 'Revisión final' },
-];
+]);
 
-const SLIDES = [
+const SLIDES = construccionPrimero([
     { id: 'portada', section: 'apertura', min: 3, title: 'La justificación: por qué vale la pena tu investigación' },
     { id: 'quees', section: 'apertura', min: 3, title: 'Qué es y qué no es' },
     { id: 'preguntas', section: 'apertura', min: 3, title: 'Las cuatro preguntas que responde' },
@@ -38,7 +39,7 @@ const SLIDES = [
     { id: 'cierre', section: 'cierre', min: 1, title: 'Lo que te llevas' },
     { id: 'construye', section: 'construccion', min: 10, title: 'Redacta tu justificación', layout: 'builder' },
     { id: 'revision', section: 'revision', min: 6, title: 'Qué hace buena a una justificación' },
-];
+]);
 
 const SLIDE_KEY = 'projectsia:justificacion:diapositiva';
 

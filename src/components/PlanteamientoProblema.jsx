@@ -9,18 +9,19 @@ import { useAutoGuardar } from '../hooks/useAutoGuardar';
 import { parrafosPlanteamiento } from '../data/ejemplos';
 import './Titulo.css';
 import './Planteamiento.css';
+import { construccionPrimero } from './deck/orden';
 
 /* Clase de 60 minutos: la suma de `min` de todas las diapositivas. */
-const SECTIONS = [
+const SECTIONS = construccionPrimero([
     { id: 'apertura', label: 'Apertura' },
     { id: 'estructura', label: 'Estructura' },
     { id: 'calidad', label: 'Calidad' },
     { id: 'cierre', label: 'Cierre' },
     { id: 'construccion', label: 'Construcción' },
     { id: 'revision', label: 'Revisión final' },
-];
+]);
 
-const SLIDES = [
+const SLIDES = construccionPrimero([
     { id: 'portada', section: 'apertura', min: 3, title: 'El planteamiento: por qué existe tu investigación' },
     { id: 'quees', section: 'apertura', min: 3, title: 'Qué es y qué no es' },
     { id: 'embudo', section: 'apertura', min: 3, title: 'De lo general a lo particular' },
@@ -36,7 +37,7 @@ const SLIDES = [
     { id: 'cierre', section: 'cierre', min: 1, title: 'Lo que te llevas' },
     { id: 'construye', section: 'construccion', min: 10, title: 'Redacta tu planteamiento', layout: 'builder' },
     { id: 'revision', section: 'revision', min: 7, title: 'Qué hace bueno a un planteamiento' },
-];
+]);
 
 const SLIDE_KEY = 'projectsia:planteamiento:diapositiva';
 

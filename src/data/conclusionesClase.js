@@ -1,9 +1,10 @@
+import { construccionPrimero } from '../components/deck/orden.js';
 /*
  * Clase «Conclusiones» (1 hora).
  * Las diapositivas 'portada', 'construye' y 'revision' se pintan aparte en el componente.
  */
 
-export const SECTIONS = [
+export const SECTIONS = construccionPrimero([
     { id: 'apertura', label: 'Apertura' },
     { id: 'estructura', label: 'Cómo se escriben' },
     { id: 'recomendaciones', label: 'Recomendaciones' },
@@ -11,11 +12,11 @@ export const SECTIONS = [
     { id: 'cierre', label: 'Cierre' },
     { id: 'construccion', label: 'Construcción' },
     { id: 'revision', label: 'Revisión final' },
-];
+]);
 
 const q = (text, options, answer, why) => ({ text, options, answer, why });
 
-export const SLIDES = [
+export const SLIDES = construccionPrimero([
     /* ---------- Apertura (9) ---------- */
     { id: 'portada', section: 'apertura', min: 3, title: 'Conclusiones: la respuesta a tus objetivos' },
     {
@@ -184,4 +185,4 @@ export const SLIDES = [
     /* ---------- Construcción y revisión (12) ---------- */
     { id: 'construye', section: 'construccion', min: 9, title: 'Construye tus conclusiones', layout: 'builder' },
     { id: 'revision', section: 'revision', min: 3, title: 'Qué hace buenas a unas conclusiones' },
-];
+]);
