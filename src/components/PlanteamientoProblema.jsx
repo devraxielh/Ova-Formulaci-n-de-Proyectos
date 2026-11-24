@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import SlideDeck, { Opciones, Pestanas } from './deck/SlideDeck';
 import { useProjectField } from '../context/ProjectContext';
+import { ideaConArbol } from '../services/arbol';
 import { useAutoGuardar } from '../hooks/useAutoGuardar';
 import { parrafosPlanteamiento } from '../data/ejemplos';
 import './Titulo.css';
@@ -291,13 +292,13 @@ const ArbolATexto = ({ idea }) => {
     const listaEfectos = efectos.length ? efectos : ['Repitencia', 'Deserción temprana'];
     return (
         <div className="ide-panel">
-            <h3>{propio ? 'Tu árbol de la Ideación' : 'Ejemplo de árbol'}</h3>
+            <h3>{propio ? 'Tu árbol del problema' : 'Ejemplo de árbol'}</h3>
             <ul className="pla-map">
                 <li data-part="donde"><span>Ramas · Efectos → párrafo de consecuencias</span><p>{listaEfectos.join(' · ')}</p></li>
                 <li data-part="paraque"><span>Tronco · Problema → párrafo de descripción</span><p>{problema}</p></li>
                 <li data-part="quien"><span>Raíces · Causas → párrafo de causas</span><p>{listaCausas.join(' · ')}</p></li>
             </ul>
-            {!propio && <p className="ide-hint">Completa tu árbol en la Ideación y aquí verás el tuyo.</p>}
+            {!propio && <p className="ide-hint">Arma tu árbol en «Árbol del problema» y aquí verás el tuyo.</p>}
         </div>
     );
 };
@@ -335,7 +336,10 @@ const usePlanteamientoState = () => {
     const [planteamiento, setPlanteamiento] = useProjectField('planteamiento', '');
     const [pregunta] = useProjectField('pregunta', '');
     const [tituloForm] = useProjectField('tituloForm', null);
-    const [idea] = useProjectField('idea', null);
+    // El árbol hecho en «Árbol del problema» manda; si no existe, se usa el de la Ideación.
+    const [ideaGuardada] = useProjectField('idea', null);
+    const [arbol] = useProjectField('arbol', null);
+    const idea = ideaConArbol(ideaGuardada, { arbol, idea: ideaGuardada });
     const f = { ...PLANTEAMIENTO_FORM, ...(form || {}) };
     const update = (patch) => setForm((prev) => ({ ...PLANTEAMIENTO_FORM, ...(prev || {}), ...patch }));
     const i = idea || {};
@@ -511,7 +515,9 @@ const Revision = ({ intro }) => {
 /* ---------- Clase ---------- */
 
 const PlanteamientoProblema = ({ onNavigate }) => {
-    const [idea] = useProjectField('idea', null);
+    const [ideaGuardada] = useProjectField('idea', null);
+    const [arbol] = useProjectField('arbol', null);
+    const idea = ideaConArbol(ideaGuardada, { arbol, idea: ideaGuardada });
     const [pregunta] = useProjectField('pregunta', '');
     const [planteamiento] = useProjectField('planteamiento', '');
     const frase = clean(idea?.frase);

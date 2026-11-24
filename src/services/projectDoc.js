@@ -1,3 +1,4 @@
+import { arbolCompleto, arbolSvg, leerArbol } from './arbol.js';
 import { ordenarReferencias, referenciaAPA } from './apa.js';
 import { partesObjetivos } from './coherencia.js';
 import { bloquesInstrumento, preguntasDe, ubicacionDe } from './instrumentos.js';
@@ -105,6 +106,29 @@ export const DECLARACION_ORIGINALIDAD = (titulo) => `Declaro bajo la gravedad de
 export const DECLARACION_EXONERACION = () => 'Declaro que la responsabilidad intelectual del presente trabajo es exclusivamente de su autor o autores. La institución no se hace responsable de los contenidos, opiniones o ideologías expresadas total o parcialmente en él.';
 
 const money = (value) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number(value) || 0);
+
+/* ---------- Árbol del problema ---------- */
+
+// Identificador de la figura del árbol: sirve para citarla («ver Figura 1») y para entregar su imagen a Word y PDF.
+export const ARBOL_ID = 'arbolfig';
+
+// La figura va al final del texto del planteamiento, y su último párrafo la cita si el estudiante no lo hizo.
+// Solo entra cuando hay texto (una figura sola no da el planteamiento por hecho) y el árbol está completo.
+const conArbol = (d, blocks) => {
+    const arbol = leerArbol(d);
+    if (!blocks.length || !arbolCompleto(arbol)) return blocks;
+    const { w, h } = arbolSvg(arbol);
+    const ultimo = blocks.map((b) => b.type).lastIndexOf('paragraph');
+    const out = blocks.map((b, i) => (i === ultimo ? { ...b, citaDe: [...(b.citaDe || []), ARBOL_ID] } : b));
+    return [...out, { type: 'figure', elementoId: ARBOL_ID, fileId: ARBOL_ID, arbol: { problema: arbol.problema, causas: arbol.causas, efectos: arbol.efectos }, caption: 'Árbol del problema', nota: 'Elaboración propia.', w, h }];
+};
+
+// Avance de la página «Árbol del problema»: cuenta cuando el estudiante lo armó allí y está completo.
+const arbolBlocks = (d) => {
+    const arbol = leerArbol(d);
+    if (!arbol.propio || !arbolCompleto(arbol)) return [];
+    return [{ type: 'list', items: [`**Problema central:** ${arbol.problema}`, `**Causas:** ${arbol.causas.join('; ')}`, `**Efectos:** ${arbol.efectos.join('; ')}`] }];
+};
 
 /* ---------- Figuras y tablas propias, Gantt, matriz y anexos ---------- */
 
@@ -224,6 +248,7 @@ export const CAMPOS_SECCION = {
     resumen: ['resumen', 'resumenForm', 'palabrasClave', 'abstract', 'keywords', 'abstractFuente', 'abstractManual'],
     preliminares: ['integrantes', 'director', 'ciudad', 'dedicatoria', 'agradecimientos', 'declaracionOriginalidad', 'declaracionExoneracion'],
     introduccion: ['introduccion', 'introduccionForm'],
+    arbol: ['arbol'],
     planteamiento: ['planteamiento', 'planteamientoForm'],
     pregunta: ['pregunta', 'preguntaForm', 'preguntaTipo'],
     objetivos: ['objetivos', 'objetivosForm', 'objetivoGeneral'],
@@ -274,7 +299,7 @@ export const SECTIONS = [
         ] : []),
     },
     { id: 'introduccion', label: 'Introducción', tab: 'introduccion', blocks: (d) => cuerpo(d.introduccion) },
-    { id: 'planteamiento', label: 'Planteamiento del problema', tab: 'planteamiento', blocks: (d) => cuerpo(d.planteamiento) },
+    { id: 'planteamiento', label: 'Planteamiento del problema', tab: 'planteamiento', blocks: (d) => conArbol(d, cuerpo(d.planteamiento)) },
     { id: 'pregunta', label: 'Pregunta de investigación', tab: 'pregunta', blocks: (d) => cuerpo(d.pregunta) },
     { id: 'objetivos', label: 'Objetivos', tab: 'objetivos', blocks: (d) => objetivosBlocks(d.objetivos) },
     { id: 'justificacion', label: 'Justificación', tab: 'justificacion', blocks: (d) => cuerpo(d.justificacion) },
@@ -357,10 +382,12 @@ export const SECTIONS = [
     },
     { id: 'anexos', label: 'Anexos', tab: 'proyecto', extra: true, blocks: anexosBlocks },
     { id: 'idea', label: 'Idea de investigación', inDocument: false, tab: 'ideacion', blocks: (d) => ideaBlocks(d.idea) },
+    // El árbol no es un capítulo: su figura va dentro del Planteamiento. Esta entrada solo marca el avance de su página.
+    { id: 'arbol', label: 'Árbol del problema', inDocument: false, tab: 'arbol', blocks: arbolBlocks },
 ];
 
 // Orden en que se construye el proyecto (menú y avance). El documento sigue el orden de SECTIONS.
-export const BUILD_ORDER = ['ideacion', 'titulo', 'pregunta', 'planteamiento', 'objetivos', 'justificacion', 'alcances', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'introduccion', 'resumen', 'referencias'];
+export const BUILD_ORDER = ['ideacion', 'titulo', 'pregunta', 'arbol', 'planteamiento', 'objetivos', 'justificacion', 'alcances', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'introduccion', 'resumen', 'referencias'];
 
 export const buildDocument = (data) => SECTIONS.map((section) => ({ ...section, content: section.blocks(data || {}) }));
 

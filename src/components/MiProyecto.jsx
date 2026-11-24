@@ -6,10 +6,11 @@ import { DocumentPaper } from './ProjectDocument';
 import Coherencia from './Coherencia';
 import ProyectoPaneles from './ProyectoPaneles';
 import { api, groq } from '../services/api';
+import { arbolPng } from '../services/arbol';
 import './Proyecto.css';
 
 // Mismo orden que el menú lateral.
-const MENU_ORDER = ['ideacion', 'titulo', 'pregunta', 'planteamiento', 'objetivos', 'introduccion', 'justificacion', 'alcances', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'resumen', 'referencias'];
+const MENU_ORDER = ['ideacion', 'titulo', 'pregunta', 'arbol', 'planteamiento', 'objetivos', 'introduccion', 'justificacion', 'alcances', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'resumen', 'referencias'];
 
 const SAVE_LABEL = {
     local: 'Guardado solo en este navegador',
@@ -99,8 +100,13 @@ const MiProyecto = ({ onNavigate }) => {
 
     // Descarga las figuras del proyecto para incluirlas en el Word o en el PDF.
     const cargarImagenes = async () => {
-        const ids = [...new Set(sections.flatMap((section) => section.content).filter((b) => b.type === 'figure').map((b) => b.fileId))];
+        const figuras = sections.flatMap((section) => section.content).filter((b) => b.type === 'figure');
+        const ids = [...new Set(figuras.filter((b) => !b.arbol).map((b) => b.fileId))];
         const imagenes = {};
+        // El árbol del problema no es un archivo subido: se dibuja aquí mismo.
+        await Promise.all(figuras.filter((b) => b.arbol).map(async (b) => {
+            try { imagenes[b.fileId] = await arbolPng(b.arbol); } catch { /* queda con un aviso en el documento */ }
+        }));
         if (!project.id) return imagenes;
         await Promise.all(ids.map(async (fid) => {
             try {

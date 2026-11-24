@@ -1,6 +1,6 @@
 import Cargando from './components/Cargando';
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import { Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, Scale, Link, Compass, Library, PanelLeftClose, PanelLeftOpen, FolderOpen, UserRound, ShieldCheck, LogOut, CheckCircle2, ListOrdered, BarChart3, Flag, BookMarked, AlignLeft, FileSpreadsheet } from 'lucide-react';
+import { Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, Scale, Link, Compass, Library, PanelLeftClose, PanelLeftOpen, FolderOpen, UserRound, ShieldCheck, LogOut, CheckCircle2, ListOrdered, BarChart3, Flag, BookMarked, AlignLeft, FileSpreadsheet, Network } from 'lucide-react';
 import { useProject } from './context/ProjectContext';
 import { CAMPOS_SECCION, SECTIONS, buildDocument } from './services/projectDoc';
 import { api } from './services/api';
@@ -11,6 +11,7 @@ const Ideacion = lazy(() => import('./components/Ideacion'));
 const Titulo = lazy(() => import('./components/Titulo'));
 const PreguntaInvestigacion = lazy(() => import('./components/PreguntaInvestigacion'));
 const PlanteamientoProblema = lazy(() => import('./components/PlanteamientoProblema'));
+const ArbolProblema = lazy(() => import('./components/ArbolProblema'));
 const Justificacion = lazy(() => import('./components/Justificacion'));
 const AlcancesLimitaciones = lazy(() => import('./components/AlcancesLimitaciones'));
 const Objetivos = lazy(() => import('./components/Objetivos'));
@@ -40,7 +41,7 @@ const seccionDe = (key) => {
     return SECTIONS.find((s) => s.id === id)?.label || 'Otros datos del proyecto';
 };
 // Nombre visible de la pestaña donde está un compañero.
-const TAB_LABEL = { proyecto: 'Mi proyecto', ideacion: 'Ideación', titulo: 'Título', pregunta: 'Pregunta de investigación', planteamiento: 'Planteamiento', objetivos: 'Objetivos', introduccion: 'Introducción', justificacion: 'Justificación', alcances: 'Alcances y limitaciones', marco: 'Marco Referencial', metodologia: 'Metodología', fases: 'Desarrollo de las fases', resultados: 'Resultados y discusión', conclusiones: 'Conclusiones', resumen: 'Resumen', referencias: 'Referencias', cuenta: 'Mi cuenta' };
+const TAB_LABEL = { proyecto: 'Mi proyecto', ideacion: 'Ideación', titulo: 'Título', pregunta: 'Pregunta de investigación', arbol: 'Árbol del problema', planteamiento: 'Planteamiento', objetivos: 'Objetivos', introduccion: 'Introducción', justificacion: 'Justificación', alcances: 'Alcances y limitaciones', marco: 'Marco Referencial', metodologia: 'Metodología', fases: 'Desarrollo de las fases', resultados: 'Resultados y discusión', conclusiones: 'Conclusiones', resumen: 'Resumen', referencias: 'Referencias', cuenta: 'Mi cuenta' };
 
 // Errores del navegador → registro del servidor (se ven en Administración). Como mucho 5 por visita.
 let erroresEnviados = 0;
@@ -190,6 +191,8 @@ function App() {
                 return <Titulo onNavigate={handleTabChange} />;
             case 'pregunta':
                 return <PreguntaInvestigacion onNavigate={handleTabChange} />;
+            case 'arbol':
+                return <ArbolProblema onNavigate={handleTabChange} />;
             case 'planteamiento':
                 return <PlanteamientoProblema onNavigate={handleTabChange} />;
             case 'justificacion':
@@ -234,6 +237,7 @@ function App() {
             case 'ideacion': return 'Fase de Ideación';
             case 'titulo': return 'Construcción del Título';
             case 'pregunta': return 'Pregunta de Investigación';
+            case 'arbol': return 'Árbol del problema';
             case 'planteamiento': return 'Planteamiento del Problema';
             case 'justificacion': return 'Justificación';
             case 'alcances': return 'Alcances y Limitaciones';
@@ -381,6 +385,16 @@ function App() {
                         <HelpCircle size={20} />
                         <span>Pregunta Investigación</span>
                         {doneTabs.has('pregunta') && <CheckCircle2 size={16} className="nav-done-check" aria-label="completado" />}
+                    </button>
+
+                    <button
+                        className={`nav-button ${activeTab === 'arbol' ? 'active' : ''} ${doneTabs.has('arbol') ? 'nav-button--done' : ''}`}
+                        onClick={() => handleTabChange('arbol')}
+                        title="Árbol del problema"
+                    >
+                        <Network size={20} />
+                        <span>Árbol del problema</span>
+                        {doneTabs.has('arbol') && <CheckCircle2 size={16} className="nav-done-check" aria-label="completado" />}
                     </button>
 
                     <button
@@ -556,6 +570,8 @@ function App() {
                                     ? 'Guarda tu proyecto y continúalo desde cualquier equipo.'
                                     : activeTab === 'admin'
                                         ? 'Consulta los usuarios registrados, sus proyectos y su estado.'
+                                    : activeTab === 'arbol'
+                                        ? 'Separa el problema central de sus causas y sus efectos. La figura entra en el Planteamiento de tu documento.'
                                     : 'Explora las herramientas interactivas para definir y estructurar tu proyecto de investigación de manera efectiva.'}
                         </p>
                     </header>

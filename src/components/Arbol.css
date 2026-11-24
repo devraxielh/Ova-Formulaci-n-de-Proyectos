@@ -1,0 +1,24 @@
+/* Página «Árbol del problema» */
+.arb-cols { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1100px) { .arb-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); } .arb-vista { position: sticky; top: 1rem; } }
+.arb-form, .arb-vista { display: grid; gap: 0.9rem; align-content: start; }
+.arb-form h2, .arb-vista h2 { display: flex; align-items: center; gap: 0.45rem; margin: 0; font-size: 1.1rem; }
+.arb-form h2 svg { color: #4f46e5; }
+.arb-problema { display: grid; gap: 0.35rem; }
+.arb-problema b, .arb-grupo legend { font-weight: 700; color: #1e293b; }
+.arb-problema small, .arb-grupo legend small { font-weight: 500; color: #64748b; margin-left: 0.35rem; }
+.arb-problema textarea { border-left: 4px solid #4338ca; }
+.arb-grupo { border: 0; padding: 0; margin: 0; display: grid; gap: 0.5rem; min-width: 0; }
+.arb-grupo legend { padding: 0; }
+.arb-grupo ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.arb-grupo li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.5rem; align-items: center; }
+.arb-grupo li > span { display: grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700; color: #1e293b; }
+.arb-grupo[data-tipo='causa'] li > span { background: #fef3c7; }
+.arb-grupo[data-tipo='efecto'] li > span { background: #ffe4e6; }
+.arb-grupo .pro-btn { justify-self: start; }
+.arb-quitar { display: grid; place-items: center; width: 2rem; height: 2rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; background: #fff; color: #b91c1c; cursor: pointer; }
+.arb-quitar:hover { background: #fef2f2; border-color: #fca5a5; }
+.arb-figura { width: 100%; height: auto; display: block; border: 1px solid #e2e8f0; border-radius: 0.6rem; background: #fff; }
+.arb-estado { margin: 0; font-size: 0.9rem; color: #92400e; background: #fffbeb; padding: 0.55rem 0.75rem; border-radius: 0.5rem; }
+.arb-estado[data-ok='true'] { color: #065f46; background: #ecfdf5; }
+.arb-acciones { display: flex; flex-wrap: wrap; gap: 0.5rem; }

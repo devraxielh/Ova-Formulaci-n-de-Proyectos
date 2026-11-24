@@ -232,3 +232,22 @@ test('validez y confiabilidad: sin cálculo el documento deja dicho que falta; c
     assert.ok(con.includes('prueba piloto con 15 personas'));
     assert.deepEqual(estadoValidacion({ instrumento: 'guía' }), []); // sin métodos elegidos no hay nada pendiente
 });
+
+test('el árbol del problema entra como figura al final del planteamiento y se cita', async () => {
+    const { documentoNumerado } = await import('../src/services/projectDoc.js');
+    const { arbolSvg, leerArbol } = await import('../src/services/arbol.js');
+    const datos = { ...proyecto, planteamiento: 'Primer párrafo.\n\nSegundo párrafo.', arbol: { problema: 'Alta inasistencia a citas', causas: ['Olvido de la fecha', ''], efectos: ['Se pierden cupos'] } };
+    const plan = documentoNumerado(buildDocument(datos)).find((s) => s.id === 'planteamiento');
+    const figura = plan.content.find((b) => b.type === 'figure');
+    assert.equal(figura.caption, 'Árbol del problema');
+    assert.equal(figura.rotulo, 'Figura 1');
+    assert.deepEqual(figura.arbol.causas, ['Olvido de la fecha']);
+    assert.match(plan.content.find((b) => b.text?.startsWith('Segundo')).text, /\(ver Figura 1\)\.$/);
+    // Sin texto de planteamiento, o con el árbol incompleto, no hay figura.
+    assert.ok(!buildDocument({ ...datos, planteamiento: '' }).find((s) => s.id === 'planteamiento').content.length);
+    assert.ok(!buildDocument({ ...datos, arbol: { problema: 'x', causas: [], efectos: ['y'] } }).find((s) => s.id === 'planteamiento').content.some((b) => b.type === 'figure'));
+    // Si no se ha hecho en su página, parte de la Ideación.
+    assert.deepEqual(leerArbol({ idea: { problema: 'P', causa1: 'C', efecto2: 'E' } }), { problema: 'P', causas: ['C'], efectos: ['E'], propio: false });
+    const { svg, w, h } = arbolSvg(leerArbol(datos));
+    assert.ok(svg.startsWith('<svg') && svg.includes('Alta inasistencia') && w === 1200 && h > 200);
+});
