@@ -28,7 +28,7 @@ const terminosMapa = (text) => {
 export const terminos = (text) => new Set(terminosMapa(text).keys());
 
 // Qué parte de los términos de `ref` aparece en `otro` (0 a 1) y qué palabras faltan.
-const comparar = (ref, otro) => {
+export const comparar = (ref, otro) => {
     const a = terminosMapa(ref);
     if (a.size === 0) return { ratio: null, faltan: [] };
     const b = terminos(otro);
