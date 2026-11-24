@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Download, Network, Plus, Trash2 } from 'lucide-react';
+import { Check, Download, Loader2, Network, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { groq } from '../services/api';
 import { useProject, useProjectField } from '../context/ProjectContext';
 import { MAX_RAMAS, arbolCompleto, arbolDataUrl, arbolPng, leerArbol } from '../services/arbol';
 import SlideDeck from './deck/SlideDeck';
@@ -60,6 +61,44 @@ const Constructor = ({ heading }) => {
         : { problema: base.problema, causas: base.causas, efectos: base.efectos };
     const cambiar = (patch) => setArbol({ ...edicion, ...patch });
 
+    // Sugerencia de la IA a partir del título y la pregunta. Si el árbol está vacío, lo llena; si no, la propone al lado
+    // para que el estudiante tome lo que le sirva sin perder lo que ya escribió.
+    const titulo = String(data?.titulo || '').trim();
+    const pregunta = String(data?.pregunta || '').trim();
+    const [sugerencia, setSugerencia] = useState(null);
+    const [pensando, setPensando] = useState(false);
+    const vacio = !base.problema && !base.causas.length && !base.efectos.length;
+    const sugerir = async () => {
+        setError('');
+        setPensando(true);
+        try {
+            const r = await groq.chat.completions.create({
+                messages: [
+                    { role: 'system', content: 'Ayudas a un estudiante a armar el árbol del problema de su proyecto de investigación. Propones un problema central, causas y efectos coherentes con su título y su pregunta. Son hipótesis de partida que el estudiante debe verificar: no inventas cifras, porcentajes, estudios ni autores. Respondes solo JSON válido en español.' },
+                    { role: 'user', content: `Título: ${titulo || '(sin título)'}\nPregunta de investigación: ${pregunta || '(sin pregunta)'}\n\nPropón el árbol del problema:\n- "problema": una sola frase, como situación negativa que existe hoy (empieza con «Alta», «Bajo», «Deficiente», «Escaso» o similar), con la población y el lugar del título. No lo escribas como la falta de una solución ni como pregunta.\n- "causas": exactamente 3 frases cortas (máximo 14 palabras) que respondan «¿por qué ocurre?», cercanas a esa población.\n- "efectos": exactamente 3 frases cortas (máximo 14 palabras) que respondan «¿qué consecuencias trae?».\nSin punto final, sin numeración y sin cifras.\n\nResponde exactamente con este JSON: {"problema": "…", "causas": ["…", "…", "…"], "efectos": ["…", "…", "…"]}` },
+                ],
+                temperature: 0.4,
+                max_tokens: 700,
+                response_format: { type: 'json_object' },
+            });
+            const content = r.choices?.[0]?.message?.content || '';
+            const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+            const frases = (v) => (Array.isArray(v) ? v : []).map((x) => String(x ?? '').replace(/\s+/g, ' ').replace(/[.\s]+$/, '').trim()).filter(Boolean).slice(0, MAX_RAMAS);
+            const nueva = { problema: frases([json.problema])[0] || '', causas: frases(json.causas), efectos: frases(json.efectos) };
+            if (!nueva.problema && !nueva.causas.length && !nueva.efectos.length) throw new Error('La IA no devolvió una sugerencia. Inténtalo de nuevo.');
+            if (vacio) { setArbol(nueva); setSugerencia({ ...nueva, aplicada: true }); } else setSugerencia(nueva);
+        } catch (err) {
+            setError(err.message || 'No se pudo generar la sugerencia.');
+        } finally {
+            setPensando(false);
+        }
+    };
+    const tiene = (lista, frase) => lista.some((x) => String(x).trim().toLowerCase() === frase.toLowerCase());
+    const sumar = (campo, frase) => {
+        const actuales = edicion[campo].filter((x) => String(x).trim());
+        if (!tiene(actuales, frase) && actuales.length < MAX_RAMAS) cambiar({ [campo]: [...actuales, frase] });
+    };
+
     const completo = arbolCompleto(base);
     const figura = useMemo(() => arbolDataUrl(base, { relleno: true }), [base]);
     const faltan = [!base.problema && 'el problema central', !base.causas.length && 'al menos una causa', !base.efectos.length && 'al menos un efecto'].filter(Boolean);
@@ -84,6 +123,39 @@ const Constructor = ({ heading }) => {
                 <section className="pro-card arb-form">
                     <h2><Network size={20} aria-hidden="true" /> Arma tu árbol</h2>
                     <p className="pro-panel-hint">Empieza por el tronco: el problema que observas, escrito como una situación negativa, no como la falta de una solución. Luego baja a las raíces y sube a las ramas.{!base.propio && (base.problema || base.causas.length || base.efectos.length) ? ' Ya cargamos lo que escribiste en la Ideación: ajústalo aquí.' : ''}</p>
+
+                    <div className="arb-ia">
+                        <button type="button" className="pro-btn pro-btn--primary" onClick={sugerir} disabled={pensando || (!titulo && !pregunta)}>
+                            {pensando ? <Loader2 size={15} className="arb-gira" /> : <Sparkles size={15} />} {pensando ? 'Pensando…' : sugerencia ? 'Sugerir otra vez' : 'Sugerir con IA'}
+                        </button>
+                        <small>{titulo || pregunta ? 'A partir de tu título y tu pregunta de investigación.' : 'Primero construye tu título o tu pregunta de investigación.'}</small>
+                    </div>
+                    {sugerencia && (
+                        <div className="arb-sugerencia" role="status">
+                            <b><Sparkles size={14} aria-hidden="true" /> {sugerencia.aplicada ? 'La IA llenó tu árbol con esta sugerencia' : 'Sugerencia de la IA'}</b>
+                            <p>Son hipótesis de partida: revísalas, ajústalas a lo que realmente pasa y respáldalas con fuentes en tu planteamiento.</p>
+                            {!sugerencia.aplicada && (
+                                <>
+                                    {sugerencia.problema && (
+                                        <div className="arb-sug-fila">
+                                            <span><i>Problema</i>{sugerencia.problema}</span>
+                                            <button type="button" className="pro-link" onClick={() => cambiar({ problema: sugerencia.problema })} disabled={edicion.problema.trim() === sugerencia.problema}>{edicion.problema.trim() === sugerencia.problema ? <><Check size={13} /> Usado</> : 'Usar'}</button>
+                                        </div>
+                                    )}
+                                    {[['causas', 'Causa'], ['efectos', 'Efecto']].flatMap(([campo, rotulo]) => sugerencia[campo].map((frase) => (
+                                        <div className="arb-sug-fila" key={`${campo}-${frase}`}>
+                                            <span><i>{rotulo}</i>{frase}</span>
+                                            <button type="button" className="pro-link" onClick={() => sumar(campo, frase)} disabled={tiene(edicion[campo], frase)}>{tiene(edicion[campo], frase) ? <><Check size={13} /> Agregada</> : <><Plus size={13} /> Agregar</>}</button>
+                                        </div>
+                                    )))}
+                                    <div className="arb-acciones">
+                                        <button type="button" className="pro-btn pro-btn--ghost" onClick={() => { setArbol({ problema: sugerencia.problema, causas: sugerencia.causas, efectos: sugerencia.efectos }); setSugerencia({ ...sugerencia, aplicada: true }); }}>Reemplazar mi árbol por esta sugerencia</button>
+                                        <button type="button" className="pro-link" onClick={() => setSugerencia(null)}>Descartar</button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
 
                     <label className="arb-problema" htmlFor="arb-problema">
                         <b>Problema central <small>el tronco</small></b>
