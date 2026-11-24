@@ -386,7 +386,7 @@ const SlideDeck = ({ sections, slides, label, renderSlide, finish }) => {
     useEffect(() => {
         const el = dialog.current;
         if (!el) return;
-        if (presentacion && !el.open) el.showModal();
+        if (presentacion && !el.open) { el.showModal(); el.focus(); } // el foco va a la ventana, no a la primera pestaña
         if (!presentacion && el.open) el.close();
     }, [presentacion]);
 
@@ -405,7 +405,7 @@ const SlideDeck = ({ sections, slides, label, renderSlide, finish }) => {
                 onPresentacion={() => setPresentacion({ seccion: teoria[0].section })}
                 onFuera={(seccion) => setPresentacion({ seccion })}
             />
-            <dialog ref={dialog} className="ide-pres-modal" aria-label={`Presentación de la clase: ${label}`} onClose={() => setPresentacion(null)}>
+            <dialog ref={dialog} tabIndex={-1} className="ide-pres-modal" aria-label={`Presentación de la clase: ${label}`} onClose={() => setPresentacion(null)}>
                 {presentacion && (
                     <Mazo
                         {...comunes}
