@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Check, Download, Loader2, Network, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { groq } from '../services/api';
 import { useProject, useProjectField } from '../context/ProjectContext';
-import { MAX_RAMAS, arbolCompleto, arbolDataUrl, arbolPng, leerArbol } from '../services/arbol';
+import { MAX_RAMAS, arbolCompleto, arbolDataUrl, arbolPng, explicacionArbol, leerArbol } from '../services/arbol';
 import SlideDeck from './deck/SlideDeck';
 import { Generica } from './deck/Contenido';
 import { SECTIONS, SLIDES } from '../data/arbolClase';
@@ -57,8 +57,8 @@ const Constructor = ({ heading }) => {
     // Lo que se edita conserva las casillas vacías; lo que se dibuja y se guarda en el documento, no.
     const base = useMemo(() => leerArbol(data), [data]);
     const edicion = guardado && typeof guardado === 'object'
-        ? { problema: String(guardado.problema ?? ''), causas: Array.isArray(guardado.causas) ? guardado.causas : [], efectos: Array.isArray(guardado.efectos) ? guardado.efectos : [] }
-        : { problema: base.problema, causas: base.causas, efectos: base.efectos };
+        ? { problema: String(guardado.problema ?? ''), causas: Array.isArray(guardado.causas) ? guardado.causas : [], efectos: Array.isArray(guardado.efectos) ? guardado.efectos : [], explicacion: String(guardado.explicacion ?? '') }
+        : { problema: base.problema, causas: base.causas, efectos: base.efectos, explicacion: '' };
     const cambiar = (patch) => setArbol({ ...edicion, ...patch });
 
     // Sugerencia de la IA a partir del título y la pregunta. Si el árbol está vacío, lo llena; si no, la propone al lado
@@ -86,7 +86,7 @@ const Constructor = ({ heading }) => {
             const frases = (v) => (Array.isArray(v) ? v : []).map((x) => String(x ?? '').replace(/\s+/g, ' ').replace(/[.\s]+$/, '').trim()).filter(Boolean).slice(0, MAX_RAMAS);
             const nueva = { problema: frases([json.problema])[0] || '', causas: frases(json.causas), efectos: frases(json.efectos) };
             if (!nueva.problema && !nueva.causas.length && !nueva.efectos.length) throw new Error('La IA no devolvió una sugerencia. Inténtalo de nuevo.');
-            if (vacio) { setArbol(nueva); setSugerencia({ ...nueva, aplicada: true }); } else setSugerencia(nueva);
+            if (vacio) { setArbol({ ...nueva, explicacion: edicion.explicacion }); setSugerencia({ ...nueva, aplicada: true }); } else setSugerencia(nueva);
         } catch (err) {
             setError(err.message || 'No se pudo generar la sugerencia.');
         } finally {
@@ -149,7 +149,7 @@ const Constructor = ({ heading }) => {
                                         </div>
                                     )))}
                                     <div className="arb-acciones">
-                                        <button type="button" className="pro-btn pro-btn--ghost" onClick={() => { setArbol({ problema: sugerencia.problema, causas: sugerencia.causas, efectos: sugerencia.efectos }); setSugerencia({ ...sugerencia, aplicada: true }); }}>Reemplazar mi árbol por esta sugerencia</button>
+                                        <button type="button" className="pro-btn pro-btn--ghost" onClick={() => { setArbol({ problema: sugerencia.problema, causas: sugerencia.causas, efectos: sugerencia.efectos, explicacion: edicion.explicacion }); setSugerencia({ ...sugerencia, aplicada: true }); }}>Reemplazar mi árbol por esta sugerencia</button>
                                         <button type="button" className="pro-link" onClick={() => setSugerencia(null)}>Descartar</button>
                                     </div>
                                 </>
@@ -194,8 +194,23 @@ const Constructor = ({ heading }) => {
                     <h2>Tu árbol del problema</h2>
                     <img className="arb-figura" src={figura} alt={completo ? `Árbol del problema. Problema central: ${base.problema}. Causas: ${base.causas.join('; ')}. Efectos: ${base.efectos.join('; ')}.` : 'Árbol del problema, aún incompleto'} />
                     {completo
-                        ? <p className="arb-estado" data-ok="true">Esta figura ya entra en el <strong>Planteamiento del problema</strong> de tu documento (vista previa, Word y PDF), después de su texto.</p>
+                        ? <p className="arb-estado" data-ok="true">Esta figura ya entra en el <strong>Planteamiento del problema</strong> de tu documento (vista previa, Word y PDF), después de su texto y con un párrafo que la explica.</p>
                         : <p className="arb-estado">Para que entre en tu documento falta {faltan.join(', ').replace(/, ([^,]*)$/, ' y $1')}.</p>}
+                    {completo && (
+                        <label className="arb-explica" htmlFor="arb-explica">
+                            <b>Párrafo que explica la figura <small>va antes de ella en tu documento</small></b>
+                            <textarea
+                                id="arb-explica"
+                                className="textarea-field"
+                                rows={5}
+                                maxLength={1200}
+                                value={edicion.explicacion}
+                                placeholder={explicacionArbol({ ...base, explicacion: '' }, 'La Figura 1')}
+                                onChange={(event) => cambiar({ explicacion: event.target.value })}
+                            />
+                            <small>{edicion.explicacion.trim() ? 'Se usará tu texto. Bórralo para volver al párrafo automático.' : 'Si lo dejas vacío se usa este párrafo automático, con el número real de la figura. Escribe aquí para redactarlo a tu manera.'}</small>
+                        </label>
+                    )}
                     {error && <p className="pro-alert" role="alert">{error}</p>}
                     <div className="arb-acciones">
                         <button type="button" className="pro-btn pro-btn--ghost" onClick={descargar} disabled={!completo}><Download size={15} /> Descargar imagen (PNG)</button>

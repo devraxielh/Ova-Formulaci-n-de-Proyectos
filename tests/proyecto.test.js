@@ -242,7 +242,15 @@ test('el árbol del problema entra como figura al final del planteamiento y se c
     assert.equal(figura.caption, 'Árbol del problema');
     assert.equal(figura.rotulo, 'Figura 1');
     assert.deepEqual(figura.arbol.causas, ['Olvido de la fecha']);
-    assert.match(plan.content.find((b) => b.text?.startsWith('Segundo')).text, /\(ver Figura 1\)\.$/);
+    // Antes de la figura va un párrafo que la presenta y la explica; el texto del estudiante no se toca.
+    const i = plan.content.indexOf(figura);
+    assert.match(plan.content[i - 1].text, /^La Figura 1 presenta el árbol del problema.*problema central: alta inasistencia a citas\. .*aparece la causa que lo origina: olvido de la fecha\. .*el efecto que produce: se pierden cupos\.$/);
+    assert.equal(plan.content.find((b) => b.text?.startsWith('Segundo')).text, 'Segundo párrafo.');
+    // Si el estudiante escribe su propio párrafo, se usa ese y se le pone el número de la figura.
+    const propio = documentoNumerado(buildDocument({ ...datos, arbol: { ...datos.arbol, explicacion: 'Como muestra la figura, el olvido es la raíz.' } })).find((s) => s.id === 'planteamiento');
+    assert.ok(propio.content.some((b) => b.text === 'Como muestra la Figura 1, el olvido es la raíz.'));
+    const sinNombrar = documentoNumerado(buildDocument({ ...datos, arbol: { ...datos.arbol, explicacion: 'El olvido es la raíz del problema.' } })).find((s) => s.id === 'planteamiento');
+    assert.ok(sinNombrar.content.some((b) => b.text === 'El olvido es la raíz del problema (ver Figura 1).'));
     // Sin texto de planteamiento, o con el árbol incompleto, no hay figura.
     assert.ok(!buildDocument({ ...datos, planteamiento: '' }).find((s) => s.id === 'planteamiento').content.length);
     assert.ok(!buildDocument({ ...datos, arbol: { problema: 'x', causas: [], efectos: ['y'] } }).find((s) => s.id === 'planteamiento').content.some((b) => b.type === 'figure'));

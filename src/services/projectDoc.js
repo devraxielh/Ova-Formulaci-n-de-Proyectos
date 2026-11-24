@@ -1,4 +1,4 @@
-import { arbolCompleto, arbolSvg, leerArbol } from './arbol.js';
+import { arbolCompleto, arbolSvg, explicacionArbol, leerArbol } from './arbol.js';
 import { ordenarReferencias, referenciaAPA } from './apa.js';
 import { partesObjetivos } from './coherencia.js';
 import { bloquesInstrumento, preguntasDe, ubicacionDe } from './instrumentos.js';
@@ -112,15 +112,17 @@ const money = (value) => new Intl.NumberFormat('es-CO', { style: 'currency', cur
 // Identificador de la figura del árbol: sirve para citarla («ver Figura 1») y para entregar su imagen a Word y PDF.
 export const ARBOL_ID = 'arbolfig';
 
-// La figura va al final del texto del planteamiento, y su último párrafo la cita si el estudiante no lo hizo.
+// La figura va al final del texto del planteamiento, precedida por un párrafo que la presenta y la explica
+// (la marca [[arbolfig]] se cambia por su número: «La Figura 1 presenta…»). Si el estudiante escribió su propio
+// párrafo sin nombrar la figura, ese párrafo la cita solo («ver Figura 1»).
 // Solo entra cuando hay texto (una figura sola no da el planteamiento por hecho) y el árbol está completo.
 const conArbol = (d, blocks) => {
     const arbol = leerArbol(d);
     if (!blocks.length || !arbolCompleto(arbol)) return blocks;
     const { w, h } = arbolSvg(arbol);
-    const ultimo = blocks.map((b) => b.type).lastIndexOf('paragraph');
-    const out = blocks.map((b, i) => (i === ultimo ? { ...b, citaDe: [...(b.citaDe || []), ARBOL_ID] } : b));
-    return [...out, { type: 'figure', elementoId: ARBOL_ID, fileId: ARBOL_ID, arbol: { problema: arbol.problema, causas: arbol.causas, efectos: arbol.efectos }, caption: 'Árbol del problema', nota: 'Elaboración propia.', w, h }];
+    const propia = Boolean(arbol.explicacion);
+    const presentacion = { type: 'paragraph', text: propia ? arbol.explicacion.replace(/\b[Ll]a figura\b(?! \d)/, (m) => `${m.charAt(0)}a [[${ARBOL_ID}]]`) : explicacionArbol(arbol, `La [[${ARBOL_ID}]]`), citaDe: [ARBOL_ID] };
+    return [...blocks, presentacion, { type: 'figure', elementoId: ARBOL_ID, fileId: ARBOL_ID, arbol: { problema: arbol.problema, causas: arbol.causas, efectos: arbol.efectos }, caption: 'Árbol del problema', nota: 'Elaboración propia.', w, h }];
 };
 
 // Avance de la página «Árbol del problema»: cuenta cuando el estudiante lo armó allí y está completo.

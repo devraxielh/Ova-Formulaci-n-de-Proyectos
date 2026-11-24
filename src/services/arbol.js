@@ -12,9 +12,26 @@ const lista = (v) => (Array.isArray(v) ? v : []).map(limpio).filter(Boolean).sli
 // Árbol del proyecto. Si aún no se ha hecho en su página, parte de lo que se escribió en la Ideación.
 export const leerArbol = (d) => {
     const a = d?.arbol;
-    if (a && typeof a === 'object') return { problema: limpio(a.problema), causas: lista(a.causas), efectos: lista(a.efectos), propio: true };
+    if (a && typeof a === 'object') return { problema: limpio(a.problema), causas: lista(a.causas), efectos: lista(a.efectos), explicacion: limpio(a.explicacion), propio: true };
     const idea = d?.idea || {};
     return { problema: limpio(idea.problema), causas: lista([idea.causa1, idea.causa2, idea.causa3]), efectos: lista([idea.efecto1, idea.efecto2, idea.efecto3]), propio: false };
+};
+
+// Párrafo que presenta la figura en el documento, para que no quede aislada. `figura` es cómo se nombra («la Figura 1»).
+// Si el estudiante escribió el suyo, se usa ese; si no, se arma con el contenido del árbol.
+const minuscula = (t) => (/^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]/.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t);
+const sinPunto = (t) => t.replace(/[.;,\s]+$/, '');
+const enumerar = (items) => {
+    const l = items.map((x) => minuscula(sinPunto(x)));
+    if (l.length === 2) return `${l[0]}, y ${l[1]}`;
+    return l.length > 2 ? `${l.slice(0, -1).join('; ')}; y ${l[l.length - 1]}` : l[0] || '';
+};
+export const explicacionArbol = (arbol, figura = 'La figura') => {
+    if (arbol.explicacion) return arbol.explicacion;
+    const n = (lista, uno, varios) => (lista.length === 1 ? uno : varios);
+    return `${figura} presenta el árbol del problema, que resume la situación estudiada en tres niveles. En el centro se ubica el problema central: ${minuscula(sinPunto(arbol.problema))}. `
+        + `En la parte inferior ${n(arbol.causas, 'aparece la causa que lo origina', 'aparecen las causas que lo originan')}: ${enumerar(arbol.causas)}. `
+        + `En la parte superior ${n(arbol.efectos, 'se muestra el efecto que produce', 'se muestran los efectos que produce')}: ${enumerar(arbol.efectos)}.`;
 };
 
 // Para ser una figura del documento necesita el problema, al menos una causa y al menos un efecto.
