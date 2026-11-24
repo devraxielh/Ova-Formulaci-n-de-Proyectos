@@ -56,3 +56,14 @@
 .res-analisis > summary small { font-weight: 400; color: #64748b; }
 .res-analisis[open] > summary { border-bottom: 1px solid #c7d2fe; }
 .ana-embebido { padding: 1rem; }
+
+/* Gráfico de barras en pantalla, con rótulo y porcentaje por opción */
+.ana-tabla { grid-template-columns: minmax(0, 1fr); }
+.ana-grafico { margin: 0; display: grid; gap: 0.45rem; padding: 0.8rem 0.9rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; }
+.ana-grafico-fila { display: grid; grid-template-columns: minmax(6rem, 14rem) minmax(0, 1fr) auto; gap: 0.7rem; align-items: center; font-size: 0.88rem; }
+.ana-grafico-rotulo { color: #334155; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+.ana-grafico-pista { display: block; height: 1.15rem; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
+.ana-grafico-pista i { display: block; height: 100%; background: #4f46e5; border-radius: 4px; }
+.ana-grafico-fila b { font-weight: 600; color: #0f172a; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ana-grafico-fila small { font-weight: 400; color: #64748b; }
+@media (max-width: 640px) { .ana-grafico-fila { grid-template-columns: minmax(0, 1fr) auto; } .ana-grafico-rotulo { grid-column: 1 / -1; text-align: left; white-space: normal; } }

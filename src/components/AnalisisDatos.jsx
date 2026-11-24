@@ -88,12 +88,18 @@ const Variable = ({ v, fuenteNota, onTabla, onGrafico, estado }) => {
                             <thead><tr>{tabla.head.map((h) => <th key={h}>{h}</th>)}</tr></thead>
                             <tbody>{tabla.rows.map((r, i) => <tr key={i}>{r.map((c, k) => <td key={k}>{c}</td>)}</tr>)}</tbody>
                         </table>
-                        {v.clase === 'categorica' && (
-                            <div className="ana-barras" aria-hidden="true">
-                                {v.frec.items.map((x) => <div key={x.valor}><span style={{ width: `${Math.max(1, x.pct)}%` }} /></div>)}
-                            </div>
-                        )}
                     </div>
+                    {v.clase === 'categorica' && (
+                        <figure className="ana-grafico" aria-label={`Gráfico de barras: ${v.nombre}`}>
+                            {v.frec.items.map((x) => (
+                                <div key={x.valor} className="ana-grafico-fila">
+                                    <span className="ana-grafico-rotulo" title={x.valor}>{x.valor}</span>
+                                    <span className="ana-grafico-pista"><i style={{ width: `${Math.max(0.5, x.pct)}%` }} /></span>
+                                    <b>{fmt(x.pct)} % <small>(n = {x.n})</small></b>
+                                </div>
+                            ))}
+                        </figure>
+                    )}
                     {frase && <p className="ana-frase">{frase} <button type="button" className="pro-link" onClick={copiar}><Copy size={13} /> {copiada ? 'Copiada' : 'Copiar'}</button></p>}
                     <div className="ins-acciones">
                         <button type="button" className="pro-btn pro-btn--ghost" onClick={() => onTabla(v, tabla, fuenteNota)} disabled={estado.tabla}>
@@ -261,7 +267,10 @@ const AnalisisDatos = ({ onNavigate, embebido = false }) => {
             // Si se llegó desde «Analizar respuestas» de un instrumento, se abre de una vez.
             let pedida = '';
             try { pedida = window.sessionStorage.getItem('projectsia:analisis:fuente') || ''; window.sessionStorage.removeItem('projectsia:analisis:fuente'); } catch { /* noop */ }
-            if (pedida && surveys.some((s) => s.instrumentId === pedida)) abrirEncuesta(pedida);
+            if (pedida && surveys.some((s) => s.instrumentId === pedida)) { abrirEncuesta(pedida); return; }
+            // Si ya hay un instrumento aplicado en línea, sus resultados se muestran de una vez (el de más respuestas).
+            const conDatos = surveys.filter((s) => s.count > 0).sort((a, b) => b.count - a.count)[0];
+            if (conDatos) abrirEncuesta(conDatos.instrumentId);
         }).catch(() => {});
     }, [project.id, abrirEncuesta]);
 

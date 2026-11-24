@@ -301,7 +301,7 @@ const Preliminares = () => {
                 <h3><FileSignature size={18} aria-hidden="true" /> Portada y preliminares</h3>
                 <p className="ide-field-hint">Con estos datos el Word arma la portada, la portada interna y las declaraciones con firma. Si dejas una declaración vacía se usa el texto modelo; revisa que coincida con el que exige tu programa.</p>
                 <div className="res-prelim-grid">
-                    <Campo id="integrantes" label="Integrantes (uno por línea)" rows={2} placeholder="Nombres y apellidos completos" hint="Si lo dejas vacío se usa el nombre de tu cuenta." />
+                    <Campo id="integrantes" label="Integrantes (uno por línea)" rows={2} placeholder="Nombres y apellidos completos" hint="Si lo dejas vacío salen como autores los integrantes del equipo del proyecto (o tu cuenta, si trabajas solo)." />
                     <Campo id="director" label="Bajo la dirección de (uno por línea)" rows={2} placeholder="Nombre del mentor e incluir sus títulos" />
                     <Campo id="ciudad" label="Ciudad y departamento" placeholder="Sincelejo, Sucre" />
                 </div>

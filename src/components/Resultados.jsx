@@ -13,6 +13,7 @@ import './Objetivos.css';
 import './Justificacion.css';
 import Elementos from './Elementos';
 import AnalisisDatos from './AnalisisDatos';
+import { api } from '../services/api';
 import './Marco.css';
 import './Alcances.css';
 import './Fases.css';
@@ -112,6 +113,20 @@ const Constructor = ({ intro, onNavigate }) => {
             }
         } catch { /* noop */ }
     }, []);
+    // Si alguna encuesta publicada ya tiene respuestas, el análisis se muestra desplegado: los resultados y gráficos están listos.
+    const { project } = useProject();
+    const [conRespuestas, setConRespuestas] = useState(0);
+    useEffect(() => {
+        if (!project?.id) return;
+        let vivo = true;
+        api.surveys(project.id).then(({ surveys }) => {
+            const total = surveys.reduce((suma, s) => suma + (s.count || 0), 0);
+            if (!vivo || !total) return;
+            setConRespuestas(total);
+            setAnalisisAbierto(true);
+        }).catch(() => {});
+        return () => { vivo = false; };
+    }, [project?.id]);
     const { f, update, setResultados, setDiscusion, especificos, antecedentes, teorias, limitacionesAlcances } = useResState();
     const [tab, setTab] = useState(0);
     const [saved, setSaved] = useState(false);
@@ -249,7 +264,7 @@ const Constructor = ({ intro, onNavigate }) => {
             </div>
             {/* El análisis de los datos (encuestas, archivos o entrevistas) vive aquí: sus tablas y gráficos caen en «Tablas y figuras». */}
             <details ref={analisisRef} className="res-analisis" open={analisisAbierto} onToggle={(e) => setAnalisisAbierto(e.currentTarget.open)}>
-                <summary><BarChart3 size={18} aria-hidden="true" /> Analiza tus datos <small>encuestas, archivos de Excel o CSV y entrevistas</small></summary>
+                <summary><BarChart3 size={18} aria-hidden="true" /> Analiza tus datos <small>{conRespuestas ? `tu encuesta ya tiene ${conRespuestas} ${conRespuestas === 1 ? 'respuesta' : 'respuestas'}: mira los resultados y gráficos` : 'encuestas, archivos de Excel o CSV y entrevistas'}</small></summary>
                 {analisisAbierto && <AnalisisDatos embebido onNavigate={onNavigate} />}
             </details>
             <Elementos seccion="resultados" />

@@ -513,3 +513,7 @@ label {
   .sidebar--collapsed nav { margin: 0.2rem -0.2rem !important; padding: 0 0.2rem !important; }
   .sidebar--collapsed .sidebar-toggle { height: 2rem; }
 }
+
+/* Nombre de la opción al pasar el cursor por el menú recogido */
+.sidebar-pista { position: fixed; z-index: 60; transform: translateY(-50%); pointer-events: none; background: #0f172a; color: #fff; font-size: 0.82rem; font-weight: 500; line-height: 1; padding: 0.45rem 0.6rem; border-radius: 0.45rem; white-space: nowrap; box-shadow: 0 6px 16px -6px rgb(15 23 42 / 0.45); }
+.sidebar-pista::before { content: ''; position: absolute; left: -4px; top: 50%; width: 8px; height: 8px; background: inherit; transform: translateY(-50%) rotate(45deg); }

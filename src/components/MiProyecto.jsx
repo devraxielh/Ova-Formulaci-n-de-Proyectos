@@ -47,7 +47,20 @@ const MiProyecto = ({ onNavigate }) => {
     // Cupo de proyectos propios que autorizó el administrador (los compartidos no cuentan).
     const cupo = user?.projectLimit ?? 0;
     const propios = projects.filter((item) => !item.shared).length;
-    const author = String(data?.integrantes || '').trim() || user?.name || '';
+    // Autores del documento: los integrantes escritos a mano en Resumen › Portada y preliminares; si no hay,
+    // el equipo del proyecto (el dueño y los invitados que ya tienen cuenta); y si no hay equipo, la cuenta.
+    const [equipo, setEquipo] = useState([]);
+    useEffect(() => {
+        if (!project.id) { setEquipo([]); return undefined; }
+        let vivo = true;
+        const cargar = () => api.members(project.id)
+            .then(({ members }) => { if (vivo) setEquipo(members.filter((m) => m.registered && m.name).map((m) => m.name.trim())); })
+            .catch(() => {});
+        cargar();
+        window.addEventListener('projectsia:equipo', cargar);
+        return () => { vivo = false; window.removeEventListener('projectsia:equipo', cargar); };
+    }, [project.id]);
+    const author = String(data?.integrantes || '').trim() || equipo.join('\n') || user?.name || '';
     const extra = { ciudad: data?.ciudad, director: data?.director, dedicatoria: data?.dedicatoria, agradecimientos: data?.agradecimientos };
 
     const run = async (action) => {

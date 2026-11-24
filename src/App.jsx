@@ -86,6 +86,23 @@ function App() {
     };
     const [activation, setActivation] = useState(null);
     const activationStarted = useRef(false);
+    // Menú recogido (solo íconos): al pasar el cursor o enfocar una opción, su nombre aparece al lado, sin esperar.
+    // El `title` pasa a `data-pista` para que el navegador no muestre además su propia etiqueta, más lenta.
+    const [pista, setPista] = useState(null);
+    const mostrarPista = (event) => {
+        const boton = event.target.closest?.('button');
+        if (!boton || !event.currentTarget.classList.contains('sidebar--collapsed')) { setPista(null); return; }
+        const titulo = boton.getAttribute('title');
+        if (titulo) {
+            boton.dataset.pista = titulo;
+            if (!boton.getAttribute('aria-label')) boton.setAttribute('aria-label', titulo);
+            boton.removeAttribute('title');
+        }
+        const texto = boton.dataset.pista;
+        if (!texto) { setPista(null); return; }
+        const r = boton.getBoundingClientRect();
+        setPista({ texto, x: r.right + 10, y: r.top + r.height / 2 });
+    };
     const isAdmin = user?.role === 'admin';
     // Con la contraseña inicial solo se puede estar en la cuenta, la cambie o no la pestaña elegida.
     const activeTab = user?.mustChangePassword ? 'cuenta' : selectedTab;
@@ -296,7 +313,7 @@ function App() {
             {isSidebarOpen && <div className="sidebar-overlay" onClick={closeSidebar}></div>}
 
             {/* Sidebar Navigation */}
-            <aside className={`sidebar ${isSidebarOpen ? 'sidebar-open' : ''} ${isSidebarCollapsed ? 'sidebar--collapsed' : ''}`}>
+            <aside className={`sidebar ${isSidebarOpen ? 'sidebar-open' : ''} ${isSidebarCollapsed ? 'sidebar--collapsed' : ''}`} onMouseOver={mostrarPista} onFocus={mostrarPista} onMouseLeave={() => setPista(null)} onBlur={() => setPista(null)} onClick={() => setPista(null)}>
                 <div className="sidebar-header">
                     <div className="sidebar-brand">
                         <Layers size={24} color="#4f46e5" />
@@ -524,6 +541,7 @@ function App() {
                     <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>© Rodrigo García,PhD</p>
                 </div>
             </aside>
+            {pista && <div className="sidebar-pista" role="tooltip" style={{ top: pista.y, left: pista.x }}>{pista.texto}</div>}
 
             {/* Main Content Area */}
             <main className={`main-content ${[...DECK_TABS, 'cuenta'].includes(activeTab) ? 'main-content--deck' : ''}`}>

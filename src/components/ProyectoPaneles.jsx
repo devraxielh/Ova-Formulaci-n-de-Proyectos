@@ -42,6 +42,7 @@ export const Equipo = () => {
         try {
             const r = await api.addMember(project.id, email);
             setMembers(r.members);
+            window.dispatchEvent(new Event('projectsia:equipo')); // el documento vuelve a leer sus autores
             setMsg(r.mailed ? `Invitación enviada a ${email.trim()}.` : `${email.trim()} ya puede abrir el proyecto al iniciar sesión con ese correo.`);
             setEmail('');
         } catch (err) {
@@ -54,7 +55,7 @@ export const Equipo = () => {
         setError('');
         try {
             const r = await api.removeMember(project.id, m.email);
-            if (isOwner) { setMembers(r.members); return; }
+            if (isOwner) { setMembers(r.members); window.dispatchEvent(new Event('projectsia:equipo')); return; }
             // Quien se sale deja de ver el proyecto: se abre otro de su lista.
             const list = await refreshProjects();
             if (list[0]) await openProject(list[0].id);
