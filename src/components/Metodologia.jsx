@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import EditorRico from './EditorRico';
 import {
     AlertTriangle, BarChart3, BookOpenCheck, Calculator, CalendarDays, CheckCircle2, ClipboardList, Compass, DollarSign, Layers, Microscope,
-    Plus, ShieldCheck, Target, Trash2, Users, XCircle,
+    Plus, ShieldCheck, Target, Trash2, Users, X, XCircle,
 } from 'lucide-react';
 import SlideDeck, { Opciones, Pestanas } from './deck/SlideDeck';
 import { useProject, useProjectField } from '../context/ProjectContext';
@@ -15,6 +15,7 @@ import {
 } from '../data/metodologia';
 import { SECTIONS, SLIDES } from '../data/metodologiaClase';
 import Instrumentos from './Instrumentos';
+import { preguntasDe } from '../services/instrumentos';
 import { Generica } from './deck/Contenido';
 import ValidacionModal from './ValidacionModal';
 import { VALIDACION_DETALLE } from '../data/validacion';
@@ -160,6 +161,8 @@ const useMetState = () => {
         quien: clean(t.quien || idea.quien), donde: clean(t.donde || idea.donde),
         tipoEsperado: TIPOS.find((x) => x.alcance === (TIPO_ALCANCE[idea.alcance] || '').split(' ')[0])?.id || '',
         alcancesTexto: String(data.alcances || ''),
+        // Instrumentos completos (encuesta o guía) que el estudiante armó; cada uno pertenece a una fila por su `filaId`.
+        armados: Array.isArray(data.instrumentosGen) ? data.instrumentosGen : [],
     };
 };
 
@@ -169,8 +172,42 @@ const redactarTodo = (s) => ({
     metDiseno: redactarDiseno({ enfoque: s.enfoque, diseno: s.diseno, texto: s.f.disenoTexto }),
     poblacionSugerida: redactarPoblacion(s.f.poblacion, s.calc),
     metPlanAnalisis: redactarAnalisis(s.f.analisis),
-    instrumentos: redactarInstrumentos(s.f.instrumentos),
+    instrumentos: redactarInstrumentos(s.f.instrumentos, s.armados),
 });
+
+/* ---------- Ventana para armar el instrumento de una fila ---------- */
+
+const ArmarModal = ({ fila, onClose, onNavigate }) => {
+    const dialog = useRef(null);
+    useEffect(() => {
+        const el = dialog.current;
+        if (!el) return;
+        if (fila && !el.open) el.showModal();
+        if (!fila && el.open) el.close();
+    }, [fila]);
+    return (
+        <dialog ref={dialog} className="met-armar-modal" aria-label="Armar el instrumento" onClose={onClose} onClick={(e) => { if (e.target === dialog.current) onClose(); }}>
+            {fila && (
+                <div className="met-armar-caja">
+                    <header>
+                        <div>
+                            <p>Instrumento de recolección</p>
+                            <h2>{fila.tecnica}: {clean(fila.instrumento) || 'instrumento'}</h2>
+                        </div>
+                        <button type="button" onClick={onClose} aria-label="Cerrar"><X size={18} /></button>
+                    </header>
+                    <div className="met-armar-cuerpo">
+                        <Instrumentos embebido fila={fila} onNavigate={(destino) => { onClose(); onNavigate?.(destino); }} />
+                    </div>
+                    <footer>
+                        <small>Los cambios se guardan solos. La descripción de «Instrumentos de recolección de información» se redacta con lo que armes aquí.</small>
+                        <button type="button" className="ide-btn ide-btn--primary" onClick={onClose}>Listo</button>
+                    </footer>
+                </div>
+            )}
+        </dialog>
+    );
+};
 
 /* ---------- Constructor ---------- */
 
@@ -262,6 +299,13 @@ const Constructor = ({ intro, onNavigate }) => {
     useAutoGuardar(JSON.stringify([partes, f.cronograma]), save);
     const setFila = (key, list, index, patch) => { touch(); update({ [key]: list.map((x, i) => (i === index ? { ...x, ...patch } : x)) }); };
     const [modal, setModal] = useState(null);
+    const [armar, setArmar] = useState(null); // id de la fila cuyo instrumento completo se está armando
+    const abrirArmado = (it, i) => {
+        // Las filas antiguas pueden no tener identificador: se les da uno para poder asociarles su instrumento.
+        const id = it.id || uid();
+        if (!it.id) setFila('instrumentos', f.instrumentos, i, { id });
+        setArmar(id);
+    };
     const toggleValidacion = (index, id) => {
         const actual = validacionesDe(f.instrumentos[index]);
         const next = actual.includes(id) ? actual.filter((x) => x !== id) : [...actual, id];
@@ -407,6 +451,20 @@ const Constructor = ({ intro, onNavigate }) => {
                                             <BookOpenCheck size={14} aria-hidden="true" /> ¿Cómo se hace? Paso a paso, ejemplo y calculadora
                                         </button>
                                     </div>
+                                    {(() => {
+                                        const armado = s.armados.find((a) => a && it.id && a.filaId === it.id);
+                                        const n = armado ? preguntasDe(armado).length : 0;
+                                        return (
+                                            <div className="mar-wide met-armar" data-listo={n > 0}>
+                                                <span>{n > 0
+                                                    ? <><CheckCircle2 size={16} aria-hidden="true" /> <b>{armado.titulo || 'Instrumento'}</b> · {n} {n === 1 ? 'pregunta' : 'preguntas'}</>
+                                                    : <>Aún no has armado este instrumento: sus preguntas, sus escalas y su versión para aplicar en línea.</>}</span>
+                                                <button type="button" className="ide-btn ide-btn--primary" onClick={() => abrirArmado(it, i)}>
+                                                    <ClipboardList size={16} aria-hidden="true" /> {n > 0 ? 'Editar el instrumento' : 'Arma el instrumento completo'}
+                                                </button>
+                                            </div>
+                                        );
+                                    })()}
                                     {f.instrumentos.length > 1 && <button type="button" className="ide-link" onClick={() => { touch(); update({ instrumentos: f.instrumentos.filter((_, k) => k !== i) }); }}><Trash2 size={13} /> Quitar</button>}
                                 </div>
                             ))}
@@ -479,8 +537,8 @@ const Constructor = ({ intro, onNavigate }) => {
                     </div>
                 </aside>
             </div>
-            {/* El instrumento completo (encuesta o guía) se arma aquí mismo y sale en el documento bajo «Instrumentos de recolección». */}
-            {tab === 'instrumentos' && <Instrumentos embebido onNavigate={onNavigate} />}
+            {/* El instrumento completo de cada fila (encuesta o guía) se arma en una ventana grande y queda asociado a ella. */}
+            <ArmarModal fila={f.instrumentos.find((it) => it.id && it.id === armar) || null} onClose={() => setArmar(null)} onNavigate={onNavigate} />
             <ValidacionModal
                 open={Boolean(modal)}
                 inicial={modal?.metodo}

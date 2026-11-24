@@ -196,3 +196,23 @@ test('diapositivas de sustentación: siguen los ítems de la plantilla, con resu
     const pedir = apartadosParaResumir(datos).map((a) => a.clave);
     assert.ok(pedir.includes('contexto') && pedir.includes('implicaciones') && !pedir.includes('pregunta') && !pedir.includes('conceptos'));
 });
+
+test('la fila de instrumentos se redacta con el instrumento armado que tiene asociado', async () => {
+    const { redactarInstrumentos, fraseArmado } = await import('../src/data/metodologia.js');
+    const filas = [
+        { id: 'f1', tecnica: 'Encuesta', instrumento: 'cuestionario', aplicaA: 'los pacientes', objetivo: 'el objetivo específico 1' },
+        { id: 'f2', tecnica: 'Entrevista', instrumento: 'guía de entrevista', aplicaA: 'las enfermeras', objetivo: '' },
+    ];
+    const armado = { id: 'a1', filaId: 'f1', titulo: 'Cuestionario', preguntas: [
+        { id: 'q1', texto: 'Edad', tipo: 'numero' }, { id: 'q2', texto: 'Olvido la cita', tipo: 'likert' }, { id: 'q3', texto: 'Llego tarde', tipo: 'likert' }, { id: 'q4', texto: '', tipo: 'abierta' },
+    ] };
+    assert.equal(fraseArmado(armado), ' Consta de 3 preguntas (2 de escala tipo Likert, 1 numérica) y se presenta completo al final de este apartado.');
+    assert.equal(fraseArmado({ ...armado, ubicacion: 'anexo', preguntas: [{ id: 'q', texto: '¿Qué opina?', tipo: 'abierta' }] }), ' Consta de 1 pregunta abierta y se presenta completo en los anexos.');
+    assert.equal(fraseArmado(null), '');
+
+    const texto = redactarInstrumentos(filas, [armado]);
+    const [uno, dos] = texto.split('\n');
+    assert.ok(uno.startsWith('- **Encuesta (cuestionario):** se aplicará a los pacientes para el objetivo específico 1. Consta de 3 preguntas'));
+    assert.ok(!dos.includes('Consta de')); // la fila sin instrumento armado se redacta igual que antes
+    assert.equal(redactarInstrumentos(filas), redactarInstrumentos(filas, [])); // sin instrumentos armados no cambia nada
+});

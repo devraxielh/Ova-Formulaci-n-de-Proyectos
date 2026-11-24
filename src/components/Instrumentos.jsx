@@ -79,18 +79,28 @@ const Pregunta = ({ q, n, total, especificos, onChange, onMove, onRemove }) => {
     );
 };
 
-const Instrumentos = ({ onNavigate, embebido = false }) => {
+// Tipo de instrumento que corresponde a la técnica de la fila de Metodología.
+const tipoDeTecnica = (tecnica) => (/encuesta|prueba|test/i.test(String(tecnica || '')) ? 'encuesta' : 'entrevista');
+
+// `fila` = fila de «Instrumentos de recolección» de Metodología: en ese caso se arma solo el instrumento de esa fila.
+const Instrumentos = ({ onNavigate, embebido = false, fila = null }) => {
     const { data, project, user } = useProject();
     const [lista, setLista] = useProjectField('instrumentosGen', []);
     const instrumentos = Array.isArray(lista) ? lista : [];
     const [activo, setActivo] = useState('');
-    const [nuevo, setNuevo] = useState({ tipo: 'encuesta', aplicaA: '', cantidad: 15 });
+    const [nuevo, setNuevo] = useState(() => (fila
+        ? { tipo: tipoDeTecnica(fila.tecnica), aplicaA: String(fila.aplicaA || '').trim(), cantidad: tipoDeTecnica(fila.tecnica) === 'entrevista' ? 10 : 15 }
+        : { tipo: 'encuesta', aplicaA: '', cantidad: 15 }));
     const [estado, setEstado] = useState('');
     const [error, setError] = useState('');
     const [publicadas, setPublicadas] = useState({});
     const [copiado, setCopiado] = useState(false);
     const { especificos } = partesObjetivos(data.objetivos);
-    const ins = instrumentos.find((i) => i.id === activo) || instrumentos[0] || null;
+    const ins = fila
+        ? instrumentos.find((i) => i.filaId === fila.id) || null
+        : instrumentos.find((i) => i.id === activo) || instrumentos[0] || null;
+    // Instrumentos armados antes de existir la asociación con las filas: se pueden traer a esta.
+    const sueltos = fila ? instrumentos.filter((i) => !i.filaId) : [];
 
     const cargarPublicadas = useCallback(async () => {
         if (!project.id) return;
@@ -111,7 +121,7 @@ const Instrumentos = ({ onNavigate, embebido = false }) => {
     };
     const crear = async (conIA) => {
         setError('');
-        const base = { id: uid(), tipo: nuevo.tipo, aplicaA: nuevo.aplicaA.trim(), ubicacion: 'plan', titulo: `${nuevo.tipo === 'entrevista' ? 'Guía de entrevista' : 'Cuestionario'}${nuevo.aplicaA.trim() ? ` para ${nuevo.aplicaA.trim()}` : ''}`, intro: '', preguntas: [] };
+        const base = { id: uid(), ...(fila ? { filaId: fila.id } : {}), tipo: nuevo.tipo, aplicaA: nuevo.aplicaA.trim(), ubicacion: 'plan', titulo: `${nuevo.tipo === 'entrevista' ? 'Guía de entrevista' : 'Cuestionario'}${nuevo.aplicaA.trim() ? ` para ${nuevo.aplicaA.trim()}` : ''}`, intro: '', preguntas: [] };
         if (conIA) {
             setEstado('generando');
             try {
@@ -157,6 +167,16 @@ const Instrumentos = ({ onNavigate, embebido = false }) => {
 
     return (
         <div className={embebido ? 'ins-page ins-embebido' : 'pro-page ins-page'}>
+            {fila && !ins && sueltos.length > 0 && (
+                <section className="pro-card">
+                    <h3>Ya armaste {sueltos.length === 1 ? 'un instrumento' : `${sueltos.length} instrumentos`}</h3>
+                    <p className="adm-muted">Puedes asociarlo a esta fila en vez de crear uno nuevo.</p>
+                    <div className="ins-acciones">
+                        {sueltos.map((x) => <button key={x.id} type="button" className="pro-btn pro-btn--ghost" onClick={() => setLista((prev) => (Array.isArray(prev) ? prev : []).map((i) => (i.id === x.id ? { ...i, filaId: fila.id } : i)))}>Usar «{x.titulo || 'Instrumento'}» ({preguntasDe(x).length} preguntas)</button>)}
+                    </div>
+                </section>
+            )}
+            {(!fila || !ins) && (
             <section className="pro-card ins-nuevo">
                 <h2><ClipboardList size={20} aria-hidden="true" /> {embebido ? 'Arma el instrumento completo' : 'Crear un instrumento'}</h2>
                 <p className="adm-muted">La IA propone las preguntas a partir de tu título y tus objetivos específicos; tú las revisas y ajustas. El instrumento sale en tu documento dentro del Plan de análisis de la información. Recuerda validarlo (juicio de expertos, prueba piloto) como indica tu Metodología.</p>
@@ -184,8 +204,10 @@ const Instrumentos = ({ onNavigate, embebido = false }) => {
                 </div>
                 {error && <p className="pro-alert" role="alert"><AlertTriangle size={15} /> {error}</p>}
             </section>
+            )}
+            {fila && ins && error && <p className="pro-alert" role="alert"><AlertTriangle size={15} /> {error}</p>}
 
-            {instrumentos.length > 1 && (
+            {!fila && instrumentos.length > 1 && (
                 <div className="ins-tabs" role="tablist">
                     {instrumentos.map((i) => <button key={i.id} type="button" role="tab" aria-selected={ins?.id === i.id} onClick={() => setActivo(i.id)}>{i.titulo || 'Instrumento'}</button>)}
                 </div>

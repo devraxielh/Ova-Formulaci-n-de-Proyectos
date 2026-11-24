@@ -1,4 +1,5 @@
 import { VALIDACION_DETALLE, VALIDACION_IDS, parrafoConDatos } from './validacion.js';
+import { preguntasDe, ubicacionDe } from '../services/instrumentos.js';
 
 /*
  * Datos y redacción de la Metodología: enfoque, tipos, diseños, población y muestra,
@@ -161,12 +162,25 @@ const conArticuloInstr = (nombre) => {
     return /^(guía|lista|ficha|prueba|escala|rúbrica|bitácora|matriz|encuesta|entrevista)/.test(n) ? `la ${n}` : `el ${n}`;
 };
 
-export const redactarInstrumentos = (items) => {
+// Frase sobre el instrumento ya armado (preguntas y dónde se presenta), para la fila que lo describe.
+const TIPO_PREGUNTA = { likert: ['de escala tipo Likert', 'de escala tipo Likert'], opcion: ['de opción única', 'de opción única'], multiple: ['de opción múltiple', 'de opción múltiple'], sino: ['dicotómica (sí o no)', 'dicotómicas (sí o no)'], numero: ['numérica', 'numéricas'], abierta: ['abierta', 'abiertas'] };
+export const fraseArmado = (armado) => {
+    const preguntas = armado ? preguntasDe(armado) : [];
+    if (!preguntas.length) return '';
+    const cuenta = Object.keys(TIPO_PREGUNTA).map((tipo) => [tipo, preguntas.filter((q) => q.tipo === tipo).length]).filter(([, n]) => n > 0);
+    const desglose = cuenta.length > 1 ? ` (${cuenta.map(([tipo, n]) => `${n} ${TIPO_PREGUNTA[tipo][n === 1 ? 0 : 1]}`).join(', ')})` : ` ${TIPO_PREGUNTA[cuenta[0][0]][preguntas.length === 1 ? 0 : 1]}`;
+    const donde = { plan: 'se presenta completo al final de este apartado', anexo: 'se presenta completo en los anexos', no: '' }[ubicacionDe(armado)];
+    return ` Consta de ${preguntas.length} ${preguntas.length === 1 ? 'pregunta' : 'preguntas'}${desglose}${donde ? ` y ${donde}` : ''}.`;
+};
+
+// `armados` = instrumentos completos (data.instrumentosGen); cada uno se asocia a su fila por `filaId`.
+export const redactarInstrumentos = (items, armados = []) => {
+    const armadoDe = (it) => (Array.isArray(armados) ? armados : []).find((a) => a && it.id && a.filaId === it.id);
     const validos = items.filter((it) => clean(it.tecnica) && clean(it.instrumento));
     const lista = validos
         .map((it) => {
             const vals = validacionesDe(it);
-            return `- **${capital(clean(it.tecnica))} (${lower(clean(it.instrumento))}):** se aplicará a ${lower(clean(it.aplicaA)) || 'los participantes'}${clean(it.objetivo) ? ` para ${lower(clean(it.objetivo))}` : ''}.${vals.length ? ` Su validez y confiabilidad se asegurarán mediante ${listaY(vals.map(lower))}.` : ''}`;
+            return `- **${capital(clean(it.tecnica))} (${lower(clean(it.instrumento))}):** se aplicará a ${lower(clean(it.aplicaA)) || 'los participantes'}${clean(it.objetivo) ? ` para ${lower(clean(it.objetivo))}` : ''}.${vals.length ? ` Su validez y confiabilidad se asegurarán mediante ${listaY(vals.map(lower))}.` : ''}${fraseArmado(armadoDe(it))}`;
         })
         .join('\n');
     // Subtítulo «Validez y confiabilidad»: un párrafo por método, con los instrumentos que lo usan.
