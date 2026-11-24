@@ -9,7 +9,8 @@
   <style>
     body { margin: 0; }
     .carga { display: grid; justify-items: center; gap: 0.9rem; color: #64748b; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; text-align: center; }
-    .carga--pantalla { min-height: 100dvh; align-content: center; padding: 1.5rem; background: #f8fafc; }
+    /* Siempre en el centro exacto de la ventana, sin depender de dónde se inserte. */
+    .carga--pantalla { position: fixed; inset: 0; z-index: 50; align-content: center; justify-content: center; padding: 1.5rem; background: #f8fafc; }
     .carga-marca { display: flex; align-items: center; gap: 0.6rem; color: #4f46e5; font-weight: 800; font-size: 1.5rem; letter-spacing: 0.01em; }
     .carga-barra { width: min(14rem, 60vw); height: 4px; border-radius: 999px; background: #e0e7ff; overflow: hidden; }
     .carga-barra i { display: block; width: 40%; height: 100%; border-radius: inherit; background: #4f46e5; animation: carga-desliza 1.1s ease-in-out infinite; }

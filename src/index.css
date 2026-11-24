@@ -518,7 +518,7 @@ label {
 .sidebar-pista { position: fixed; z-index: 60; transform: translateY(-50%); pointer-events: none; background: #0f172a; color: #fff; font-size: 0.82rem; font-weight: 500; line-height: 1; padding: 0.45rem 0.6rem; border-radius: 0.45rem; white-space: nowrap; box-shadow: 0 6px 16px -6px rgb(15 23 42 / 0.45); }
 .sidebar-pista::before { content: ''; position: absolute; left: -4px; top: 50%; width: 8px; height: 8px; background: inherit; transform: translateY(-50%) rotate(45deg); }
 
-/* Carga de una sección dentro de la página: centrada y con una breve espera para no parpadear */
-.carga--seccion { min-height: 50vh; align-content: center; padding: 2rem 1rem; opacity: 0; animation: carga-aparece 0.25s ease-out 0.18s forwards; }
+/* Carga de una sección: en el centro de la ventana (no del hueco que deja el menú) y con una breve espera para no parpadear */
+.carga--seccion { position: fixed; inset: 0; z-index: 40; align-content: center; justify-content: center; pointer-events: none; padding: 2rem 1rem; opacity: 0; animation: carga-aparece 0.25s ease-out 0.18s forwards; }
 @keyframes carga-aparece { to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .carga--seccion { animation: none; opacity: 1; } }
