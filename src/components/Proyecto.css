@@ -1,5 +1,18 @@
 /* Mi proyecto y Cuenta */
 
+/* Los colores de botones, tarjetas y avisos se definen para toda la app: estos componentes también se usan
+   dentro de las clases (instrumentos en Metodología, análisis en Resultados) y en avisos fuera de una página. */
+:root {
+  --pro-ink: #1e293b;
+  --pro-body: #475569;
+  --pro-line: #e2e8f0;
+  --pro-primary: #4f46e5;
+  --pro-primary-strong: #4338ca;
+  --pro-ok: #047857;
+  --pro-bad: #b91c1c;
+  --pro-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 .pro-page {
   --pro-ink: #1e293b;
   --pro-body: #475569;

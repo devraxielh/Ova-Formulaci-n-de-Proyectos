@@ -210,6 +210,29 @@ const Instrumentos = ({ onNavigate, embebido = false }) => {
                     </section>
 
                     <aside className="ins-lado">
+                        {ins.tipo !== 'entrevista' && (
+                            <section className="pro-card">
+                                <h3><Globe size={16} aria-hidden="true" /> Aplicarla en línea</h3>
+                                {!user || !project.id ? <p className="adm-muted">Inicia sesión para publicarla.</p> : !pub ? (
+                                    <>
+                                        <p className="adm-muted">Publica la encuesta y obtén un enlace para enviarlo por WhatsApp o correo: los participantes responden desde el celular, sin cuenta y de forma anónima.</p>
+                                        <button type="button" className="pro-btn pro-btn--primary" onClick={() => publicar(true)} disabled={estado === 'publicando' || validas.length === 0 || sinOpciones > 0}><Globe size={15} /> Publicar y obtener el enlace</button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p className="ins-estado" data-open={pub.open}>{pub.open ? <CheckCircle2 size={15} aria-hidden="true" /> : null} {pub.open ? 'Recibiendo respuestas' : 'Cerrada'} · <b>{pub.count}</b> {pub.count === 1 ? 'respuesta' : 'respuestas'}</p>
+                                        <div className="ins-enlace"><input className="input-field" readOnly value={enlace} onFocus={(e) => e.target.select()} aria-label="Enlace de la encuesta" /><button type="button" className="pro-btn pro-btn--primary" onClick={copiar}><Copy size={15} /> {copiado ? 'Copiado' : 'Copiar enlace'}</button></div>
+                                        <a className="pro-link" href={enlace} target="_blank" rel="noreferrer noopener">Abrir la encuesta como la ve un participante</a>
+                                        <div className="ins-acciones">
+                                            <button type="button" className="pro-btn pro-btn--ghost" onClick={() => publicar(pub.open)} disabled={estado === 'publicando'}>Actualizar preguntas en línea</button>
+                                            <button type="button" className="pro-btn pro-btn--ghost" onClick={() => publicar(!pub.open)} disabled={estado === 'publicando'}>{pub.open ? 'Cerrar encuesta' : 'Volver a abrir'}</button>
+                                            <button type="button" className="pro-btn pro-btn--primary" onClick={() => { try { window.sessionStorage.setItem('projectsia:analisis:fuente', ins.id); } catch { /* noop */ } onNavigate('analisis'); }}><BarChart3 size={15} /> Analizar respuestas</button>
+                                        </div>
+                                        <small className="adm-muted">Si cambias las preguntas después de recibir respuestas, usa «Actualizar preguntas en línea». No cambies el sentido de una pregunta ya respondida.</small>
+                                    </>
+                                )}
+                            </section>
+                        )}
                         <section className="pro-card">
                             <h3>En tu documento</h3>
                             <label className="ins-campo"><span>¿Dónde va el instrumento? ({validas.length} preguntas)</span>
@@ -228,28 +251,6 @@ const Instrumentos = ({ onNavigate, embebido = false }) => {
                             {sinOpciones > 0 && <p className="pro-warn">{sinOpciones} {sinOpciones === 1 ? 'pregunta necesita' : 'preguntas necesitan'} al menos dos opciones.</p>}
                         </section>
 
-                        {ins.tipo !== 'entrevista' && (
-                            <section className="pro-card">
-                                <h3><Globe size={16} aria-hidden="true" /> Aplicarla en línea</h3>
-                                {!user || !project.id ? <p className="adm-muted">Inicia sesión para publicarla.</p> : !pub ? (
-                                    <>
-                                        <p className="adm-muted">Se crea un enlace para que los participantes respondan desde el celular, sin cuenta y de forma anónima.</p>
-                                        <button type="button" className="pro-btn pro-btn--primary" onClick={() => publicar(true)} disabled={estado === 'publicando' || validas.length === 0 || sinOpciones > 0}><Globe size={15} /> Publicar encuesta</button>
-                                    </>
-                                ) : (
-                                    <>
-                                        <p className="ins-estado" data-open={pub.open}>{pub.open ? 'Recibiendo respuestas' : 'Cerrada'} · <b>{pub.count}</b> {pub.count === 1 ? 'respuesta' : 'respuestas'}</p>
-                                        <div className="ins-enlace"><input className="input-field" readOnly value={enlace} onFocus={(e) => e.target.select()} aria-label="Enlace de la encuesta" /><button type="button" className="pro-btn pro-btn--ghost" onClick={copiar}><Copy size={15} /> {copiado ? 'Copiado' : 'Copiar'}</button></div>
-                                        <div className="ins-acciones">
-                                            <button type="button" className="pro-btn pro-btn--ghost" onClick={() => publicar(pub.open)} disabled={estado === 'publicando'}>Actualizar preguntas en línea</button>
-                                            <button type="button" className="pro-btn pro-btn--ghost" onClick={() => publicar(!pub.open)} disabled={estado === 'publicando'}>{pub.open ? 'Cerrar encuesta' : 'Volver a abrir'}</button>
-                                            <button type="button" className="pro-btn pro-btn--primary" onClick={() => { try { window.sessionStorage.setItem('projectsia:analisis:fuente', ins.id); } catch { /* noop */ } onNavigate('analisis'); }}><BarChart3 size={15} /> Analizar respuestas</button>
-                                        </div>
-                                        <small className="adm-muted">Si cambias las preguntas después de recibir respuestas, usa «Actualizar preguntas en línea». No cambies el sentido de una pregunta ya respondida.</small>
-                                    </>
-                                )}
-                            </section>
-                        )}
                     </aside>
                 </div>
             )}

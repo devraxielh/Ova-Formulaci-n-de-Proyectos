@@ -49,3 +49,13 @@
 .enc-gracias { text-align: center; padding: 2rem 0; display: grid; gap: 0.5rem; justify-items: center; color: #166534; }
 /* Dentro de Metodología › Instrumentos */
 .ins-embebido { margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px dashed #c7d2fe; }
+
+/* Dentro de una clase las tarjetas no heredan el marco de la página: se les da uno propio. */
+.ins-embebido .pro-card, .ana-embebido .pro-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1rem 1.1rem; }
+.ins-estado { display: flex; align-items: center; gap: 0.35rem; }
+.ins-lado .pro-link { font-size: 0.85rem; }
+/* El enlace ocupa todo el ancho para que se lea completo; el botón de copiar va debajo. */
+.ins-enlace { flex-wrap: wrap; }
+.ins-enlace input { flex: 1 1 100%; }
+.ins-estado { display: block; }
+.ins-estado svg { vertical-align: -2px; margin-right: 0.25rem; }
