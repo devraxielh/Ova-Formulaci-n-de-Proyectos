@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, Check, Loader2, PenLine, Quote, X } from 'lucide-react';
+import { AlertTriangle, Check, Loader2, PenLine, Quote, Sparkles, X } from 'lucide-react';
+import { useProject } from '../../context/ProjectContext';
+import { leerArbol, leerArbolObjetivos } from '../../services/arbol';
 import { groq } from '../../services/api';
 // aHtml escapa todo lo escrito antes de aplicar negrita y cursiva: lo que se muestra nunca se interpreta como HTML.
 import { aHtml } from '../../services/textoRico';
-import { campoDe, fijarValor, insertarEn, marcaDe, valorDe } from './campo';
+import { campoDe, fijarValor, insertarEn, marcaDe, placeholderDe, valorDe } from './campo';
 import './RevisarIA.css';
 import './Redactar.css';
 
@@ -13,6 +15,8 @@ import './Redactar.css';
  */
 
 const ACCIONES = [
+    // Única acción que escribe contenido: arma el párrafo con lo que el estudiante ya definió en su proyecto.
+    { id: 'llenar', label: 'Llenar con mi proyecto', llenar: true },
     { id: 'mejorar', label: 'Mejorar la redacción', pide: 'Mejora la redacción: frases claras y bien conectadas, sin muletillas ni repeticiones, con ortografía y puntuación correctas. Conserva el registro académico.' },
     { id: 'tercera', label: 'Pasar a tercera persona', pide: 'Pasa el texto a tercera persona o a forma impersonal («se realizó», «el estudio analiza»), como exige la escritura académica. No cambies nada más.' },
     { id: 'acortar', label: 'Acortar', pide: 'Acorta el texto alrededor de un tercio: quita relleno y repeticiones, y conserva todas las ideas, datos y citas.' },
@@ -20,6 +24,54 @@ const ACCIONES = [
 ];
 
 const REGLAS = 'Reglas estrictas: no agregues información, datos, cifras, autores ni citas que no estén en el texto; no quites ni cambies las citas (Autor, año), las marcas entre corchetes dobles como [[abc123]] ni los asteriscos de formato (**negrita**, *cursiva*); conserva el significado y el idioma (español); no uses viñetas ni títulos si el original no los tiene.';
+
+// De qué trata el campo: su etiqueta visible (o la más cercana) y su texto de ayuda.
+const rotuloDe = (el) => {
+    const doc = el.ownerDocument;
+    const porId = el.id ? doc.querySelector(`label[for="${window.CSS?.escape ? window.CSS.escape(el.id) : el.id}"]`) : null;
+    const cercano = porId || el.closest('label') || el.closest('.input-group, .pla-part, fieldset, .ide-field')?.querySelector('label, legend, h3, b');
+    return String(el.getAttribute('aria-label') || cercano?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 140);
+};
+
+// Lo que ya está definido en el proyecto y sirve para redactar: solo los ítems que tienen contenido.
+const itemsDelProyecto = (d) => {
+    const t = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
+    const problema = leerArbol(d);
+    const objetivos = leerArbolObjetivos(d);
+    const f = d?.tituloForm || {};
+    const idea = d?.idea || {};
+    return [
+        ['Título', t(d?.titulo)],
+        ['Pregunta de investigación', t(d?.pregunta)],
+        ['Población', t(f.quien || idea.quien)],
+        ['Lugar', t(f.donde || idea.donde)],
+        ['Periodo', t(f.cuando || idea.cuando)],
+        ['Problema central', problema.problema],
+        ['Causas del problema', problema.causas.join('; ')],
+        ['Efectos del problema', problema.efectos.join('; ')],
+        ['Objetivo general', t(d?.objetivoGeneral)],
+        ['Objetivos específicos', t(String(d?.objetivos || '').split(/objetivos\s+espec[ií]ficos/i)[1]).slice(0, 700)],
+        ['Medios (árbol de objetivos)', objetivos.propio ? objetivos.causas.join('; ') : ''],
+        ['Fines (árbol de objetivos)', objetivos.propio ? objetivos.efectos.join('; ') : ''],
+        ['Enfoque metodológico', t(d?.metEnfoque)],
+        ['Tipo de investigación', t(d?.metTipo)],
+        ['Diseño', t(d?.metDiseno)],
+    ].filter(([, valor]) => valor);
+};
+
+const pedirLlenar = async ({ rotulo, clase, ayuda, actual, items }) => {
+    const r = await groq.chat.completions.create({
+        messages: [
+            { role: 'system', content: 'Ayudas a un estudiante a redactar una parte de su proyecto de investigación, en español y en tercera persona o forma impersonal. Te basas únicamente en los datos de su proyecto que se te entregan. No inventas cifras, porcentajes, estudios, autores, citas ni leyes: donde haga falta un dato o una fuente, dejas una indicación entre corchetes, por ejemplo [agrega una cifra y su fuente]. Devuelves únicamente el párrafo, sin título, sin comillas y sin explicaciones.' },
+            { role: 'user', content: `Sección del proyecto: ${clase || '(sin nombre)'}\nParte que se va a redactar: ${rotulo || '(sin etiqueta)'}${ayuda ? `\nIndicación del campo: ${ayuda}` : ''}\n\nDATOS DEL PROYECTO\n${items.map(([k, v]) => `- ${k}: ${v}`).join('\n')}\n\n${actual ? `El estudiante ya escribió esto; consérvalo, mejóralo si hace falta y complétalo:\n${actual}\n\n` : ''}Redacta ${actual ? 'el párrafo completo' : 'un párrafo'} para esa parte, de 70 a 130 palabras, coherente con el título, la pregunta y los objetivos. Usa solo lo que corresponde a esa parte (por ejemplo, en «Causas» habla de las causas; en «Contexto», del panorama general). Mantén la misma población y el mismo lugar. Conserva tal cual las citas (Autor, año) y las marcas como [[abc123]] que ya existan.` },
+        ],
+        temperature: 0.4,
+        max_tokens: 700,
+    });
+    const propuesta = String(r.choices?.[0]?.message?.content || '').trim().replace(/^["«]|["»]$/g, '').trim();
+    if (!propuesta) throw new Error('La IA no devolvió texto. Inténtalo de nuevo.');
+    return { propuesta };
+};
 
 const pedir = async (accion, texto) => {
     if (accion.detectar) {
@@ -53,6 +105,8 @@ const pedir = async (accion, texto) => {
 const protegidas = (texto) => [...String(texto).matchAll(/\([^()]*\b(?:19|20)\d{2}[^()]*\)|\[\[[a-z0-9]{5,9}\]\]/g)].map((m) => m[0]);
 
 const Redactar = ({ stageRef }) => {
+    const { data } = useProject();
+    const items = itemsDelProyecto(data);
     const [estado, setEstado] = useState('');
     const [error, setError] = useState('');
     const [trabajo, setTrabajo] = useState(null); // { el, inicio, fin, original, accion, propuesta?, frases? }
@@ -79,7 +133,7 @@ const Redactar = ({ stageRef }) => {
         if (!u || !u.el.isConnected) { setTrabajo(null); dialog.current?.showModal(); return; }
         // Con texto seleccionado se trabaja solo sobre esa parte; si no, sobre todo el campo.
         const haySeleccion = u.marca.texto.trim().length > 0;
-        setTrabajo({ el: u.el, marca: u.marca, original: haySeleccion ? u.marca.texto : valorDe(u.el), seleccion: haySeleccion });
+        setTrabajo({ el: u.el, marca: u.marca, original: haySeleccion ? u.marca.texto : valorDe(u.el), seleccion: haySeleccion, rotulo: rotuloDe(u.el) });
         dialog.current?.showModal();
     };
     const ejecutar = async (accion) => {
@@ -87,7 +141,10 @@ const Redactar = ({ stageRef }) => {
         setEstado('pensando');
         setTrabajo((t) => ({ ...t, accion, propuesta: '', frases: null }));
         try {
-            const r = await pedir(accion, trabajo.original);
+            // «Llenar con mi proyecto» trabaja sobre el campo completo, aunque esté vacío o haya una parte seleccionada.
+            const r = accion.llenar
+                ? await pedirLlenar({ rotulo: trabajo.rotulo, clase: stageRef.current?.getAttribute('aria-label') || '', ayuda: placeholderDe(trabajo.el).replace(/^Ej:\s*/, ''), actual: valorDe(trabajo.el).trim(), items })
+                : await pedir(accion, trabajo.original);
             setTrabajo((t) => ({ ...t, accion, ...r }));
         } catch (err) {
             setError(err?.message?.includes('JSON') ? 'La IA respondió en un formato inesperado. Inténtalo de nuevo.' : (err.message || 'No se pudo completar.'));
@@ -97,7 +154,7 @@ const Redactar = ({ stageRef }) => {
     };
     const aceptar = () => {
         if (trabajo.el.isConnected) {
-            if (trabajo.seleccion) insertarEn(trabajo.el, trabajo.propuesta, trabajo.marca, { espacios: false });
+            if (trabajo.seleccion && !trabajo.accion?.llenar) insertarEn(trabajo.el, trabajo.propuesta, trabajo.marca, { espacios: false });
             else fijarValor(trabajo.el, trabajo.propuesta);
         }
         dialog.current?.close();
@@ -109,7 +166,7 @@ const Redactar = ({ stageRef }) => {
 
     return (
         <>
-            <button type="button" className="ria-btn" onClick={abrir} title="Mejorar el párrafo donde está el cursor">
+            <button type="button" className="ria-btn" onClick={abrir} title="Redactar o mejorar el párrafo donde está el cursor">
                 <PenLine size={16} aria-hidden="true" /> <span>Redactar</span>
             </button>
             <dialog ref={dialog} className="ria-modal" aria-label="Asistente de redacción" onClick={(e) => { if (e.target === dialog.current) dialog.current.close(); }}>
@@ -117,22 +174,27 @@ const Redactar = ({ stageRef }) => {
                     <header className="ria-head">
                         <div>
                             <p className="ria-kicker">Asistente de redacción</p>
-                            <h2>{trabajo?.seleccion ? 'Texto seleccionado' : 'Párrafo del campo'}</h2>
+                            <h2>{trabajo?.seleccion ? 'Texto seleccionado' : trabajo?.rotulo || 'Párrafo del campo'}</h2>
                         </div>
                         <button type="button" className="ria-close" onClick={() => dialog.current?.close()} aria-label="Cerrar"><X size={18} /></button>
                     </header>
                     <div className="ria-body">
-                        {!texto ? (
-                            <p className="ria-vacio">Haz clic dentro del campo que quieres mejorar (o selecciona solo una parte del texto) y vuelve a tocar «Redactar».</p>
+                        {!trabajo ? (
+                            <p className="ria-vacio">Haz clic dentro del campo que quieres redactar o mejorar (o selecciona solo una parte del texto) y vuelve a tocar «Redactar».</p>
                         ) : (
                             <>
                                 <div className="red-acciones">
-                                    {ACCIONES.map((a) => <button key={a.id} type="button" className="red-accion" data-activa={trabajo.accion?.id === a.id} disabled={estado === 'pensando'} onClick={() => ejecutar(a)}>{a.detectar && <Quote size={14} aria-hidden="true" />} {a.label}</button>)}
+                                    {ACCIONES.map((a) => <button key={a.id} type="button" className="red-accion" data-activa={trabajo.accion?.id === a.id} data-llenar={a.llenar || undefined} disabled={estado === 'pensando' || (a.llenar ? items.length === 0 : !texto)} onClick={() => ejecutar(a)}>{a.detectar && <Quote size={14} aria-hidden="true" />}{a.llenar && <Sparkles size={14} aria-hidden="true" />} {a.label}</button>)}
                                 </div>
-                                <section>
-                                    <h3>Tu texto <small>{palabras(trabajo.original)} palabras</small></h3>
-                                    <div className="red-texto" dangerouslySetInnerHTML={{ __html: aHtml(trabajo.original) }} />
-                                </section>
+                                <p className="red-nota">{items.length === 0
+                                    ? '«Llenar con mi proyecto» necesita que ya tengas al menos tu título o tu pregunta de investigación.'
+                                    : `«Llenar con mi proyecto» redacta este párrafo con lo que ya definiste: ${items.slice(0, 6).map(([k]) => k.toLowerCase()).join(', ')}${items.length > 6 ? ` y ${items.length - 6} más` : ''}.`}</p>
+                                {texto ? (
+                                    <section>
+                                        <h3>Tu texto <small>{palabras(trabajo.original)} palabras</small></h3>
+                                        <div className="red-texto" dangerouslySetInnerHTML={{ __html: aHtml(trabajo.original) }} />
+                                    </section>
+                                ) : <p className="ria-vacio">Este campo está vacío. Puedes llenarlo con tu proyecto; las demás opciones sirven cuando ya hay texto.</p>}
                                 {estado === 'pensando' && <p className="ria-cargando" role="status"><Loader2 size={18} className="ria-spin" aria-hidden="true" /> Trabajando en tu texto…</p>}
                                 {error && <p className="ria-error" role="alert"><AlertTriangle size={16} aria-hidden="true" /> {error}</p>}
                                 {trabajo.propuesta && estado !== 'pensando' && (
@@ -157,7 +219,7 @@ const Redactar = ({ stageRef }) => {
                         )}
                     </div>
                     <footer className="ria-foot">
-                        <small>La IA no agrega datos ni fuentes; solo cambia la forma. Lee la propuesta completa antes de aceptarla: el texto sigue siendo tuyo.</small>
+                        <small>{trabajo?.accion?.llenar ? 'Es un borrador armado con tu proyecto: no trae cifras ni fuentes. Complétalo donde veas corchetes, léelo completo y ajústalo antes de aceptarlo.' : 'La IA no agrega datos ni fuentes; solo cambia la forma. Lee la propuesta completa antes de aceptarla: el texto sigue siendo tuyo.'}</small>
                         {trabajo?.propuesta && estado !== 'pensando' && (
                             <span className="red-decidir">
                                 <button type="button" className="red-rechazar" onClick={() => setTrabajo((t) => ({ ...t, propuesta: '', accion: null }))}>Rechazar</button>

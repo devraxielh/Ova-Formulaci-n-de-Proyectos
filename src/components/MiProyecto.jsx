@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, BookMarked, CheckCircle2, Circle, Clipboard, Download, FileDown, FolderOpen, Image as ImageIcon, ListChecks, Pencil, Presentation, Plus, Printer, Trash2, Type as TypeIcon, UserRound, Users } from 'lucide-react';
+import { ArrowRight, BookMarked, CheckCircle2, Circle, Download, FileDown, FolderOpen, Image as ImageIcon, ListChecks, Pencil, Presentation, Plus, Trash2, Type as TypeIcon, UserRound, Users } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
-import { BUILD_ORDER, buildDocument, documentHtml, documentText } from '../services/projectDoc';
+import { BUILD_ORDER, buildDocument, documentHtml } from '../services/projectDoc';
 import { DocumentPaper } from './ProjectDocument';
 import Coherencia from './Coherencia';
 import ProyectoPaneles from './ProyectoPaneles';
@@ -184,7 +184,7 @@ const MiProyecto = ({ onNavigate }) => {
             descargar(await pdfBlob(project.name, author, sections, { ...extra, imagenes }), 'pdf');
             setNotice('PDF descargado.');
         } catch (err) {
-            setError(`No se pudo generar el PDF${err?.message ? `: ${err.message}` : ''}. Puedes usar «Imprimir» y elegir «Guardar como PDF».`);
+            setError(`No se pudo generar el PDF${err?.message ? `: ${err.message}` : ''}. Inténtalo de nuevo o descarga el Word.`);
         } finally {
             setGenerando('');
         }
@@ -227,11 +227,6 @@ const MiProyecto = ({ onNavigate }) => {
             setGenerando('');
         }
     };
-
-    const copyText = () => run(async () => {
-        await navigator.clipboard.writeText(documentText(project.name, sections));
-        setNotice('Texto del proyecto copiado al portapapeles.');
-    });
 
     return (
         <div className="pro-page">
@@ -392,12 +387,6 @@ const MiProyecto = ({ onNavigate }) => {
                             </button>
                             <button type="button" className="pro-btn pro-btn--ghost" onClick={downloadSlides} disabled={inPaper.length === 0 || Boolean(generando)}>
                                 <Presentation size={16} /> {generando === 'pptx' ? 'Generando…' : 'Diapositivas'}
-                            </button>
-                            <button type="button" className="pro-btn pro-btn--ghost" onClick={() => window.print()} disabled={inPaper.length === 0}>
-                                <Printer size={16} /> Imprimir
-                            </button>
-                            <button type="button" className="pro-btn pro-btn--ghost" onClick={copyText} disabled={inPaper.length === 0}>
-                                <Clipboard size={16} /> Copiar texto
                             </button>
                         </div>
                     </div>
