@@ -1339,3 +1339,32 @@
 .pro-coh-despues i { color: #047857; }
 .pro-coh-decidir { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.8rem; }
 .pro-coh-propuesta small { color: #64748b; font-size: 0.8rem; }
+
+/* ---------- Temas de las diapositivas ---------- */
+.pro-temas-modal { position: fixed; inset: 0; margin: auto; width: min(60rem, calc(100vw - 1.5rem)); max-width: none; max-height: calc(100dvh - 1.5rem); padding: 1.25rem; border: 0; border-radius: 1rem; background: #fff; color: #1e293b; box-shadow: 0 24px 60px -20px rgb(15 23 42 / 0.5); overflow-y: auto; }
+.pro-temas-modal[open] { display: grid; gap: 1rem; align-content: start; }
+.pro-temas-modal::backdrop { background: rgb(15 23 42 / 0.55); }
+.pro-temas-modal header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.pro-temas-modal header h2 { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.2rem; font-size: 1.15rem; }
+.pro-temas-modal header h2 svg { color: #4f46e5; }
+.pro-temas-modal header p { margin: 0; font-size: 0.9rem; color: #64748b; }
+.pro-temas { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.8rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 12.5rem), 1fr)); }
+.pro-temas li { display: grid; }
+.pro-tema { position: relative; display: grid; gap: 0.55rem; padding: 0.6rem; border: 2px solid #e2e8f0; border-radius: 0.9rem; background: #fff; font: inherit; color: inherit; text-align: left; cursor: pointer; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+.pro-tema:hover { border-color: #a5b4fc; }
+.pro-tema:focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; }
+.pro-tema[aria-checked='true'] { border-color: #4f46e5; box-shadow: 0 0 0 3px #e0e7ff; }
+.pro-tema-minis { display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem; }
+.pro-tema-mini { display: grid; align-content: center; gap: 7%; aspect-ratio: 16 / 9; padding: 10% 10% 8%; border-radius: 0.35rem; border: 1px solid rgb(15 23 42 / 0.12); overflow: hidden; }
+.pro-tema-mini i { display: block; border-radius: 2px; }
+.pro-tema-mini--contenido { align-content: start; padding: 9% 8%; }
+.pro-tema-mini--contenido > span { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6%; margin-top: 6%; flex: 1; height: 55%; }
+.pro-tema-mini--contenido b { display: block; border: 1px solid; border-radius: 2px; padding: 12% 12% 0; }
+.pro-tema-mini--contenido em { display: block; height: 3px; width: 70%; border-radius: 2px; }
+.pro-tema-nombre { display: grid; gap: 0.05rem; padding: 0 0.15rem 0.1rem; }
+.pro-tema-nombre b { font-size: 0.95rem; }
+.pro-tema-nombre small { font-size: 0.8rem; color: #64748b; }
+.pro-tema-ok { position: absolute; top: 0.35rem; right: 0.35rem; display: grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 999px; background: #fff; color: #4f46e5; box-shadow: 0 2px 6px rgb(15 23 42 / 0.25); }
+.pro-temas-modal footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.pro-temas-modal footer small { color: #64748b; font-size: 0.88rem; }
+.pro-temas-modal footer span { display: flex; flex-wrap: wrap; gap: 0.5rem; }

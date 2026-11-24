@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, BookMarked, CheckCircle2, Circle, Download, FileDown, FolderOpen, Image as ImageIcon, ListChecks, Pencil, Presentation, Plus, Trash2, Type as TypeIcon, UserRound, Users } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowRight, BookMarked, CheckCircle2, Circle, Download, FileDown, FolderOpen, Image as ImageIcon, ListChecks, Pencil, Presentation, Plus, Trash2, Type as TypeIcon, UserRound, Users, X } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 import { BUILD_ORDER, buildDocument, documentHtml } from '../services/projectDoc';
 import { DocumentPaper } from './ProjectDocument';
@@ -7,6 +7,7 @@ import Coherencia from './Coherencia';
 import ProyectoPaneles from './ProyectoPaneles';
 import { api, groq } from '../services/api';
 import { arbolPng } from '../services/arbol';
+import { TEMAS, temaDe } from '../data/temasDiapositivas';
 import './Proyecto.css';
 
 // Mismo orden que el menú lateral.
@@ -192,7 +193,14 @@ const MiProyecto = ({ onNavigate }) => {
 
     // Diapositivas de sustentación con los ítems de la plantilla del seminario. La IA resume cada apartado;
     // si falla, se usan las primeras frases de lo que escribió el estudiante.
+    // Antes de generar se elige el tema de color; se recuerda el último que usó este navegador.
+    const temasDialog = useRef(null);
+    const [temaId, setTemaId] = useState(() => { try { return temaDe(window.localStorage.getItem('projectsia:tema-diapositivas')).id; } catch { return TEMAS[0].id; } });
+    const elegirTema = () => temasDialog.current?.showModal();
     const downloadSlides = async () => {
+        const tema = temaDe(temaId);
+        try { window.localStorage.setItem('projectsia:tema-diapositivas', tema.id); } catch { /* sin almacenamiento: no se recuerda */ }
+        temasDialog.current?.close();
         setError('');
         setNotice('');
         setGenerando('pptx');
@@ -219,8 +227,8 @@ const MiProyecto = ({ onNavigate }) => {
             }
             const slides = guionDiapositivas(sections, data, { autor: author, resumen });
             const imagenes = await cargarImagenes();
-            descargar(await presentacionPptx(slides, imagenes), 'pptx');
-            setNotice(`Presentación descargada: ${slides.length} diapositivas con los apartados de la plantilla de sustentación${conIA ? ', resumidos por la IA a partir de tu documento' : ' (sin resumen de IA: se usaron las primeras frases de cada apartado)'}. Los apartados que aún no has escrito no aparecen. Revísala en PowerPoint antes de sustentar.`);
+            descargar(await presentacionPptx(slides, imagenes, tema), 'pptx');
+            setNotice(`Presentación descargada con el tema «${tema.nombre}»: ${slides.length} diapositivas con los apartados de la plantilla de sustentación${conIA ? ', resumidos por la IA a partir de tu documento' : ' (sin resumen de IA: se usaron las primeras frases de cada apartado)'}. Los apartados que aún no has escrito no aparecen. Revísala en PowerPoint antes de sustentar.`);
         } catch (err) {
             setError(`No se pudo generar la presentación${err?.message ? `: ${err.message}` : ''}.`);
         } finally {
@@ -230,6 +238,46 @@ const MiProyecto = ({ onNavigate }) => {
 
     return (
         <div className="pro-page">
+            <dialog ref={temasDialog} className="pro-temas-modal" aria-labelledby="pro-temas-titulo" onClick={(e) => { if (e.target === temasDialog.current) temasDialog.current.close(); }}>
+                <header>
+                    <div>
+                        <h2 id="pro-temas-titulo"><Presentation size={19} aria-hidden="true" /> Elige el tema de tus diapositivas</h2>
+                        <p>Cambia solo los colores; el contenido es el mismo. Podrás ajustarlo después en PowerPoint.</p>
+                    </div>
+                    <button type="button" className="pro-coh-cerrar" aria-label="Cerrar" onClick={() => temasDialog.current?.close()}><X size={18} /></button>
+                </header>
+                <ul className="pro-temas" role="radiogroup" aria-label="Tema de color">
+                    {TEMAS.map((t) => (
+                        <li key={t.id}>
+                            <button type="button" className="pro-tema" role="radio" aria-checked={temaId === t.id} onClick={() => setTemaId(t.id)} onDoubleClick={downloadSlides}>
+                                {/* Miniaturas: la portada y una diapositiva de contenido con los colores del tema */}
+                                <span className="pro-tema-minis" aria-hidden="true">
+                                    <span className="pro-tema-mini" style={{ background: `#${t.primario}` }}>
+                                        <i style={{ background: `#${t.sobrePrimario}`, width: '70%', height: '14%' }} />
+                                        <i style={{ background: `#${t.sobrePrimario}`, width: '48%', height: '14%' }} />
+                                        <i style={{ background: `#${t.suavePrimario}`, width: '36%', height: '8%', marginTop: '10%' }} />
+                                    </span>
+                                    <span className="pro-tema-mini pro-tema-mini--contenido" style={{ background: `#${t.fondo}`, borderLeft: `5px solid #${t.primario}` }}>
+                                        <i style={{ background: `#${t.tinta}`, width: '60%', height: '12%' }} />
+                                        <span>
+                                            {[0, 1, 2].map((k) => <b key={k} style={{ background: `#${t.tarjeta}`, borderColor: `#${t.borde}` }}><em style={{ background: `#${t.acento}` }} /></b>)}
+                                        </span>
+                                    </span>
+                                </span>
+                                <span className="pro-tema-nombre"><b>{t.nombre}</b><small>{t.nota}</small></span>
+                                {temaId === t.id && <span className="pro-tema-ok"><CheckCircle2 size={18} aria-hidden="true" /></span>}
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+                <footer>
+                    <small>Tema elegido: <b>{temaDe(temaId).nombre}</b></small>
+                    <span>
+                        <button type="button" className="pro-btn pro-btn--ghost" onClick={() => temasDialog.current?.close()}>Cancelar</button>
+                        <button type="button" className="pro-btn pro-btn--primary" onClick={downloadSlides}><Download size={16} /> Aplicar y descargar</button>
+                    </span>
+                </footer>
+            </dialog>
             {user ? (
                 <section className="pro-galeria" aria-labelledby="pro-galeria-titulo">
                     <div className="pro-galeria-head">
@@ -385,7 +433,7 @@ const MiProyecto = ({ onNavigate }) => {
                             <button type="button" className="pro-btn pro-btn--ghost" onClick={downloadPdf} disabled={inPaper.length === 0 || Boolean(generando)}>
                                 <FileDown size={16} /> {generando === 'pdf' ? 'Generando…' : 'Descargar PDF'}
                             </button>
-                            <button type="button" className="pro-btn pro-btn--ghost" onClick={downloadSlides} disabled={inPaper.length === 0 || Boolean(generando)}>
+                            <button type="button" className="pro-btn pro-btn--ghost" onClick={elegirTema} disabled={inPaper.length === 0 || Boolean(generando)}>
                                 <Presentation size={16} /> {generando === 'pptx' ? 'Generando…' : 'Diapositivas'}
                             </button>
                         </div>
