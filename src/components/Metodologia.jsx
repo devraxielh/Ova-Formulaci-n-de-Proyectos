@@ -79,6 +79,54 @@ const recomendarEnfoque = async ({ data, especificos }) => {
     return { enfoque, razon, descartados };
 };
 
+// Lo que la IA necesita saber del proyecto para elegir o justificar el tipo de investigación.
+const proyectoParaTipo = ({ data, especificos, enfoque }) => {
+    const t = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
+    const general = t(data.objetivoGeneral) || t(partesObjetivos(data.objetivos).general);
+    return `PROYECTO\nTítulo: ${t(data.titulo) || '(sin título)'}\nPregunta: ${t(data.pregunta) || '(sin definir)'}\nObjetivo general: ${general || '(sin definir)'}\nObjetivos específicos:\n${especificos.length ? especificos.map((x, i) => `${i + 1}. ${x}`).join('\n') : '(sin definir)'}\nEnfoque elegido: ${enfoque || '(sin definir)'}`;
+};
+const TIPOS_TEXTO = TIPOS.map((x) => `- ${x.id}: ${x.def.replace(/^pues /, '')}`).join('\n');
+
+// «Por qué este tipo»: coherente con el título, la pregunta, los objetivos y el enfoque.
+const razonTipo = async ({ tipo, ...proyecto }) => {
+    const r = await groq.chat.completions.create({
+        messages: [
+            { role: 'system', content: 'Ayudas a un estudiante a justificar el tipo (alcance) de su investigación en la metodología. Escribes en español, en tercera persona o forma impersonal, con lo que dicen su título, su pregunta y sus objetivos: no inventas cifras, técnicas, muestras, autores ni citas. Devuelves únicamente el texto, sin comillas ni explicaciones.' },
+            { role: 'user', content: `TIPOS POSIBLES\n${TIPOS_TEXTO}\n\n${proyectoParaTipo(proyecto)}\n\nTIPO ELEGIDO: ${tipo}\n\nEscribe en dos frases completas (entre 40 y 70 palabras) por qué la investigación es de tipo ${tipo.toLowerCase()}: qué busca el estudio según su pregunta y su objetivo general (el verbo y lo que pide), hasta dónde llega y cómo encaja con el enfoque elegido. Empieza con «El estudio». No repitas la definición del tipo: ya está escrita antes. Es una justificación: no señales limitaciones ni recomiendes otro tipo. Sin punto final.` },
+        ],
+        temperature: 0.3,
+        max_tokens: 1200,
+    });
+    const texto = String(r.choices?.[0]?.message?.content ?? '').replace(/\s+/g, ' ').trim().replace(/^["«]|["»]$/g, '').replace(/[.\s]+$/, '');
+    if (texto.length < 120 || /\s(?:de|del|la|el|los|las|y|que|en|a|con|para|por|un|una)$/i.test(texto)) throw new Error('vacio');
+    return texto;
+};
+
+// Elige el tipo que corresponde al proyecto y explica por qué no los demás.
+const recomendarTipo = async (proyecto) => {
+    const t = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
+    const r = await groq.chat.completions.create({
+        messages: [
+            { role: 'system', content: 'Eres asesor metodológico. Eliges el tipo (alcance) de investigación que corresponde a un proyecto según lo que piden su pregunta, su objetivo general y sus específicos, en coherencia con su título y su enfoque. Escribes en español, en tercera persona o forma impersonal. No inventas cifras, técnicas, muestras, autores ni citas. Respondes solo JSON válido.' },
+            { role: 'user', content: `TIPOS POSIBLES\n${TIPOS_TEXTO}\n\n${proyectoParaTipo(proyecto)}\n\nElige UN tipo: el nivel más alto que el proyecto realmente alcanza, que es el que piden la pregunta y el objetivo general (los específicos anteriores son pasos para llegar a él). Guíate por el verbo y por lo que se pide: explorar un tema nuevo → exploratoria; caracterizar o describir → descriptiva; relacionar o asociar variables → correlacional; determinar causas o por qué ocurre → explicativa; valorar el efecto de una intervención ya aplicada → evaluativa; diagnosticar y diseñar una propuesta como fin principal → propositiva. Debe ser posible con el enfoque elegido.\n- "tipo": uno de ${TIPOS.map((x) => `"${x.id}"`).join(', ')}.\n- "razon": dos frases completas (40 a 70 palabras) que justifiquen ese tipo con lo que piden la pregunta y el objetivo general, y cómo encaja con el enfoque. Empieza con «El estudio». No repitas la definición ni señales limitaciones. Sin punto final.\n- "descartados": para CADA UNO de los otros cinco tipos, una frase (12 a 25 palabras) que diga por qué no es el de ESTE proyecto: qué le faltaría al proyecto para serlo o qué pide el proyecto que ese tipo no alcanza. Empieza en minúscula. Sin punto final.\n\nResponde exactamente con este JSON: {"tipo": "…", "razon": "…", "descartados": [{"tipo": "…", "porque": "…"}]}` },
+        ],
+        temperature: 0.2,
+        max_tokens: 2200,
+        response_format: { type: 'json_object' },
+    });
+    const content = r.choices?.[0]?.message?.content || '';
+    const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+    const ids = TIPOS.map((x) => x.id);
+    const sinPunto = (v) => t(v).replace(/[.\s]+$/, '');
+    const tipo = ids.find((id) => id.toLowerCase() === t(json.tipo).toLowerCase());
+    const razon = sinPunto(json.razon);
+    if (!tipo || razon.length < 60) throw new Error('vacio');
+    const descartados = (Array.isArray(json.descartados) ? json.descartados : [])
+        .map((d) => ({ tipo: ids.find((id) => id.toLowerCase() === t(d?.tipo).toLowerCase()), porque: sinPunto(d?.porque).replace(/^\p{Lu}(?=\p{Ll})/u, (l) => l.toLowerCase()) }))
+        .filter((d) => d.tipo && d.tipo !== tipo && d.porque.length > 15);
+    return { tipo, razon, descartados };
+};
+
 const clean = (text) => String(text || '').trim().replace(/[\s.,;:]+$/, '');
 const lower = (text) => (text ? text.charAt(0).toLowerCase() + text.slice(1) : '');
 const money = (value) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number(value) || 0);
@@ -349,6 +397,44 @@ const Constructor = ({ intro, onNavigate }) => {
         elegirEnfoque();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tab, enfoque]);
+    // Tipo de investigación: lo mismo que el enfoque. Se elige con el título, la pregunta, los objetivos y el
+    // enfoque; la razón se redacta sola y las notas dicen por qué no los demás tipos.
+    const [razonT, setRazonT] = useState('');
+    const proyectoTipo = () => ({ data: estado.data, especificos, enfoque });
+    const pedirRazonTipo = async (v, forzar) => {
+        if (!v || (!forzar && String(f.tipoTexto || '').trim() && f.tipoTexto !== f.tipoAuto)) return;
+        setRazonT('pensando');
+        try {
+            const texto = await razonTipo({ tipo: v, ...proyectoTipo() });
+            touch();
+            update({ tipoTexto: texto, tipoAuto: texto });
+            setRazonT('');
+        } catch {
+            setRazonT('fallo');
+        }
+    };
+    const elegirTipo = async () => {
+        setRazonT('eligiendo');
+        try {
+            const r = await recomendarTipo(proyectoTipo());
+            touch();
+            setTipo(r.tipo);
+            const libre = !String(f.tipoTexto || '').trim() || f.tipoTexto === f.tipoAuto;
+            update({ tipoNotas: { recomendado: r.tipo, enfoque, descartados: r.descartados }, ...(libre ? { tipoTexto: r.razon, tipoAuto: r.razon } : {}) });
+            setRazonT('');
+        } catch {
+            setRazonT('fallo');
+        }
+    };
+    // La primera vez que se abre el tipo sin razón escrita ni notas, se elige solo (si ya hay objetivos o pregunta).
+    const yaEligioTipo = useRef(false);
+    useEffect(() => {
+        if (tab !== 'tipo' || yaEligioTipo.current || f.tipoNotas || String(f.tipoTexto || '').trim()) return;
+        if (!especificos.length && !String(estado.data.pregunta || '').trim()) return;
+        yaEligioTipo.current = true;
+        elegirTipo();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tab]);
     const setPob = (patch) => { touch(); update({ poblacion: { ...f.poblacion, ...patch } }); };
 
     // La primera vez: tipo según los alcances, población del título, una fila de análisis por específico y un cronograma base.
@@ -463,9 +549,34 @@ const Constructor = ({ intro, onNavigate }) => {
                     {tab === 'tipo' && (
                         <div className="input-group pla-part">
                             <span className="alc-label">Elige el tipo de investigación</span>
-                            <Chips options={TIPOS.map((t) => t.id)} value={tipo} label="Tipo de investigación" sugerido={tipoEsperado} onPick={(v) => { touch(); setTipo(v); }} />
+                            <div className="met-razon">
+                                <button type="button" className="ide-btn ide-btn--ghost" disabled={razonT === 'eligiendo' || razonT === 'pensando'} onClick={elegirTipo}>
+                                    {razonT === 'eligiendo' ? <Loader2 size={15} className="met-gira" /> : <Sparkles size={15} />} {razonT === 'eligiendo' ? 'Eligiendo según tu proyecto…' : 'Elegir el tipo con mi proyecto'}
+                                </button>
+                                <span>Se basa en tu título, tu pregunta, tus objetivos y el enfoque{enfoque ? ` ${enfoque.toLowerCase()}` : ''}. Puedes cambiarlo abajo.</span>
+                            </div>
+                            <Chips options={TIPOS.map((t) => t.id)} value={tipo} label="Tipo de investigación" sugerido={tipoEsperado} onPick={(v) => { touch(); setTipo(v); if (v !== tipo) pedirRazonTipo(v, false); }} />
                             <small className="ide-field-hint">{tipoEsperado ? `★ Según lo que quieres lograr (y tus alcances), el tuyo es ${tipoEsperado.toLowerCase()}.` : 'Debe coincidir con el alcance que declaraste.'}</small>
+                            {f.tipoNotas?.recomendado && (
+                                <div className="met-notas">
+                                    <b>Notas</b>
+                                    <p>Para tu proyecto se recomienda una investigación <strong>{f.tipoNotas.recomendado.toLowerCase()}</strong>{tipo && tipo !== f.tipoNotas.recomendado ? `, pero elegiste ${tipo.toLowerCase()}: revisa que tu pregunta y tu objetivo general lo sostengan` : ''}.</p>
+                                    {tipoEsperado && tipoEsperado !== f.tipoNotas.recomendado && <p>En tus alcances declaraste un estudio {tipoEsperado.toLowerCase()}: deja el mismo en las dos secciones.</p>}
+                                    {f.tipoNotas.enfoque && enfoque && f.tipoNotas.enfoque !== enfoque && <p>Cambiaste el enfoque después de esta recomendación: vuelve a elegir el tipo con tu proyecto.</p>}
+                                    {(f.tipoNotas.descartados || []).map((d) => <p key={d.tipo}><strong>Por qué no {d.tipo.toLowerCase()}:</strong> {d.porque}.</p>)}
+                                    <small>Las notas son para ti: no pasan al documento.</small>
+                                </div>
+                            )}
                             <Campo id="met-tipo-txt" label="Por qué este tipo" rows={3} value={f.tipoTexto} onChange={set('tipoTexto')} placeholder="Ej: El estudio busca establecer la relación entre el olvido de la cita y la inasistencia, sin manipular las variables" />
+                            {tipo && (
+                                <div className="met-razon">
+                                    <button type="button" className="ide-link" disabled={razonT === 'pensando' || razonT === 'eligiendo'} onClick={() => pedirRazonTipo(tipo, true)}>
+                                        {razonT === 'pensando' ? <Loader2 size={13} className="met-gira" /> : <Sparkles size={13} />} {razonT === 'pensando' ? 'Redactando con tu proyecto…' : clean(f.tipoTexto) ? 'Volver a redactar con mi proyecto' : 'Redactar con mi proyecto'}
+                                    </button>
+                                    {razonT === 'fallo' && <span>No se pudo: inténtalo de nuevo o escríbelo tú.</span>}
+                                    {razonT !== 'fallo' && f.tipoTexto && f.tipoTexto === f.tipoAuto && <span>Redactado por la IA con tu proyecto: léelo y ajústalo.</span>}
+                                </div>
+                            )}
                         </div>
                     )}
 
