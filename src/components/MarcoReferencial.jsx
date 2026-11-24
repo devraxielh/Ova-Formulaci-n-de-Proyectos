@@ -29,6 +29,8 @@ const RECIENTE = ANIO_ACTUAL - 10;
 /* ---------- Utilidades ---------- */
 
 const clean = (text) => String(text || '').trim().replace(/[\s.,;:]+$/, '');
+// El autor tal como va en la cita: «et al.» conserva su punto (clean se lo quita por ir al final).
+const autorDe = (v) => clean(v).replace(/\bet al$/i, 'et al.');
 const lower = (text) => (text ? text.charAt(0).toLowerCase() + text.slice(1) : '');
 const capital = (text) => (text ? text.charAt(0).toUpperCase() + text.slice(1) : '');
 const countWords = (text) => String(text || '').trim().split(/\s+/).filter(Boolean).length;
@@ -67,7 +69,7 @@ const redactarAntecedentes = (items) => AMBITOS.flatMap((ambito) => items
     .filter((a) => a.ambito === ambito && clean(a.autor) && clean(a.hallazgo))
     .map((a) => {
         const partes = [
-            `${clean(a.autor)} (${clean(a.anio) || 's. f.'})${clean(a.titulo) ? `, en su estudio «${clean(a.titulo)}»` : ''}${clean(a.lugar) ? `, realizado en ${clean(a.lugar)}` : ''}${clean(a.objetivo) ? `, buscó ${lower(clean(a.objetivo))}` : ''}.`,
+            `${autorDe(a.autor)} (${clean(a.anio) || 's. f.'})${clean(a.titulo) ? `, en su estudio «${clean(a.titulo)}»` : ''}${clean(a.lugar) ? `, realizado en ${clean(a.lugar)}` : ''}${clean(a.objetivo) ? `, buscó ${lower(clean(a.objetivo))}` : ''}.`,
             `${capital(clean(a.hallazgo))}.`,
             clean(a.relacion) ? `Este antecedente se relaciona con la presente investigación porque ${lower(clean(a.relacion))}.` : '',
         ];
@@ -77,14 +79,14 @@ const redactarAntecedentes = (items) => AMBITOS.flatMap((ambito) => items
 const redactarTeorias = (items) => items
     .filter((t) => clean(t.nombre) && clean(t.postulado))
     .map((t) => [
-        `${capital(clean(t.nombre))}${clean(t.autor) ? `, propuesta por ${clean(t.autor)} (${clean(t.anio) || 's. f.'})` : ''}, plantea que ${lower(clean(t.postulado))}.`,
+        `${capital(clean(t.nombre))}${clean(t.autor) ? `, propuesta por ${autorDe(t.autor)} (${clean(t.anio) || 's. f.'})` : ''}, plantea que ${lower(clean(t.postulado))}.`,
         clean(t.relacion) ? `Esta teoría sustenta la investigación porque ${lower(clean(t.relacion))}.` : '',
     ].filter(Boolean).join(' '))
     .join('\n\n');
 
 const redactarConceptos = (items) => items
     .filter((c) => clean(c.termino) && clean(c.definicion))
-    .map((c) => `- **${capital(clean(c.termino))}:** ${capital(clean(c.definicion))}${clean(c.autor) ? ` (${clean(c.autor)}, ${clean(c.anio) || 's. f.'})` : ''}.`)
+    .map((c) => `- **${capital(clean(c.termino))}:** ${capital(clean(c.definicion))}${clean(c.autor) ? ` (${autorDe(c.autor)}, ${clean(c.anio) || 's. f.'})` : ''}.`)
     .join('\n');
 
 const redactarContexto = (c) => [
@@ -337,7 +339,7 @@ const useMarcoState = () => {
     const [idea] = useProjectField('idea', null);
     const [titulo] = useProjectField('titulo', '');
     const [pregunta] = useProjectField('pregunta', '');
-    const [refs] = useProjectField('referencias', []);
+    const [refs, setRefs] = useProjectField('referencias', []);
     const setters = {
         marcoAntecedentes: useProjectField('marcoAntecedentes', '')[1],
         marcoTeorico: useProjectField('marcoTeorico', '')[1],
@@ -359,7 +361,7 @@ const useMarcoState = () => {
     const i = idea || {};
     const t = tituloForm || {};
     return {
-        f, update, setForm, setters, guardados, titulo, pregunta, refs: Array.isArray(refs) ? refs : [], idea: i,
+        f, update, setForm, setters, guardados, titulo, pregunta, refs: Array.isArray(refs) ? refs : [], setRefs, idea: i,
         quien: clean(t.quien || i.quien), donde: clean(t.donde || i.donde),
     };
 };
@@ -376,8 +378,38 @@ const origenDe = (item, refs) => {
     return { titulo, enlace };
 };
 
+// Cómo queda la cita de una ficha frente a «Mis referencias»:
+// 'ok' (hay una referencia con ese autor y año), 'ajustar' (la referencia de su fuente está, pero el autor o el año
+// de la ficha no coinciden con ella) o 'falta' (no hay referencia para esa cita).
+const sinTildes = (v) => clean(v).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ');
+const citaDeFicha = (item, refs) => {
+    const autor = autorDe(item.autor);
+    const anio = clean(item.anio);
+    const titulo = clean(String(item.fuente || '').split('|').pop());
+    if (!autor && !anio && !titulo) return null;
+    const lista = refs || [];
+    const mismoAutor = (r) => sinTildes(autorCita(r)) === sinTildes(autor) && clean(r.anio) === anio;
+    // Primero la referencia de su propia fuente (por título); si no, cualquiera con el mismo autor y año.
+    const deFuente = titulo ? lista.find((r) => sinTildes(r.titulo) === sinTildes(titulo)) : null;
+    if (deFuente) return { estado: mismoAutor(deFuente) ? 'ok' : 'ajustar', ref: deFuente, cita: `(${autorCita(deFuente)}, ${clean(deFuente.anio) || 's. f.'})` };
+    const igual = autor ? lista.find(mismoAutor) : null;
+    if (igual) return { estado: 'ok', ref: igual, cita: `(${autor}, ${anio || 's. f.'})` };
+    return autor ? { estado: 'falta', cita: `(${autor}, ${anio || 's. f.'})` } : null;
+};
+// Referencia mínima a partir de lo que dice la ficha, para que la cita tenga a dónde apuntar; se completa en Referencias.
+// «Pérez y Gómez» → «Pérez; Gómez». Con «et al.» solo se conoce el primer autor.
+const refDesdeFicha = (item) => ({
+    id: Math.random().toString(36).slice(2, 9),
+    tipo: 'articulo',
+    autores: clean(item.autor).replace(/\s+et al\.?$/i, '').split(/\s+y\s+|\s*;\s*|\s*&\s*/).map(clean).filter(Boolean).join('; '),
+    anio: clean(item.anio),
+    titulo: clean(item.titulo) || clean(String(item.fuente || '').split('|').pop()),
+    revista: '', volumen: '', numero: '', paginas: '', doi: '',
+});
+
 // Lista de fichas editables (antecedentes, teorías, conceptos o normas).
-const Fichas = ({ items, vacio, max, onChange, render, agregar, refs }) => (
+// `onAgregarRef`: si se pasa, cada ficha muestra cómo está su cita frente a «Mis referencias» y deja arreglarla.
+const Fichas = ({ items, vacio, max, onChange, render, agregar, refs, onAgregarRef }) => (
     <div className="mar-fichas">
         {items.map((item, index) => (
             <div className="input-group pla-part mar-ficha" key={index}>
@@ -388,6 +420,28 @@ const Fichas = ({ items, vacio, max, onChange, render, agregar, refs }) => (
                     )}
                 </div>
                 {render(item, (patch) => onChange(items.map((it, i) => (i === index ? { ...it, ...patch } : it))), index)}
+                {onAgregarRef && (() => {
+                    const c = citaDeFicha(item, refs);
+                    if (!c) return null;
+                    const cambiar = (patch) => onChange(items.map((it, i) => (i === index ? { ...it, ...patch } : it)));
+                    return (
+                        <p className="mar-cita" data-estado={c.estado}>
+                            {c.estado === 'ok' && <><CheckCircle2 size={14} aria-hidden="true" /> Cita {c.cita}: está en tus referencias.</>}
+                            {c.estado === 'ajustar' && (
+                                <>
+                                    <AlertTriangle size={14} aria-hidden="true" /> La ficha cita «{autorDe(item.autor) || 'sin autor'}, {clean(item.anio) || 's. f.'}», pero su referencia se cita {c.cita}.
+                                    <button type="button" className="ide-link" onClick={() => cambiar({ autor: autorCita(c.ref), anio: clean(c.ref.anio) })}>Ajustar la cita a la referencia</button>
+                                </>
+                            )}
+                            {c.estado === 'falta' && (
+                                <>
+                                    <AlertTriangle size={14} aria-hidden="true" /> La cita {c.cita} no tiene referencia.
+                                    <button type="button" className="ide-link" onClick={() => onAgregarRef(refDesdeFicha(item))}>Agregarla a mis referencias</button>
+                                </>
+                            )}
+                        </p>
+                    );
+                })()}
                 {origenDe(item, refs) && (
                     <p className="mar-origen">
                         <ExternalLink size={13} aria-hidden="true" /> Salió de:{' '}
@@ -414,7 +468,7 @@ const Campo = ({ id, label, value, onChange, placeholder, rows = 1, className = 
 );
 
 const Constructor = ({ intro, onNavigate }) => {
-    const { f, update, setForm, setters, idea, quien, donde, titulo, pregunta, refs } = useMarcoState();
+    const { f, update, setForm, setters, idea, quien, donde, titulo, pregunta, refs, setRefs } = useMarcoState();
     const [tab, setTab] = useState('antecedentes');
     const [saved, setSaved] = useState(false);
     const partes = redactar(f);
@@ -465,6 +519,23 @@ const Constructor = ({ intro, onNavigate }) => {
             const libre = actuales.findIndex(estaLibre);
             return { ...base, [lista]: libre >= 0 ? actuales.map((x, i) => (i === libre ? ficha : x)) : [...actuales, ficha].slice(0, max) };
         });
+    };
+    // Citas del apartado frente a «Mis referencias»: cuántas no coinciden, y arreglarlas todas de una vez.
+    const LISTA_CITAS = { antecedentes: 'antecedentes', teorico: 'teorias', conceptual: 'conceptos' };
+    const agregarRef = (ref) => setRefs((prev) => [...(Array.isArray(prev) ? prev : []), ref]);
+    const citasTab = LISTA_CITAS[tab] ? f[LISTA_CITAS[tab]].map((x) => citaDeFicha(x, refs)) : [];
+    const pendientes = citasTab.filter((c) => c && c.estado !== 'ok').length;
+    const arreglarCitas = () => {
+        const lista = LISTA_CITAS[tab];
+        const nuevas = [];
+        const fichas = f[lista].map((x) => {
+            const c = citaDeFicha(x, [...refs, ...nuevas]);
+            if (c?.estado === 'ajustar') return { ...x, autor: autorCita(c.ref), anio: clean(c.ref.anio) };
+            if (c?.estado === 'falta') nuevas.push(refDesdeFicha(x));
+            return x;
+        });
+        if (nuevas.length) setRefs((prev) => [...(Array.isArray(prev) ? prev : []), ...nuevas]);
+        set(lista)(fichas);
     };
     // «Usar esta obra» de «Sugerir teorías»: el nombre viene de la propuesta; el autor y el año, de la obra encontrada.
     const usarTeoria = async ({ nombre, ref, resumen, prestado, enlace }) => {
@@ -580,9 +651,22 @@ const Constructor = ({ intro, onNavigate }) => {
                             onUsar={usarConcepto}
                         />
                     )}
+                    {LISTA_CITAS[tab] && citasTab.some(Boolean) && (
+                        <p className="mar-citas-resumen" data-ok={pendientes === 0 || undefined}>
+                            {pendientes === 0
+                                ? <><CheckCircle2 size={15} aria-hidden="true" /> Todas las citas de este apartado están en tus referencias.</>
+                                : (
+                                    <>
+                                        <AlertTriangle size={15} aria-hidden="true" /> {pendientes === 1 ? 'Una cita de este apartado no coincide' : `${pendientes} citas de este apartado no coinciden`} con tus referencias.
+                                        <button type="button" className="ide-btn ide-btn--ghost" onClick={arreglarCitas}>Ajustarlas y ponerlas en referencias</button>
+                                    </>
+                                )}
+                        </p>
+                    )}
                     {tab === 'antecedentes' && (
                         <Fichas
                             refs={refs}
+                            onAgregarRef={agregarRef}
                             items={f.antecedentes}
                             vacio={VACIO.antecedente}
                             max={10}
@@ -611,6 +695,7 @@ const Constructor = ({ intro, onNavigate }) => {
                     {tab === 'teorico' && (
                         <Fichas
                             refs={refs}
+                            onAgregarRef={agregarRef}
                             items={f.teorias}
                             vacio={VACIO.teoria}
                             max={5}
@@ -631,6 +716,7 @@ const Constructor = ({ intro, onNavigate }) => {
                     {tab === 'conceptual' && (
                         <Fichas
                             refs={refs}
+                            onAgregarRef={agregarRef}
                             items={f.conceptos}
                             vacio={VACIO.concepto}
                             max={MAX_CONCEPTOS}
