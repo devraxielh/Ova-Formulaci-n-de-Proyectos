@@ -11,7 +11,8 @@ import './Arbol.css';
 
 /*
  * Árbol de objetivos: el árbol del problema «en positivo». El estudiante escribe el objetivo central,
- * los medios (raíces) y los fines (ramas), y la página dibuja la figura, que entra sola en Objetivos.
+ * los medios (raíces) y los fines (ramas), y la página dibuja la figura, que entra sola en el Planteamiento,
+ * debajo del árbol del problema.
  * Es una clase como las demás: «Construcción» en la página y la teoría (40 minutos) en «Presentación».
  */
 const texto = (v) => String(v ?? '').trim();
@@ -26,7 +27,7 @@ const CFG = {
     centroEjemplo: 'Reducir la inasistencia de los pacientes a sus citas médicas de consulta externa',
     abajo: { titulo: 'Medios', pregunta: 'las raíces · ¿cómo se logra?', ayuda: 'Cada causa del problema, resuelta. De aquí salen tus objetivos específicos.', ejemplo: 'Los pacientes reciben un recordatorio de su cita' },
     arriba: { titulo: 'Fines', pregunta: 'las ramas · ¿para qué se logra?', ayuda: 'Cada efecto del problema, en positivo. Son los beneficios a los que contribuye tu proyecto.', ejemplo: 'Se aprovechan los cupos de atención disponibles' },
-    destino: <>Esta figura ya entra en la sección <strong>Objetivos</strong> de tu documento (vista previa, Word y PDF), después de tus objetivos y con un párrafo que la explica.</>,
+    destino: <>Esta figura ya entra en el <strong>Planteamiento del problema</strong> de tu documento (vista previa, Word y PDF), justo debajo del árbol del problema y con un párrafo que la explica.</>,
     ia: {
         disponible: (d) => arbolCompleto(leerArbol(d)) || Boolean(texto(d?.objetivoGeneral) || texto(d?.titulo)),
         nota: 'A partir de tu árbol del problema, tu título y tu objetivo general.',
@@ -125,7 +126,7 @@ const ArbolObjetivos = ({ onNavigate }) => {
             slides={SLIDES}
             label="Árbol de objetivos"
             renderSlide={renderSlide}
-            finish={onNavigate ? { label: 'Redactar los objetivos', onClick: () => onNavigate('objetivos') } : null}
+            finish={onNavigate ? { label: 'Plantear el problema', onClick: () => onNavigate('planteamiento') } : null}
         />
     );
 };

@@ -265,7 +265,7 @@ test('el árbol del problema entra como figura al final del planteamiento y se c
     assert.ok(svg.startsWith('<svg') && svg.includes('Alta inasistencia') && w === 1200 && h > 200);
 });
 
-test('el árbol de objetivos entra como figura al final de Objetivos, con su párrafo', async () => {
+test('el árbol de objetivos va debajo del árbol del problema, en el planteamiento', async () => {
     const { documentoNumerado } = await import('../src/services/projectDoc.js');
     const { arbolSvg, leerArbolObjetivos } = await import('../src/services/arbol.js');
     const datos = { ...proyecto, arbolObjetivos: { problema: 'Reducir la inasistencia a citas', causas: ['Los pacientes recuerdan su cita'], efectos: ['Se aprovechan los cupos', 'Disminuye la espera'] } };
@@ -280,7 +280,12 @@ test('el árbol de objetivos entra como figura al final de Objetivos, con su pá
     assert.ok(svg.includes('MEDIOS') && svg.includes('FINES') && !svg.includes('CAUSAS'));
     // Sin hacerlo en su página no hay figura, aunque exista el objetivo general.
     assert.ok(!buildDocument(proyecto).find((s) => s.id === 'objetivos').content.some((b) => b.type === 'figure'));
-    // Con los dos árboles, se numeran en el orden del documento: problema (planteamiento) y luego objetivos.
+    // Con texto en el planteamiento, los dos árboles van juntos allí, antes del cierre, y Objetivos queda sin figura.
+    const junto = documentoNumerado(buildDocument({ ...datos, planteamiento: 'Contexto.\n\nPor lo anterior, resulta necesario investigar.', planteamientoForm: { cierre: 'Por lo anterior, resulta necesario investigar.' }, arbol: { problema: 'P', causas: ['C'], efectos: ['E'] } }));
+    const plan = junto.find((s) => s.id === 'planteamiento').content.map((b) => (b.type === 'figure' ? b.caption : b.type === 'heading' ? 'TITULO' : b.text.slice(0, 22)));
+    assert.deepEqual(plan.slice(0, 6), ['Contexto.', 'La Figura 1 presenta e', 'Árbol del problema', 'La Figura 2 presenta e', 'Árbol de objetivos', 'Por lo anterior, resul']);
+    assert.ok(!junto.find((s) => s.id === 'objetivos').content.some((b) => b.type === 'figure'));
+    // Con los dos árboles, se numeran en ese orden: problema y luego objetivos.
     const ambos = documentoNumerado(buildDocument({ ...datos, planteamiento: 'Texto.', arbol: { problema: 'P', causas: ['C'], efectos: ['E'] } }));
     assert.deepEqual(ambos.flatMap((s) => s.content).filter((b) => b.type === 'figure').map((b) => `${b.rotulo} ${b.caption}`), ['Figura 1 Árbol del problema', 'Figura 2 Árbol de objetivos']);
 });

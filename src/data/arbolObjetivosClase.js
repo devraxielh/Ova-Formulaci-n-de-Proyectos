@@ -116,13 +116,13 @@ export const SLIDES = construccionPrimero([
     },
     {
         id: 'usos', section: 'pasos', min: 3, title: 'Del árbol a tus objetivos',
-        lead: ['El árbol de objetivos es el puente entre el problema y lo que vas a hacer. En PROJECTSIA, además, la figura entra sola en la sección de Objetivos.'],
+        lead: ['El árbol de objetivos es el puente entre el problema y lo que vas a hacer. En PROJECTSIA, además, la figura entra sola en tu documento, justo debajo del árbol del problema.'],
         panel: {
             type: 'table', title: 'Para qué te sirve cada nivel', head: ['Del árbol', 'Sale'], rows: [
                 ['Objetivo central', 'Tu **objetivo general**.'],
                 ['Medios', 'Tus **objetivos específicos** (elige los que sí puedes cumplir).'],
                 ['Fines', 'Los argumentos de la **justificación** y el **impacto** esperado.'],
-                ['La figura', 'La **Figura** «Árbol de objetivos» dentro de Objetivos.'],
+                ['La figura', 'La **Figura** «Árbol de objetivos», debajo del árbol del problema.'],
             ],
         },
     },

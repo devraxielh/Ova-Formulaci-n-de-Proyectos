@@ -99,7 +99,7 @@ const ArbolProblema = ({ onNavigate }) => {
             slides={SLIDES}
             label="Árbol del problema"
             renderSlide={renderSlide}
-            finish={onNavigate ? { label: 'Plantear el problema', onClick: () => onNavigate('planteamiento') } : null}
+            finish={onNavigate ? { label: 'Armar el árbol de objetivos', onClick: () => onNavigate('arbolobjetivos') } : null}
         />
     );
 };

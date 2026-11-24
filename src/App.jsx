@@ -402,16 +402,6 @@ function App() {
                     </button>
 
                     <button
-                        className={`nav-button ${activeTab === 'planteamiento' ? 'active' : ''} ${doneTabs.has('planteamiento') ? 'nav-button--done' : ''}`}
-                        onClick={() => handleTabChange('planteamiento')}
-                        title="Planteamiento Problema"
-                    >
-                        <FileText size={20} />
-                        <span>Planteamiento Problema</span>
-                        {doneTabs.has('planteamiento') && <CheckCircle2 size={16} className="nav-done-check" aria-label="completado" />}
-                    </button>
-
-                    <button
                         className={`nav-button ${activeTab === 'arbolobjetivos' ? 'active' : ''} ${doneTabs.has('arbolobjetivos') ? 'nav-button--done' : ''}`}
                         onClick={() => handleTabChange('arbolobjetivos')}
                         title="Árbol de objetivos"
@@ -419,6 +409,16 @@ function App() {
                         <GitFork size={20} />
                         <span>Árbol de objetivos</span>
                         {doneTabs.has('arbolobjetivos') && <CheckCircle2 size={16} className="nav-done-check" aria-label="completado" />}
+                    </button>
+
+                    <button
+                        className={`nav-button ${activeTab === 'planteamiento' ? 'active' : ''} ${doneTabs.has('planteamiento') ? 'nav-button--done' : ''}`}
+                        onClick={() => handleTabChange('planteamiento')}
+                        title="Planteamiento Problema"
+                    >
+                        <FileText size={20} />
+                        <span>Planteamiento Problema</span>
+                        {doneTabs.has('planteamiento') && <CheckCircle2 size={16} className="nav-done-check" aria-label="completado" />}
                     </button>
 
                     <button

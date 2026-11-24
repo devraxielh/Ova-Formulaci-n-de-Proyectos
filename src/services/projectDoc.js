@@ -112,36 +112,44 @@ const money = (value) => new Intl.NumberFormat('es-CO', { style: 'currency', cur
 // Identificador de la figura del árbol: sirve para citarla («ver Figura 1») y para entregar su imagen a Word y PDF.
 export const ARBOL_ID = 'arbolfig';
 
-// La figura va dentro del planteamiento, justo antes de su «Párrafo de cierre» (la parte 5 del constructor):
+// Las figuras de los árboles van dentro del planteamiento, justo antes de su «Párrafo de cierre» (la parte 5 del constructor):
 // así el texto cierra con la necesidad de investigar y no con una figura. Si el planteamiento no tiene cierre
 // (o se escribió de otra forma), va al final del texto. La precede un párrafo que la presenta y la explica
 // (la marca [[arbolfig]] se cambia por su número: «La Figura 1 presenta…»). Si el estudiante escribió su propio
 // párrafo sin nombrar la figura, ese párrafo la cita solo («ver Figura 1»).
 // Solo entra cuando hay texto (una figura sola no da el planteamiento por hecho) y el árbol está completo.
-const conArbol = (d, blocks) => {
-    const arbol = leerArbol(d);
-    if (!blocks.length || !arbolCompleto(arbol)) return blocks;
+// Párrafo de presentación y figura de un árbol. `id` es su marca para citarla; `leyenda`, el título de la figura.
+const bloquesDeArbol = (arbol, id, leyenda) => {
     const { w, h } = arbolSvg(arbol);
-    const propia = Boolean(arbol.explicacion);
-    const presentacion = { type: 'paragraph', text: propia ? arbol.explicacion.replace(/\b[Ll]a figura\b(?! \d)/, (m) => `${m.charAt(0)}a [[${ARBOL_ID}]]`) : explicacionArbol(arbol, `La [[${ARBOL_ID}]]`), citaDe: [ARBOL_ID] };
-    const figura = { type: 'figure', elementoId: ARBOL_ID, fileId: ARBOL_ID, arbol: { problema: arbol.problema, causas: arbol.causas, efectos: arbol.efectos }, caption: 'Árbol del problema', nota: 'Elaboración propia.', w, h };
+    const presentacion = { type: 'paragraph', text: arbol.explicacion ? arbol.explicacion.replace(/\b[Ll]a figura\b(?! \d)/, (m) => `${m.charAt(0)}a [[${id}]]`) : explicacionArbol(arbol, `La [[${id}]]`), citaDe: [id] };
+    const figura = { type: 'figure', elementoId: id, fileId: id, arbol: { ...(arbol.tipo ? { tipo: arbol.tipo } : {}), problema: arbol.problema, causas: arbol.causas, efectos: arbol.efectos }, caption: leyenda, nota: 'Elaboración propia.', w, h };
+    return [presentacion, figura];
+};
+
+// Árbol de objetivos: va justo debajo del árbol del problema, dentro del planteamiento (el problema y, enseguida,
+// su versión en positivo). Solo cuenta el que el estudiante armó en su página y está completo.
+export const ARBOL_OBJ_ID = 'arbolobj';
+const bloquesArbolObjetivos = (d) => {
+    const arbol = leerArbolObjetivos(d);
+    return arbol.propio && arbolCompleto(arbol) ? bloquesDeArbol(arbol, ARBOL_OBJ_ID, 'Árbol de objetivos') : [];
+};
+
+const conArbol = (d, blocks) => {
+    if (!blocks.length) return blocks;
+    const arbol = leerArbol(d);
+    const arboles = [...(arbolCompleto(arbol) ? bloquesDeArbol(arbol, ARBOL_ID, 'Árbol del problema') : []), ...bloquesArbolObjetivos(d)];
+    if (!arboles.length) return blocks;
     // El cierre son los últimos párrafos del texto, tantos como tenga la parte «cierre» del constructor.
     const parrafosCierre = text(d.planteamientoForm?.cierre).split(/\n\s*\n/).filter((p) => p.trim()).length;
     const indices = blocks.map((b, k) => (b.type === 'paragraph' ? k : -1)).filter((k) => k >= 0);
     const corte = parrafosCierre > 0 && indices.length > parrafosCierre ? indices[indices.length - parrafosCierre] : blocks.length;
-    return [...blocks.slice(0, corte), presentacion, figura, ...blocks.slice(corte)];
+    return [...blocks.slice(0, corte), ...arboles, ...blocks.slice(corte)];
 };
 
-// Árbol de objetivos: va al final de la sección Objetivos, con su párrafo de presentación. Igual que el del
-// problema, solo entra si la sección ya tiene contenido y el árbol está completo.
-export const ARBOL_OBJ_ID = 'arbolobj';
+// Si el planteamiento aún no tiene texto, el árbol de objetivos no se pierde: queda al final de Objetivos.
 const conArbolObjetivos = (d, blocks) => {
-    const arbol = leerArbolObjetivos(d);
-    if (!blocks.length || !arbol.propio || !arbolCompleto(arbol)) return blocks;
-    const { w, h } = arbolSvg(arbol);
-    const presentacion = { type: 'paragraph', text: arbol.explicacion ? arbol.explicacion.replace(/\b[Ll]a figura\b(?! \d)/, (m) => `${m.charAt(0)}a [[${ARBOL_OBJ_ID}]]`) : explicacionArbol(arbol, `La [[${ARBOL_OBJ_ID}]]`), citaDe: [ARBOL_OBJ_ID] };
-    const figura = { type: 'figure', elementoId: ARBOL_OBJ_ID, fileId: ARBOL_OBJ_ID, arbol: { tipo: 'objetivos', problema: arbol.problema, causas: arbol.causas, efectos: arbol.efectos }, caption: 'Árbol de objetivos', nota: 'Elaboración propia.', w, h };
-    return [...blocks, presentacion, figura];
+    if (!blocks.length || cuerpo(d.planteamiento).length) return blocks;
+    return [...blocks, ...bloquesArbolObjetivos(d)];
 };
 const arbolObjetivosBlocks = (d) => {
     const arbol = leerArbolObjetivos(d);
@@ -415,7 +423,7 @@ export const SECTIONS = [
 ];
 
 // Orden en que se construye el proyecto (menú y avance). El documento sigue el orden de SECTIONS.
-export const BUILD_ORDER = ['ideacion', 'titulo', 'pregunta', 'arbol', 'planteamiento', 'arbolobjetivos', 'objetivos', 'justificacion', 'alcances', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'introduccion', 'resumen', 'referencias'];
+export const BUILD_ORDER = ['ideacion', 'titulo', 'pregunta', 'arbol', 'arbolobjetivos', 'planteamiento', 'objetivos', 'justificacion', 'alcances', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'introduccion', 'resumen', 'referencias'];
 
 export const buildDocument = (data) => SECTIONS.map((section) => ({ ...section, content: section.blocks(data || {}) }));
 
