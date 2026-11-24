@@ -194,6 +194,41 @@ const sugerirAnalisis = async ({ objetivos, enfoque, tipo, diseno, instrumentos,
     return plan;
 };
 
+// Instrumentos de recolección que corresponden al proyecto: técnica, instrumento, a quién se aplica, para qué
+// objetivo y cómo se valida. La técnica y la validación se eligen de las listas de la plataforma.
+const sugerirInstrumentos = async ({ data, especificos, enfoque, tipo, diseno, poblacion, muestreo, analisis }) => {
+    const t = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
+    const general = t(data.objetivoGeneral) || t(partesObjetivos(data.objetivos).general);
+    const r = await groq.chat.completions.create({
+        messages: [
+            { role: 'system', content: 'Eres asesor metodológico. Propones los instrumentos de recolección de información que un proyecto necesita para lograr sus objetivos, en coherencia con su enfoque, su tipo de investigación, su diseño, su población y su plan de análisis. Las técnicas y los métodos de validación los eliges solo de las listas que recibes, copiados letra por letra. No inventas instrumentos con nombre propio ni autores: describes el instrumento de forma genérica. Respondes solo JSON válido en español.' },
+            { role: 'user', content: `PROYECTO\nTítulo: ${t(data.titulo) || '(sin título)'}\nPregunta: ${t(data.pregunta) || '(sin definir)'}\nObjetivo general: ${general || '(sin definir)'}\nObjetivos específicos:\n${especificos.length ? especificos.map((x, i) => `${i + 1}. ${x}`).join('\n') : '(sin definir)'}\nEnfoque: ${enfoque || '(sin definir)'}\nTipo de investigación: ${tipo || '(sin definir)'}\nDiseño: ${diseno || '(sin definir)'}\nPoblación: ${t(poblacion) || '(sin describir)'}\nMuestreo: ${muestreo || '(sin definir)'}\nPlan de análisis: ${analisis || '(sin definir)'}\n\nTÉCNICAS (elige de aquí)\n${TECNICAS.map((x) => `- ${x.tecnica} (instrumento habitual: ${x.instrumento})`).join('\n')}\n\nMÉTODOS DE VALIDEZ Y CONFIABILIDAD (elige de aquí)\n${VALIDACION_DETALLE.map((v) => `- ${v.id}: ${v.tipo || v.titulo}`).join('\n')}\n\nPropón entre uno y tres instrumentos: solo los necesarios para cubrir todos los objetivos específicos, sin repetir técnica. Criterios: con enfoque cuantitativo, instrumentos que den datos numéricos (encuesta con preguntas cerradas o escala, prueba, ficha de registro de datos); con enfoque cualitativo, entrevista, grupo focal u observación; con enfoque mixto, al menos uno de cada clase. El instrumento debe dar los datos que pide la técnica del plan de análisis. Validación: alfa de Cronbach solo para cuestionarios con escala; triangulación solo en instrumentos cualitativos; juicio de expertos y prueba piloto sirven para casi todos.\n- "tecnica": copia exacta de una técnica de la lista.\n- "instrumento": descripción corta del instrumento, en minúscula y sin punto (por ejemplo «cuestionario estructurado con preguntas cerradas y escala tipo Likert»). No digas cuántas preguntas tiene.\n- "aplicaA": a quiénes se aplica, en minúscula, con la población del proyecto.\n- "objetivo": número del objetivo específico al que sirve (1, 2, 3…) o 0 si sirve a todos.\n- "validaciones": lista de uno o dos métodos, copiados de la lista.\n- "porque": una frase (12 a 25 palabras) que diga por qué ese instrumento da la información que el objetivo necesita. Empieza en minúscula, sin punto final.\n\nResponde exactamente con este JSON: {"instrumentos": [{"tecnica": "…", "instrumento": "…", "aplicaA": "…", "objetivo": 0, "validaciones": ["…"], "porque": "…"}]}` },
+        ],
+        temperature: 0.2,
+        max_tokens: 1800,
+        response_format: { type: 'json_object' },
+    });
+    const content = r.choices?.[0]?.message?.content || '';
+    const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+    const sinPunto = (v) => t(v).replace(/[.\s]+$/, '');
+    const vistas = new Set();
+    const lista = (Array.isArray(json.instrumentos) ? json.instrumentos : []).map((x) => {
+        const tecnica = TECNICAS.find((y) => y.tecnica.toLowerCase() === t(x?.tecnica).toLowerCase())?.tecnica || '';
+        const k = Math.round(Number(x?.objetivo) || 0);
+        const validaciones = (Array.isArray(x?.validaciones) ? x.validaciones : []).map((v) => VALIDACION_DETALLE.find((d) => d.id.toLowerCase() === t(v).toLowerCase() || d.titulo.toLowerCase() === t(v).toLowerCase())?.id).filter(Boolean).slice(0, 2);
+        return {
+            tecnica,
+            instrumento: sinPunto(x?.instrumento).slice(0, 140) || TECNICAS.find((y) => y.tecnica === tecnica)?.instrumento || '',
+            aplicaA: sinPunto(x?.aplicaA).slice(0, 140),
+            objetivo: k >= 1 && k <= especificos.length ? `el objetivo específico ${k}` : 'todos los objetivos específicos',
+            validaciones,
+            nota: sinPunto(x?.porque).slice(0, 220),
+        };
+    }).filter((x) => x.tecnica && !vistas.has(x.tecnica) && vistas.add(x.tecnica)).slice(0, 3);
+    if (!lista.length) throw new Error('vacio');
+    return lista;
+};
+
 const clean = (text) => String(text || '').trim().replace(/[\s.,;:]+$/, '');
 const lower = (text) => (text ? text.charAt(0).toLowerCase() + text.slice(1) : '');
 const capital = (text) => (text ? text.charAt(0).toUpperCase() + text.slice(1) : '');
@@ -630,6 +665,61 @@ const Constructor = ({ intro, onNavigate }) => {
         if (!it.id) setFila('instrumentos', f.instrumentos, i, { id });
         setArmar(id);
     };
+    // Instrumentos sugeridos por la IA. Una fila «libre» es la que el estudiante no ha tocado (sin destinatarios ni
+    // objetivo): esas se llenan conservando su id, para no perder el instrumento armado que tengan asociado.
+    // Las filas ya trabajadas no se tocan ni se borran; lo que sobre de la sugerencia se agrega al final.
+    const [sugInst, setSugInst] = useState('');
+    // Tampoco es libre la fila que ya tiene su encuesta o guía armada.
+    const filaLibre = (it) => !clean(it.aplicaA) && !clean(it.objetivo) && !s.armados.some((a) => a && it.id && a.filaId === it.id);
+    const sugerirInst = async () => {
+        setSugInst('pensando');
+        try {
+            const lista = await sugerirInstrumentos({
+                data: estado.data, especificos, enfoque, tipo, diseno,
+                poblacion: f.poblacion.descripcion, muestreo: f.poblacion.muestreo,
+                analisis: f.analisis.filter((x) => clean(x.tecnica)).map((x) => clean(x.tecnica)).join('; '),
+            });
+            // No se repite una técnica que el estudiante ya tiene trabajada.
+            const ocupadas = new Set(f.instrumentos.filter((it) => !filaLibre(it)).map((it) => it.tecnica));
+            const nuevas = lista.filter((x) => !ocupadas.has(x.tecnica));
+            // Cada sugerencia va a una fila libre: primero a la de su misma técnica, si no a cualquiera libre.
+            const usadas = new Set();
+            const destino = new Map(); // id de la fila → sugerencia
+            const resto = [];
+            nuevas.forEach((sug) => {
+                const libres = f.instrumentos.filter((it) => filaLibre(it) && !usadas.has(it.id));
+                const fila = libres.find((it) => it.tecnica === sug.tecnica) || libres[0];
+                if (fila) { usadas.add(fila.id); destino.set(fila.id, sug); } else resto.push({ id: uid(), ...sug, validez: sug.validaciones[0] || '' });
+            });
+            // A una fila ya trabajada (o con su instrumento armado) de la misma técnica solo se le completa lo que tenga vacío.
+            let completadas = 0;
+            const filas = f.instrumentos.map((it) => {
+                if (destino.has(it.id)) return { ...it, ...destino.get(it.id), validez: destino.get(it.id).validaciones[0] || '' };
+                const sug = lista.find((x) => x.tecnica === it.tecnica);
+                if (!sug || filaLibre(it)) return it;
+                const patch = {};
+                if (!clean(it.aplicaA) && sug.aplicaA) patch.aplicaA = sug.aplicaA;
+                if (!clean(it.objetivo)) patch.objetivo = sug.objetivo;
+                if (validacionesDe(it).length === 0 && sug.validaciones.length) { patch.validaciones = sug.validaciones; patch.validez = sug.validaciones[0]; }
+                if (!Object.keys(patch).length) return it;
+                completadas += 1;
+                return { ...it, ...patch, nota: sug.nota };
+            });
+            touch();
+            update({ instrumentos: [...filas, ...resto] });
+            setSugInst(nuevas.length || completadas ? '' : 'nada');
+        } catch {
+            setSugInst('fallo');
+        }
+    };
+    const yaSugirioInst = useRef(false);
+    useEffect(() => {
+        if (tab !== 'instrumentos' || yaSugirioInst.current || !f.instrumentos.every(filaLibre) || f.instrumentos.some((it) => it.nota)) return;
+        if (!especificos.length && !String(estado.data.pregunta || '').trim()) return;
+        yaSugirioInst.current = true;
+        sugerirInst();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tab]);
     const toggleValidacion = (index, id) => {
         const actual = validacionesDe(f.instrumentos[index]);
         const next = actual.includes(id) ? actual.filter((x) => x !== id) : [...actual, id];
@@ -850,6 +940,12 @@ const Constructor = ({ intro, onNavigate }) => {
 
                     {tab === 'instrumentos' && (
                         <div className="mar-fichas">
+                            <div className="met-razon">
+                                <button type="button" className="ide-btn ide-btn--ghost" disabled={sugInst === 'pensando'} onClick={sugerirInst}>
+                                    {sugInst === 'pensando' ? <Loader2 size={15} className="met-gira" /> : <Sparkles size={15} />} {sugInst === 'pensando' ? 'Eligiendo según tu proyecto…' : 'Sugerir instrumentos para mi proyecto'}
+                                </button>
+                                <span>{sugInst === 'fallo' ? 'No se pudo sugerir: inténtalo de nuevo.' : sugInst === 'nada' ? 'Tus instrumentos ya cubren lo que se sugeriría para este proyecto.' : `Según tus objetivos, tu enfoque${enfoque ? ` ${enfoque.toLowerCase()}` : ''}, tu diseño, tu población y tu plan de análisis. No cambia los que ya trabajaste.`}</span>
+                            </div>
                             {f.instrumentos.map((it, i) => (
                                 <div className="input-group pla-part mar-grid" key={it.id || i}>
                                     <label className="mar-campo">
@@ -868,6 +964,7 @@ const Constructor = ({ intro, onNavigate }) => {
                                             <option value="todos los objetivos específicos">Todos</option>
                                         </select>
                                     </label>
+                                    {it.nota && <p className="mar-wide met-nota-fila"><Sparkles size={13} aria-hidden="true" /> Sugerido porque {it.nota}.</p>}
                                     <div className="mar-campo mar-wide met-val">
                                         <span>Validez y confiabilidad (puedes elegir varios)</span>
                                         <div className="met-val-chips" role="group" aria-label={`Métodos de validación del instrumento ${i + 1}`}>
