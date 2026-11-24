@@ -1381,3 +1381,7 @@
 .ide-deck--modal .ide-slide { align-items: start; padding: clamp(1rem, 2.5cqi, 2.25rem); }
 /* El marco de foco de las pestañas va por dentro: la fila se desplaza y lo recortaba. */
 .ide-deck .ide-section:focus-visible { outline-offset: -2px; }
+/* Modo presentación: el contenedor de la ventana va a pantalla completa */
+.ide-pres-full { height: 100%; }
+.ide-pres-full:fullscreen { background: #fff; }
+.ide-pres-full:fullscreen .ide-stage { border: none; border-radius: 0; }

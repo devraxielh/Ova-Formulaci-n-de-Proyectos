@@ -161,7 +161,7 @@ const fillExample = (event) => {
  * - la «Presentación», en una ventana grande: la teoría de la clase (Apertura … Cierre).
  * `onFuera(seccion)` avisa cuando se pide una sección que está en el otro mazo.
  */
-const Mazo = ({ sections, slides, label, renderSlide, finish, enModal = false, activo = true, seccionInicial, salto, onPresentacion, onFuera, onCerrar, totalClase, minutosDe }) => {
+const Mazo = ({ sections, slides, label, renderSlide, finish, enModal = false, activo = true, seccionInicial, salto, pantallaRef, onPresentacion, onFuera, onCerrar, totalClase, minutosDe }) => {
     // Abre siempre en su primera diapositiva (o en la sección pedida): no se recuerda dónde quedó la vez anterior.
     const [index, setIndex] = useState(() => Math.max(0, slides.findIndex((item) => item.section === seccionInicial)));
     const [direction, setDirection] = useState(1);
@@ -222,14 +222,15 @@ const Mazo = ({ sections, slides, label, renderSlide, finish, enModal = false, a
     }, [index, reduceMotion]);
 
     useEffect(() => {
-        const onChange = () => setIsFullscreen(document.fullscreenElement === stageRef.current);
+        const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement) && document.fullscreenElement === (pantallaRef?.current ?? stageRef.current));
+        onChange(); // la presentación ya llega en pantalla completa
         document.addEventListener('fullscreenchange', onChange);
         return () => document.removeEventListener('fullscreenchange', onChange);
     }, []);
 
     const toggleFullscreen = () => {
         if (document.fullscreenElement) document.exitFullscreen?.();
-        else stageRef.current?.requestFullscreen?.().catch(() => {});
+        else (pantallaRef?.current ?? stageRef.current)?.requestFullscreen?.().catch(() => {});
     };
 
     const slide = slides[index];
@@ -373,6 +374,7 @@ const SlideDeck = ({ sections, slides, label, renderSlide, finish }) => {
     const [presentacion, setPresentacion] = useState(null); // null = cerrada; { seccion } = abierta (en esa sección)
     const [irA, setIrA] = useState(null); // { seccion }: sección de trabajo pedida desde la presentación
     const dialog = useRef(null);
+    const pantalla = useRef(null);
 
     const trabajo = slides.filter((item) => DE_TRABAJO.has(item.section));
     const teoria = slides.filter((item) => !DE_TRABAJO.has(item.section));
@@ -387,8 +389,20 @@ const SlideDeck = ({ sections, slides, label, renderSlide, finish }) => {
         const el = dialog.current;
         if (!el) return;
         if (presentacion && !el.open) { el.showModal(); el.focus(); } // el foco va a la ventana, no a la primera pestaña
-        if (!presentacion && el.open) el.close();
+        if (!presentacion) {
+            if (el.open) el.close();
+            if (document.fullscreenElement && document.fullscreenElement === pantalla.current) document.exitFullscreen?.();
+        }
     }, [presentacion]);
+
+    // «Presentación» abre directamente en pantalla completa. Se pide dentro del mismo clic, que es cuando el navegador lo permite;
+    // si lo niega, la presentación queda como ventana grande. Un <dialog> no puede ir a pantalla completa: va su contenedor.
+    const abrir = (seccion) => {
+        const el = dialog.current;
+        if (el && !el.open) { el.showModal(); el.focus(); }
+        pantalla.current?.requestFullscreen?.().catch(() => {});
+        setPresentacion({ seccion });
+    };
 
     // Una clase sin secciones de trabajo (o sin teoría) se muestra como un solo mazo.
     if (trabajo.length === 0 || teoria.length === 0) return <Mazo {...comunes} sections={sections} slides={slides} finish={finish} />;
@@ -402,10 +416,11 @@ const SlideDeck = ({ sections, slides, label, renderSlide, finish }) => {
                 finish={finish}
                 activo={!presentacion}
                 salto={irA}
-                onPresentacion={() => setPresentacion({ seccion: teoria[0].section })}
-                onFuera={(seccion) => setPresentacion({ seccion })}
+                onPresentacion={() => abrir(teoria[0].section)}
+                onFuera={abrir}
             />
             <dialog ref={dialog} tabIndex={-1} className="ide-pres-modal" aria-label={`Presentación de la clase: ${label}`} onClose={() => setPresentacion(null)}>
+                <div ref={pantalla} className="ide-pres-full">
                 {presentacion && (
                     <Mazo
                         {...comunes}
@@ -413,11 +428,13 @@ const SlideDeck = ({ sections, slides, label, renderSlide, finish }) => {
                         sections={sections.filter((item) => !DE_TRABAJO.has(item.id))}
                         slides={teoria}
                         enModal
+                        pantallaRef={pantalla}
                         seccionInicial={presentacion.seccion}
                         onCerrar={() => setPresentacion(null)}
                         onFuera={(seccion) => { setPresentacion(null); setIrA({ seccion }); }}
                     />
                 )}
+                </div>
             </dialog>
         </>
     );
