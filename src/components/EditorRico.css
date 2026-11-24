@@ -4,8 +4,9 @@
 .rico-barra button { display: grid; place-items: center; width: 1.9rem; height: 1.9rem; border: 0; border-radius: 0.35rem; background: transparent; color: #334155; cursor: pointer; }
 .rico-barra button:hover { background: #e0e7ff; color: #3730a3; }
 .rico-barra i { width: 1px; height: 1.2rem; background: #cbd5e1; margin: 0 0.3rem; }
-.rico-texto { padding: 0.6rem 0.75rem; font-size: 1rem; line-height: 1.6; color: var(--text-primary, #0f172a); outline: none; overflow-wrap: anywhere; white-space: pre-wrap; max-height: 60vh; overflow-y: auto; }
-.rico-texto:empty::before { content: attr(data-placeholder); color: #94a3b8; pointer-events: none; }
+/* El editor suele ir dentro de una etiqueta en negrilla: su texto no la hereda. */
+.rico-texto { padding: 0.6rem 0.75rem; font-size: 1rem; font-weight: 400; line-height: 1.6; color: var(--text-primary, #0f172a); outline: none; overflow-wrap: anywhere; white-space: pre-wrap; max-height: 60vh; overflow-y: auto; }
+.rico-texto:empty::before { content: attr(data-placeholder); font-weight: 400; color: #94a3b8; pointer-events: none; }
 .rico-texto p, .rico-texto h4 { margin: 0; }
 .rico-texto h4 { font-size: 1rem; font-weight: 700; }
 .rico-texto ul, .rico-texto ol { margin: 0.2rem 0; padding-left: 1.5rem; }

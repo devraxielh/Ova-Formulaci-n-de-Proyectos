@@ -47,3 +47,7 @@
 /* De dónde salió la ficha (informativo: no pasa al documento) */
 .mar-origen { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; margin: 0.5rem 0 0; font-size: 0.82rem; color: #64748b; }
 .mar-origen a { color: #4338ca; word-break: break-word; }
+
+/* Dentro de una parte, la etiqueta del campo va arriba y el campo ocupa todo el ancho (no al lado, que lo estrecha). */
+.pla-part label.mar-campo { display: grid; align-items: stretch; gap: 0.25rem; }
+.pla-part p.mar-origen { font-size: 0.82rem; line-height: 1.4; }

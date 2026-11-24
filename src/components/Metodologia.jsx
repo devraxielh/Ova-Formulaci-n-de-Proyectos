@@ -19,6 +19,7 @@ import Instrumentos from './Instrumentos';
 import { preguntasDe } from '../services/instrumentos';
 import { Generica } from './deck/Contenido';
 import ValidacionModal from './ValidacionModal';
+import MuestreoModal from './MuestreoModal';
 import { VALIDACION_DETALLE } from '../data/validacion';
 import './Titulo.css';
 import './Planteamiento.css';
@@ -518,6 +519,7 @@ const Constructor = ({ intro, onNavigate }) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tab, enfoque]);
     const setPob = (patch) => { touch(); update({ poblacion: { ...f.poblacion, ...patch } }); };
+    const [verMuestreo, setVerMuestreo] = useState(false);
 
     // La primera vez: tipo según los alcances, población del título, una fila de análisis por específico y un cronograma base.
     useEffect(() => {
@@ -716,7 +718,19 @@ const Constructor = ({ intro, onNavigate }) => {
                                     <optgroup label="Probabilístico">{MUESTREOS.filter((m) => m.probabilistico).map((m) => <option key={m.id} value={m.id}>{m.id}</option>)}</optgroup>
                                     <optgroup label="No probabilístico">{MUESTREOS.filter((m) => !m.probabilistico).map((m) => <option key={m.id} value={m.id}>{m.id}</option>)}</optgroup>
                                 </select>
+                                <span className="mue-abrir">
+                                    <button type="button" className="ide-btn ide-btn--ghost" onClick={() => setVerMuestreo(true)}><BookOpenCheck size={15} /> Ver cada muestreo y sus ecuaciones</button>
+                                </span>
                             </label>
+                            <MuestreoModal
+                                open={verMuestreo}
+                                inicial={f.poblacion.muestreo}
+                                poblacion={f.poblacion}
+                                calc={calc}
+                                unidad={lower(clean(f.poblacion.unidad)) || 'persona'}
+                                onUsar={(patch) => setPob(patch)}
+                                onClose={() => setVerMuestreo(false)}
+                            />
                             <Campo className="mar-wide" id="met-inc" label="Criterios de inclusión" rows={2} value={f.poblacion.inclusion} onChange={(v) => setPob({ inclusion: v })} placeholder="Ej: mayores de 18 años, con al menos una cita programada en el periodo, que acepten participar" />
                             <Campo className="mar-wide" id="met-exc" label="Criterios de exclusión" rows={2} value={f.poblacion.exclusion} onChange={(v) => setPob({ exclusion: v })} placeholder="Ej: pacientes de urgencias u hospitalización, o con limitaciones para responder" />
                             {MUESTREOS.find((m) => m.id === f.poblacion.muestreo)?.probabilistico

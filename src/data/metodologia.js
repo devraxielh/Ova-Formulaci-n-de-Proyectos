@@ -1,5 +1,6 @@
 import { VALIDACION_DETALLE, VALIDACION_IDS, parrafoConDatos } from './validacion.js';
 import { preguntasDe, ubicacionDe } from '../services/instrumentos.js';
+import { repartoEstratos } from './muestreo.js';
 
 /*
  * Datos y redacción de la Metodología: enfoque, tipos, diseños, población y muestra,
@@ -135,6 +136,21 @@ export const redactarPoblacion = (p, calc) => {
         const conf = CONFIANZAS.find((c) => c.z === Number(calc.Z))?.label || '95 %';
         partes.push(`El tamaño de la muestra se calculó con la fórmula para población ${calc.finita ? 'finita' : 'infinita'}, con un nivel de confianza del ${conf} y un margen de error del ${Math.round(Number(calc.e) * 100)} %, lo que da una muestra de ${tamanoMuestra(calc)} ${lower(unidad)}.`);
         partes.push(`Se usa un muestreo probabilístico ${m.id}: ${m.def}.`);
+        // Datos guardados desde la ventana de muestreo: intervalo, reparto por estratos o conglomerados sorteados.
+        const n = tamanoMuestra(calc);
+        if (m.id === 'sistemático' && calc.finita && Number(calc.N) > 0 && n > 0) {
+            const k = Math.max(1, Math.floor(Number(calc.N) / n));
+            partes.push(`El intervalo de selección es k = ${Number(calc.N).toLocaleString('es-CO')} / ${n} ≈ ${k}: a partir de un arranque sorteado entre 1 y ${k}, se toma un elemento cada ${k} de la lista.`);
+        }
+        if (m.id === 'aleatorio estratificado') {
+            const { filas } = repartoEstratos(p.estratos, n);
+            if (filas.length >= 2) partes.push(`La muestra se reparte de forma proporcional al tamaño de cada estrato: ${filas.map((f) => `${f.nombre} (${f.n} de ${f.N.toLocaleString('es-CO')})`).join('; ')}.`);
+        }
+        if (m.id === 'por conglomerados') {
+            const M = Math.round(Number(p.conglomerados?.total) || 0);
+            const prom = Number(p.conglomerados?.promedio) || 0;
+            if (M > 0 && prom > 0) partes.push(`De los ${M.toLocaleString('es-CO')} conglomerados, con cerca de ${prom.toLocaleString('es-CO')} ${lower(unidad)} cada uno, se sortean ${Math.min(M, Math.ceil(n / prom))} y se estudia a todos sus integrantes.`);
+        }
     } else if (m) {
         partes.push(m.id.startsWith('censo')
             ? `Se trabaja con toda la población (censo): ${m.def}.`
