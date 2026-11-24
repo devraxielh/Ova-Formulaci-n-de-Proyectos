@@ -1323,3 +1323,19 @@
 .pro-cifras b small { font-size: 0.8rem; font-weight: 500; color: #64748b; }
 .pro-cifras span { font-size: 0.78rem; color: #64748b; }
 @media (prefers-reduced-motion: reduce) { .pro-tarjeta, .pro-anillo-valor { transition: none; } .pro-tarjeta:hover:not(:disabled) { transform: none; } }
+
+/* Coherencia: «Arreglar con IA» */
+.pro-coh-ia { display: grid; gap: 0.6rem; justify-items: start; }
+.pro-coh-gira { animation: pro-coh-gira 0.9s linear infinite; }
+@keyframes pro-coh-gira { to { transform: rotate(360deg); } }
+.pro-coh-fix .pro-coh-ok { display: flex; align-items: center; gap: 0.3rem; margin: 0; color: #047857; font-size: 0.88rem; font-weight: 600; }
+.pro-coh-propuesta { display: grid; gap: 0.6rem; width: 100%; padding: 0.75rem 0.85rem; border: 1px dashed #a5b4fc; border-radius: 0.6rem; background: #eef2ff; }
+.pro-coh-cambio { display: grid; gap: 0.3rem; padding: 0.55rem 0.7rem; border-radius: 0.5rem; background: #fff; }
+.pro-coh-cambio b { font-size: 0.82rem; color: #3730a3; }
+.pro-coh-fix .pro-coh-cambio p { margin: 0; font-size: 0.9rem; line-height: 1.45; }
+.pro-coh-cambio i { display: inline-block; min-width: 4.2rem; margin-right: 0.4rem; font-style: normal; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: #64748b; }
+.pro-coh-fix .pro-coh-antes { color: #64748b; text-decoration: line-through; text-decoration-color: #cbd5e1; }
+.pro-coh-fix .pro-coh-despues { color: #0f172a; }
+.pro-coh-despues i { color: #047857; }
+.pro-coh-decidir { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.8rem; }
+.pro-coh-propuesta small { color: #64748b; font-size: 0.8rem; }

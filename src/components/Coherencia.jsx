@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, Circle, Clipboard, Link2, X } from 'lucide-react';
 import { evaluarCoherencia } from '../services/coherencia';
+import Arreglar, { sePuedeArreglar } from './CoherenciaArreglar';
 import './Proyecto.css';
 
 const NOMBRE_TAB = {
@@ -86,6 +87,8 @@ const Coherencia = ({ data, onNavigate, compacto = false, enVentana = false, tit
                                             </button>
                                         </div>
                                     )}
+                                    {/* Solo en la vista del estudiante (con onNavigate): el administrador no cambia proyectos ajenos. */}
+                                    {onNavigate && sePuedeArreglar(check.id) && <Arreglar check={check} data={data} />}
                                     {onNavigate && (
                                         <button type="button" className="pro-btn pro-btn--ghost pro-coh-go" onClick={() => { setVentana(false); onNavigate(check.tab); }}>
                                             Ir a {NOMBRE_TAB[check.tab] || 'la sección'} <ArrowRight size={14} aria-hidden="true" />
