@@ -1225,22 +1225,24 @@ const OBRAS_CAMPOS = 'id,display_name,publication_year,authorships,primary_locat
 // En un filtro de OpenAlex la coma y la barra separan condiciones: se quitan del texto buscado.
 const paraFiltro = (texto) => String(texto || '').replace(/[^\p{L}\p{N}\s'-]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 100);
 
-const obrasDeTitulo = async (titulo, autor) => {
-    const filtro = [`title.search:${titulo}`, autor ? `raw_author_name.search:${autor}` : ''].filter(Boolean).join(',');
-    const res = await fetch(`https://api.openalex.org/works?filter=${encodeURIComponent(filtro)}&sort=cited_by_count:desc&per-page=3&select=${OBRAS_CAMPOS}`
+// Teorías: las más citadas (la obra fundacional). Conceptos: las más pertinentes al término y que traigan resumen,
+// porque la definición se saca de él; ordenar por citas traería estudios famosos de otros temas.
+const obrasDeTitulo = async (titulo, autor, concepto = false) => {
+    const filtro = [`title.search:${titulo}`, autor ? `raw_author_name.search:${autor}` : '', concepto ? 'has_abstract:true' : ''].filter(Boolean).join(',');
+    const res = await fetch(`https://api.openalex.org/works?filter=${encodeURIComponent(filtro)}${concepto ? '' : '&sort=cited_by_count:desc'}&per-page=3&select=${OBRAS_CAMPOS}`
         + `&api_key=${encodeURIComponent(OPENALEX_API_KEY)}`, { signal: AbortSignal.timeout(20000) });
     if (!res.ok) throw Object.assign(new Error(`openalex ${res.status}`), { status: res.status });
     return ((await res.json()).results || []).filter((w) => w.display_name);
 };
 
-const obrasDeTeoria = async ({ ingles, nombre, autor }) => {
-    const clave = `${ingles}|${nombre}|${autor}`.toLowerCase();
+const obrasDeTeoria = async ({ ingles, nombre, autor }, concepto) => {
+    const clave = `${concepto ? 'c' : 't'}|${ingles}|${nombre}|${autor}`.toLowerCase();
     const guardada = OBRAS_CACHE.get(clave);
     if (guardada && guardada.hasta > Date.now()) return guardada.obras;
     let delAutor = [];
     let otras = [];
     for (const titulo of [ingles, nombre].filter(Boolean)) {
-        [delAutor, otras] = await Promise.all([autor ? obrasDeTitulo(titulo, autor) : [], obrasDeTitulo(titulo, '')]);
+        [delAutor, otras] = await Promise.all([autor && !concepto ? obrasDeTitulo(titulo, autor) : [], obrasDeTitulo(titulo, '', concepto)]);
         if (delAutor.length || otras.length) break; // con el nombre en inglés basta; el español es el respaldo
     }
     const vistas = new Set();
@@ -1257,9 +1259,10 @@ app.post('/api/buscar/teorias', requireUser, searchLimit, async (req, res) => {
     const teorias = (Array.isArray(req.body?.teorias) ? req.body.teorias : []).slice(0, 6)
         .map((t) => ({ ingles: paraFiltro(t?.ingles), nombre: paraFiltro(t?.nombre), autor: paraFiltro(t?.autor).split(' ').at(-1) || '' }))
         .filter((t) => (t.ingles || t.nombre).length >= 3);
+    const concepto = req.body?.tipo === 'concepto';
     if (!teorias.length) return res.status(400).json({ error: 'Falta el nombre de la teoría.' });
     try {
-        const items = await Promise.all(teorias.map((t) => obrasDeTeoria(t).then((obras) => ({ obras }), (error) => {
+        const items = await Promise.all(teorias.map((t) => obrasDeTeoria(t, concepto).then((obras) => ({ obras }), (error) => {
             if (error?.status === 429) throw error;
             return { obras: [], fallo: true }; // una teoría que falla no tumba a las demás
         })));

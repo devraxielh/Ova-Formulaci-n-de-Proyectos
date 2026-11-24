@@ -199,7 +199,7 @@ const FICHA_DE = {
         base: (ref) => ({ ...VACIO.antecedente, autor: autorCita(ref), anio: ref.anio, titulo: ref.titulo, ambito: 'Internacional' }),
     },
     teorico: {
-        tipo: 'teoria', nombre: 'teoría', buscar: 'Buscar teorías y modelos en artículos', lista: 'teorias', max: 5,
+        tipo: 'teoria', nombre: 'teoría', lista: 'teorias', max: 5,
         campos: ['nombre', 'postulado'], reemplaza: ['autor', 'anio'],
         base: (ref) => ({ ...VACIO.teoria, autor: autorCita(ref), anio: ref.anio }),
     },
@@ -311,6 +311,23 @@ Responde exactamente con este JSON: {"postulado": "…", "relacion": "…"}` },
     };
 };
 
+// Definición de un concepto según el resumen de una obra. Si el resumen no lo define, queda vacía: no se le
+// atribuye al autor una definición que no es suya.
+const conceptoDesdeObra = async ({ termino, ref, resumen }) => {
+    const r = await groq.chat.completions.create({
+        messages: [
+            { role: 'system', content: 'Ayudas a un estudiante a fichar la definición de un concepto para su marco conceptual. Te basas únicamente en el resumen (abstract) que recibes: la definición debe ser la que el resumen da o la forma en que el resumen entiende el concepto. No completas con lo que tú sabes ni inventas. La definición debe ser general: válida para el concepto en cualquier estudio, no la descripción del caso, la muestra o el procedimiento particular de ese artículo. Si el resumen no permite decir qué es el concepto en general, dejas "definicion" como cadena vacía. Escribes en español. Respondes solo JSON válido.' },
+            { role: 'user', content: `CONCEPTO: ${termino}\nOBRA: ${ref.titulo} (${ref.autores || 's. a.'}, ${ref.anio || 's. f.'})\nResumen: ${String(resumen).slice(0, 3500)}\n\n- "definicion": qué es ese concepto según el resumen. Una o dos frases que empiecen en minúscula, sin repetir el término al comienzo. Ejemplo solo de forma: «abandono de los estudios antes de obtener el título». Cadena vacía si el resumen no lo define ni lo explica.\nEl ejemplo solo muestra la forma: no copies su contenido. Sin punto final.\n\nResponde exactamente con este JSON: {"definicion": "…"}` },
+        ],
+        temperature: 0.2,
+        max_tokens: 400,
+        response_format: { type: 'json_object' },
+    });
+    const content = r.choices?.[0]?.message?.content || '';
+    const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+    return clean(String(json.definicion ?? '')).replace(/[.\s]+$/, '').replace(/^(?:se define como|es|son|se entiende como)\s+/i, '').slice(0, 600);
+};
+
 const useMarcoState = () => {
     const [form, setForm] = useProjectField('marcoForm', MARCO_FORM);
     const [tituloForm] = useProjectField('tituloForm', null);
@@ -413,15 +430,23 @@ const Constructor = ({ intro, onNavigate }) => {
             return 'vacia'; // sin IA: queda la ficha con lo que se sabía del artículo
         }
     };
+    // Pone una ficha nueva en la primera que esté libre (o al final). Parte siempre de lo último guardado:
+    // así dos «Usar» seguidos no se pisan.
+    const ponerFicha = (lista, ficha, max, estaLibre) => {
+        touch();
+        setForm((prev) => {
+            const base = { ...MARCO_FORM, ...(prev || {}) };
+            const actuales = Array.isArray(base[lista]) && base[lista].length ? base[lista] : MARCO_FORM[lista];
+            if (actuales.some((x) => x.fuente === ficha.fuente)) return base;
+            const libre = actuales.findIndex(estaLibre);
+            return { ...base, [lista]: libre >= 0 ? actuales.map((x, i) => (i === libre ? ficha : x)) : [...actuales, ficha].slice(0, max) };
+        });
+    };
     // «Usar esta obra» de «Sugerir teorías»: el nombre viene de la propuesta; el autor y el año, de la obra encontrada.
     const usarTeoria = async ({ nombre, ref, resumen, prestado }) => {
         const fuente = clean(ref.titulo);
         const ficha = { ...VACIO.teoria, nombre: clean(nombre), autor: autorCita(ref), anio: ref.anio, fuente };
-        const actuales = f.teorias;
-        if (!actuales.some((x) => x.fuente === fuente)) {
-            const libre = actuales.findIndex((x) => !clean(x.nombre) && !clean(x.postulado) && !clean(x.autor));
-            set('teorias')(libre >= 0 ? actuales.map((x, i) => (i === libre ? ficha : x)) : [...actuales, ficha].slice(0, 5));
-        }
+        ponerFicha('teorias', ficha, 5, (x) => !clean(x.nombre) && !clean(x.postulado) && !clean(x.autor));
         try {
             const datos = await teoriaDesdeObra({ nombre, ref, resumen, proyecto: { titulo, problema: clean(idea.problema), quien, donde } });
             if (!datos.postulado && !datos.relacion) return 'vacia';
@@ -439,6 +464,26 @@ const Constructor = ({ intro, onNavigate }) => {
             return clean(resumen).length < 80 ? 'ia' : prestado ? 'prestada' : 'llena';
         } catch {
             return 'vacia'; // sin IA: queda la ficha con el nombre, el autor y el año
+        }
+    };
+    // «Usar la definición de esta obra» de «Sugerir conceptos»: el término viene de la propuesta; la definición, del resumen.
+    const usarConcepto = async ({ nombre, ref, resumen }) => {
+        const fuente = `${clean(nombre)}|${clean(ref.titulo)}`;
+        const ficha = { ...VACIO.concepto, termino: clean(nombre), autor: autorCita(ref), anio: ref.anio, fuente };
+        ponerFicha('conceptos', ficha, 12, (x) => !clean(x.termino) && !clean(x.definicion) && !clean(x.autor));
+        if (clean(resumen).length < 80) return 'vacia';
+        try {
+            const definicion = await conceptoDesdeObra({ termino: nombre, ref, resumen });
+            if (!definicion) return 'vacia';
+            setForm((prev) => {
+                const base = { ...MARCO_FORM, ...(prev || {}) };
+                const lista = Array.isArray(base.conceptos) ? base.conceptos : [];
+                return { ...base, conceptos: lista.map((x) => (x.fuente === fuente && !clean(x.definicion) ? { ...x, definicion } : x)) };
+            });
+            touch();
+            return 'llena';
+        } catch {
+            return 'vacia';
         }
     };
     const save = () => {
@@ -495,9 +540,19 @@ const Constructor = ({ intro, onNavigate }) => {
                     )}
                     {tab === 'teorico' && (
                         <SugerirTeorias
+                            key="teorias"
                             proyecto={{ titulo, problema: clean(idea.problema), pregunta: clean(pregunta), quien, donde }}
                             yaTiene={f.teorias.map((t) => clean(t.nombre)).filter(Boolean)}
                             onUsar={usarTeoria}
+                        />
+                    )}
+                    {tab === 'conceptual' && (
+                        <SugerirTeorias
+                            key="conceptos"
+                            tipo="concepto"
+                            proyecto={{ titulo, problema: clean(idea.problema), pregunta: clean(pregunta), quien, donde }}
+                            yaTiene={f.conceptos.map((c) => clean(c.termino)).filter(Boolean)}
+                            onUsar={usarConcepto}
                         />
                     )}
                     {tab === 'antecedentes' && (

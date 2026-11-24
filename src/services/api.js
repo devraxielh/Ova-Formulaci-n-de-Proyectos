@@ -45,7 +45,7 @@ export const api = {
     projectVersion: (id, tab = '') => request(`/projects/${id}/version?tab=${encodeURIComponent(tab)}`),
     forgot: (email) => request('/auth/forgot', { method: 'POST', body: { email } }),
     reset: (payload) => request('/auth/reset', { method: 'POST', body: payload }),
-    buscarTeorias: (teorias) => request('/buscar/teorias', { method: 'POST', body: { teorias } }),
+    buscarTeorias: (teorias, tipo = 'teoria') => request('/buscar/teorias', { method: 'POST', body: { teorias, tipo } }),
     buscarNormas:({ texto, fuente = 'normas' }) => request(`/buscar/normas?fuente=${fuente}&q=${encodeURIComponent(texto)}`),
     buscarArticulos: ({ texto, desde, idioma, fuente = 'openalex' }) => request(`/buscar/articulos?fuente=${fuente}&q=${encodeURIComponent(texto)}&desde=${desde}&idioma=${idioma}`),
     log: (payload) => request('/log', { method: 'POST', body: payload }),
