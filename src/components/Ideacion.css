@@ -1386,3 +1386,5 @@
 .ide-pres-full { height: 100%; }
 .ide-pres-full:fullscreen { background: #fff; }
 .ide-pres-full:fullscreen .ide-stage { border: none; border-radius: 0; }
+/* Barra inferior de la página: solo el botón de la siguiente herramienta, a la derecha */
+.ide-nav.ide-nav--solo { display: flex; justify-content: flex-end; }

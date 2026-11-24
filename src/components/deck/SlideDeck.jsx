@@ -166,6 +166,8 @@ const Mazo = ({ sections, slides, label, renderSlide, finish, enModal = false, a
     const [index, setIndex] = useState(() => Math.max(0, slides.findIndex((item) => item.section === seccionInicial)));
     const [direction, setDirection] = useState(1);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    // Mazo de la página en una clase con presentación aparte: se navega con las pestañas, no paso a paso.
+    const sinPasos = Boolean(onPresentacion);
     const reduceMotion = useReducedMotion();
     const stageRef = useRef(null);
     const slideRef = useRef(null);
@@ -202,7 +204,7 @@ const Mazo = ({ sections, slides, label, renderSlide, finish, enModal = false, a
     useEffect(() => {
         const onKey = (event) => {
             // Con la presentación abierta, las flechas solo mueven la presentación.
-            if (!activo) return;
+            if (!activo || sinPasos) return;
             if (event.altKey || event.ctrlKey || event.metaKey) return;
             if (event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
             if (event.key === 'ArrowRight' || event.key === 'PageDown') goTo(index + 1);
@@ -210,7 +212,7 @@ const Mazo = ({ sections, slides, label, renderSlide, finish, enModal = false, a
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [goTo, index, activo]);
+    }, [goTo, index, activo, sinPasos]);
 
     useEffect(() => {
         if (!didMount.current) {
@@ -314,6 +316,14 @@ const Mazo = ({ sections, slides, label, renderSlide, finish, enModal = false, a
                     </AnimatePresence>
                 </div>
 
+                {/* En la página (Construcción y Revisión) se cambia con las pestañas: sin Anterior/Siguiente; solo queda el paso a la siguiente herramienta. */}
+                {sinPasos ? (finish && (
+                    <nav className="ide-nav ide-nav--solo" aria-label="Siguiente paso">
+                        <button type="button" className="ide-btn ide-btn--primary" onClick={finish.onClick}>
+                            {finish.label} <ArrowRight size={16} />
+                        </button>
+                    </nav>
+                )) : (
                 <nav className="ide-nav" aria-label="Navegación de diapositivas">
                     <button type="button" className="ide-btn ide-btn--ghost" onClick={() => goTo(index - 1)} disabled={isFirst}>
                         <ArrowLeft size={16} /> Anterior
@@ -355,11 +365,12 @@ const Mazo = ({ sections, slides, label, renderSlide, finish, enModal = false, a
                         )}
                     </div>
                 </nav>
+                )}
             </section>
 
             {!enModal && (
                 <p className="ide-keys">
-                    {slides.length > 1 && <>Avanza con las teclas <kbd>←</kbd> y <kbd>→</kbd>. </>}En un campo vacío, <kbd>Tab</kbd> escribe el ejemplo.{onPresentacion ? ` La presentación de la clase dura ${totalClase - slides.reduce((sum, item) => sum + item.min, 0)} minutos.` : ''}
+                    {slides.length > 1 && !sinPasos && <>Avanza con las teclas <kbd>←</kbd> y <kbd>→</kbd>. </>}En un campo vacío, <kbd>Tab</kbd> escribe el ejemplo.{onPresentacion ? ` La presentación de la clase dura ${totalClase - slides.reduce((sum, item) => sum + item.min, 0)} minutos.` : ''}
                 </p>
             )}
         </div>
