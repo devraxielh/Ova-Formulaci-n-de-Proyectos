@@ -56,19 +56,61 @@ export const MUESTREOS = [
     { id: 'censo (toda la población)', probabilistico: false, def: 'se estudia a toda la población porque es pequeña y accesible' },
 ];
 
-export const TECNICAS_ANALISIS = [
-    'estadística descriptiva (frecuencias, porcentajes, media y desviación estándar)',
-    'tablas de contingencia y prueba chi cuadrado',
-    'correlación de Pearson o Spearman',
-    'comparación de grupos (t de Student o U de Mann-Whitney)',
-    'análisis de varianza (ANOVA)',
-    'regresión lineal o logística',
-    'análisis de contenido',
-    'análisis temático con codificación abierta y axial',
-    'triangulación de fuentes',
+// Técnicas de análisis por familia. Las nueve primeras frases se conservan tal cual: ya están guardadas en proyectos.
+export const TECNICAS_ANALISIS_GRUPOS = [
+    { grupo: 'Describir (cuantitativo)', items: [
+        'estadística descriptiva (frecuencias, porcentajes, media y desviación estándar)',
+        'medidas de tendencia central y dispersión (media, mediana, moda, rango y desviación estándar)',
+        'distribución de frecuencias con tablas y gráficos',
+        'análisis por dimensiones e ítems de la escala (puntajes y niveles)',
+    ] },
+    { grupo: 'Relacionar variables', items: [
+        'tablas de contingencia y prueba chi cuadrado',
+        'correlación de Pearson o Spearman',
+        'razón de probabilidades (odds ratio) con intervalos de confianza',
+        'regresión lineal o logística',
+        'regresión múltiple',
+    ] },
+    { grupo: 'Comparar grupos o momentos', items: [
+        'comparación de grupos (t de Student o U de Mann-Whitney)',
+        'análisis de varianza (ANOVA)',
+        'comparación antes y después (t para muestras relacionadas o prueba de Wilcoxon)',
+        'prueba de Kruskal-Wallis',
+    ] },
+    { grupo: 'Revisar los datos y el instrumento', items: [
+        'pruebas de normalidad (Shapiro-Wilk o Kolmogorov-Smirnov)',
+        'análisis de confiabilidad (alfa de Cronbach)',
+        'análisis factorial exploratorio',
+    ] },
+    { grupo: 'Cualitativo', items: [
+        'análisis de contenido',
+        'análisis temático con codificación abierta y axial',
+        'análisis del discurso',
+        'análisis narrativo',
+        'categorización y codificación con matriz de categorías',
+        'teoría fundamentada (codificación abierta, axial y selectiva)',
+        'análisis documental',
+    ] },
+    { grupo: 'Integrar y proponer', items: [
+        'triangulación de fuentes',
+        'triangulación de métodos (integración de resultados cuantitativos y cualitativos)',
+        'matriz DOFA',
+        'análisis de causas (diagrama de Ishikawa o árbol de problemas)',
+        'priorización de alternativas con matriz de criterios',
+        'validación de la propuesta por juicio de expertos',
+        'análisis de costo-beneficio',
+    ] },
 ];
+export const TECNICAS_ANALISIS = TECNICAS_ANALISIS_GRUPOS.flatMap((g) => g.items);
 
-export const SOFTWARE = ['Excel', 'SPSS', 'R', 'Jamovi', 'JASP', 'Atlas.ti', 'NVivo', 'Taguette'];
+export const SOFTWARE_GRUPOS = [
+    { grupo: 'Estadística, gratuitos', items: ['Jamovi', 'JASP', 'R', 'RStudio', 'Python (pandas y SciPy)', 'PSPP', 'Epi Info'] },
+    { grupo: 'Estadística, con licencia', items: ['SPSS', 'Stata', 'Minitab', 'SAS'] },
+    { grupo: 'Hojas de cálculo', items: ['Excel', 'Google Sheets', 'LibreOffice Calc'] },
+    { grupo: 'Cualitativo', items: ['Atlas.ti', 'NVivo', 'MAXQDA', 'Taguette', 'QDA Miner Lite'] },
+    { grupo: 'Gráficos y tableros', items: ['Power BI', 'Tableau Public'] },
+];
+export const SOFTWARE = SOFTWARE_GRUPOS.flatMap((g) => g.items);
 
 export const TECNICAS = [
     { tecnica: 'Encuesta', instrumento: 'cuestionario' },

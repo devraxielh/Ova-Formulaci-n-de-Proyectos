@@ -11,7 +11,7 @@ import { groq } from '../services/api';
 import { partesObjetivos } from '../services/coherencia';
 import { TIPO_ALCANCE } from '../data/ejemplos';
 import {
-    CATEGORIAS, CONFIANZAS, DISENOS, ENFOQUES, FASES, FUENTES, MUESTREOS, SOFTWARE, TECNICAS, TECNICAS_ANALISIS, TIPOS, VALIDACIONES,
+    CATEGORIAS, CONFIANZAS, DISENOS, ENFOQUES, FASES, FUENTES, MUESTREOS, SOFTWARE, SOFTWARE_GRUPOS, TECNICAS, TECNICAS_ANALISIS, TECNICAS_ANALISIS_GRUPOS, TIPOS, VALIDACIONES,
     periodoLabel, redactarAnalisis, estadoValidacion, validacionesDe, redactarDiseno, redactarEnfoque, redactarInstrumentos, redactarPoblacion, redactarTipo, tamanoMuestra,
 } from '../data/metodologia';
 import { SECTIONS, SLIDES } from '../data/metodologiaClase';
@@ -172,6 +172,26 @@ const recomendarDiseno = async ({ tipo, ...proyecto }) => {
         .map((d) => ({ diseno: cual(d?.diseno), porque: sinPunto(d?.porque).replace(/^\p{Lu}(?=\p{Ll})/u, (l) => l.toLowerCase()) }))
         .filter((d) => d.diseno && d.diseno !== diseno && d.porque.length > 15);
     return { diseno, razon, descartados };
+};
+
+// Plan de análisis: para cada objetivo específico, la técnica y el software que le corresponden, elegidos de las listas.
+const sugerirAnalisis = async ({ objetivos, enfoque, tipo, diseno, instrumentos, data }) => {
+    const t = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
+    const r = await groq.chat.completions.create({
+        messages: [
+            { role: 'system', content: 'Eres asesor metodológico. Para cada objetivo específico de un proyecto eliges la técnica de análisis de datos y el software que le corresponden, en coherencia con el enfoque, el tipo de investigación, el diseño y los instrumentos con que se recogerán los datos. Solo puedes elegir opciones de las listas que recibes, copiadas letra por letra. Respondes solo JSON válido en español.' },
+            { role: 'user', content: `PROYECTO\nTítulo: ${t(data.titulo) || '(sin título)'}\nPregunta: ${t(data.pregunta) || '(sin definir)'}\nEnfoque: ${enfoque || '(sin definir)'}\nTipo de investigación: ${tipo || '(sin definir)'}\nDiseño: ${diseno || '(sin definir)'}\nInstrumentos de recolección: ${instrumentos || '(sin definir)'}\n\nOBJETIVOS ESPECÍFICOS\n${objetivos.map((o, i) => `${i + 1}. ${o}`).join('\n')}\n\nTÉCNICAS DE ANÁLISIS (elige una por objetivo)\n${TECNICAS_ANALISIS_GRUPOS.map((g) => `${g.grupo}:\n${g.items.map((x) => `- ${x}`).join('\n')}`).join('\n')}\n\nSOFTWARE (elige uno por objetivo)\n${SOFTWARE_GRUPOS.map((g) => `${g.grupo}: ${g.items.join(', ')}`).join('\n')}\n\nCriterios: guíate por el verbo del objetivo (identificar o caracterizar → describir; relacionar, asociar o determinar factores → relacionar variables; comparar o evaluar un cambio → comparar; comprender o interpretar experiencias → cualitativo; diseñar o proponer → integrar y proponer). La técnica debe ser posible con el enfoque y con los datos que dan los instrumentos: no elijas una técnica cualitativa si solo hay cuestionarios cerrados, ni una estadística si solo hay entrevistas. El software debe servir para esa técnica; prefiere uno gratuito salvo que la técnica pida otro, y usa el mismo en los objetivos del mismo tipo.\n- "tecnica": copia exacta de una técnica de la lista.\n- "software": copia exacta de un software de la lista.\n- "porque": una frase corta (10 a 22 palabras) que diga por qué esa técnica responde a ese objetivo. Empieza en minúscula, sin punto final.\n\nResponde exactamente con este JSON, un elemento por objetivo y en el mismo orden: {"plan": [{"tecnica": "…", "software": "…", "porque": "…"}]}` },
+        ],
+        temperature: 0.2,
+        max_tokens: 1800,
+        response_format: { type: 'json_object' },
+    });
+    const content = r.choices?.[0]?.message?.content || '';
+    const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+    const igual = (lista, v) => lista.find((x) => x.toLowerCase() === t(v).toLowerCase()) || '';
+    const plan = (Array.isArray(json.plan) ? json.plan : []).map((x) => ({ tecnica: igual(TECNICAS_ANALISIS, x?.tecnica), software: igual(SOFTWARE, x?.software), porque: t(x?.porque).replace(/[.\s]+$/, '').slice(0, 220) }));
+    if (plan.length !== objetivos.length || !plan.some((x) => x.tecnica)) throw new Error('vacio');
+    return plan;
 };
 
 const clean = (text) => String(text || '').trim().replace(/[\s.,;:]+$/, '');
@@ -522,6 +542,51 @@ const Constructor = ({ intro, onNavigate }) => {
     }, [tab, enfoque]);
     const setPob = (patch) => { touch(); update({ poblacion: { ...f.poblacion, ...patch } }); };
     const [verMuestreo, setVerMuestreo] = useState(false);
+    // Plan de análisis: la IA sugiere técnica y software por objetivo. `todas` reemplaza también las ya elegidas.
+    const [sugiriendo, setSugiriendo] = useState('');
+    const sugerirPlan = async (todas) => {
+        // Si no hay filas, se arman con los objetivos específicos guardados.
+        const filas = f.analisis.length ? f.analisis : especificos.map((obj) => ({ id: uid(), objetivo: obj.replace(/\.$/, ''), tecnica: '', software: '' }));
+        const conObjetivo = filas.filter((x) => clean(x.objetivo));
+        if (!conObjetivo.length) { setSugiriendo('sin'); return; }
+        setSugiriendo('pensando');
+        try {
+            const plan = await sugerirAnalisis({
+                objetivos: conObjetivo.map((x) => clean(x.objetivo)), enfoque, tipo, diseno,
+                instrumentos: f.instrumentos.map((it) => [clean(it.tecnica), clean(it.instrumento)].filter(Boolean).join(': ')).filter(Boolean).join('; '),
+                data: estado.data,
+            });
+            let k = -1;
+            touch();
+            update({ analisis: filas.map((fila) => {
+                if (!clean(fila.objetivo)) return fila;
+                k += 1;
+                const s = plan[k];
+                if (!s?.tecnica || (!todas && clean(fila.tecnica))) return fila;
+                return { ...fila, tecnica: s.tecnica, software: s.software || fila.software, nota: s.porque };
+            }) });
+            setSugiriendo('');
+        } catch {
+            setSugiriendo('fallo');
+        }
+    };
+    // Las filas del plan se arman una vez con los objetivos: si después cambian, se pueden poner al día sin perder
+    // lo elegido en los que siguen iguales.
+    const igualTexto = (a, b) => clean(a).toLowerCase() === clean(b).toLowerCase();
+    const objetivosActuales = especificos.map((o) => o.replace(/\.$/, ''));
+    const planDesfasado = objetivosActuales.length > 0 && (objetivosActuales.length !== f.analisis.length || objetivosActuales.some((o, i) => !igualTexto(o, f.analisis[i]?.objetivo)));
+    const actualizarFilas = () => {
+        touch();
+        update({ analisis: objetivosActuales.map((o) => f.analisis.find((x) => igualTexto(x.objetivo, o)) || { id: uid(), objetivo: o, tecnica: '', software: '' }) });
+    };
+    const yaSugirio = useRef(false);
+    useEffect(() => {
+        if (tab !== 'analisis' || yaSugirio.current || !f.analisis.length || f.analisis.some((x) => clean(x.tecnica))) return;
+        if (!f.analisis.some((x) => clean(x.objetivo))) return;
+        yaSugirio.current = true;
+        sugerirPlan(false);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tab]);
 
     // La primera vez: tipo según los alcances, población del título, una fila de análisis por específico y un cronograma base.
     useEffect(() => {
@@ -742,24 +807,37 @@ const Constructor = ({ intro, onNavigate }) => {
 
                     {tab === 'analisis' && (
                         <div className="mar-fichas">
+                            <div className="met-razon">
+                                <button type="button" className="ide-btn ide-btn--ghost" disabled={sugiriendo === 'pensando'} onClick={() => sugerirPlan(false)}>
+                                    {sugiriendo === 'pensando' ? <Loader2 size={15} className="met-gira" /> : <Sparkles size={15} />} {sugiriendo === 'pensando' ? 'Eligiendo para cada objetivo…' : 'Sugerir técnica y software para cada objetivo'}
+                                </button>
+                                {f.analisis.some((x) => clean(x.tecnica)) && <button type="button" className="ide-link" disabled={sugiriendo === 'pensando'} onClick={() => sugerirPlan(true)}>Volver a sugerir todas</button>}
+                                <span>{sugiriendo === 'fallo' ? 'No se pudo sugerir: inténtalo de nuevo.' : sugiriendo === 'sin' ? 'Escribe primero los objetivos de cada fila.' : `Según tu enfoque${enfoque ? ` ${enfoque.toLowerCase()}` : ''}, tu tipo de investigación, tu diseño y tus instrumentos. Llena las filas vacías.`}</span>
+                            </div>
+                            {planDesfasado && f.analisis.length > 0 && (
+                                <p className="obj-warn"><AlertTriangle size={14} aria-hidden="true" /> Las filas no coinciden con tus {objetivosActuales.length} objetivos específicos actuales. <button type="button" className="ide-link" onClick={actualizarFilas}>Actualizar las filas con mis objetivos</button></p>
+                            )}
                             {f.analisis.length === 0 && <p className="obj-warn"><AlertTriangle size={14} aria-hidden="true" /> Guarda tus objetivos específicos para tener una fila por objetivo, o agrega una.</p>}
                             {f.analisis.map((fila, i) => (
                                 <div className="input-group pla-part mar-grid" key={fila.id || i}>
                                     <Campo className="mar-wide" id={`an-obj-${i}`} label={`Objetivo específico ${i + 1}`} value={fila.objetivo} onChange={(v) => setFila('analisis', f.analisis, i, { objetivo: v })} placeholder="Ej: Caracterizar la inasistencia…" />
                                     <label className="mar-campo">
                                         <span>Técnica de análisis</span>
-                                        <select className="input-field" value={fila.tecnica} onChange={(e) => setFila('analisis', f.analisis, i, { tecnica: e.target.value })}>
+                                        <select className="input-field" value={fila.tecnica} onChange={(e) => setFila('analisis', f.analisis, i, { tecnica: e.target.value, nota: '' })}>
                                             <option value="">Elige…</option>
-                                            {TECNICAS_ANALISIS.map((t) => <option key={t} value={t}>{t}</option>)}
+                                            {TECNICAS_ANALISIS_GRUPOS.map((g) => <optgroup key={g.grupo} label={g.grupo}>{g.items.map((t) => <option key={t} value={t}>{t}</option>)}</optgroup>)}
+                                            {fila.tecnica && !TECNICAS_ANALISIS.includes(fila.tecnica) && <option value={fila.tecnica}>{fila.tecnica}</option>}
                                         </select>
                                     </label>
                                     <label className="mar-campo">
                                         <span>Software</span>
                                         <select className="input-field" value={fila.software} onChange={(e) => setFila('analisis', f.analisis, i, { software: e.target.value })}>
                                             <option value="">Elige…</option>
-                                            {SOFTWARE.map((t) => <option key={t} value={t}>{t}</option>)}
+                                            {SOFTWARE_GRUPOS.map((g) => <optgroup key={g.grupo} label={g.grupo}>{g.items.map((t) => <option key={t} value={t}>{t}</option>)}</optgroup>)}
+                                            {fila.software && !SOFTWARE.includes(fila.software) && <option value={fila.software}>{fila.software}</option>}
                                         </select>
                                     </label>
+                                    {fila.nota && clean(fila.tecnica) && <p className="mar-wide met-nota-fila"><Sparkles size={13} aria-hidden="true" /> Sugerida porque {fila.nota}.</p>}
                                     {f.analisis.length > 1 && <button type="button" className="ide-link" onClick={() => { touch(); update({ analisis: f.analisis.filter((_, k) => k !== i) }); }}><Trash2 size={13} /> Quitar</button>}
                                 </div>
                             ))}
