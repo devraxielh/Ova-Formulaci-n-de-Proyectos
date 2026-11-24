@@ -134,7 +134,7 @@ const SugerirTeorias = ({ proyecto, yaTiene = [], onUsar, tipo = 'teoria', cupo 
         if (!refYaEsta(lista, ref)) setRefs((prev) => [...(Array.isArray(prev) ? prev : []), { ...ref, id: uid() }]);
         // Si esta obra no trae resumen (pasa en libros antiguos), se usa el de otra obra muy citada sobre la misma teoría.
         const otra = !tx.prestar || item.resumen.length >= 80 ? null : teoria.obras.find((o) => o.clave !== item.clave && o.resumen.length >= 80);
-        const quedo = await onUsar({ nombre: teoria.nombre, ref, resumen: otra ? otra.resumen : item.resumen, prestado: otra ? otra.ref.titulo : '' });
+        const quedo = await onUsar({ nombre: teoria.nombre, ref, resumen: otra ? otra.resumen : item.resumen, prestado: otra ? otra.ref.titulo : '', enlace: ref.doi ? `https://doi.org/${ref.doi}` : (item.enlace || item.clave) });
         setUsados((p) => ({ ...p, [item.clave]: quedo }));
     };
 

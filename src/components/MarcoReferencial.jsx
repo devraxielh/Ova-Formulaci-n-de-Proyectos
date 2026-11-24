@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import EditorRico from './EditorRico';
 import {
-    AlertTriangle, ArrowRight, BookOpen, CheckCircle2, Layers, Library, MapPin, Plus, Quote, Scale, Search, Target, Trash2,
+    AlertTriangle, ArrowRight, BookOpen, CheckCircle2, ExternalLink, Layers, Library, MapPin, Plus, Quote, Scale, Search, Target, Trash2,
 } from 'lucide-react';
 import SlideDeck, { Opciones, Pestanas } from './deck/SlideDeck';
 import { useProjectField } from '../context/ProjectContext';
@@ -337,6 +337,7 @@ const useMarcoState = () => {
     const [idea] = useProjectField('idea', null);
     const [titulo] = useProjectField('titulo', '');
     const [pregunta] = useProjectField('pregunta', '');
+    const [refs] = useProjectField('referencias', []);
     const setters = {
         marcoAntecedentes: useProjectField('marcoAntecedentes', '')[1],
         marcoTeorico: useProjectField('marcoTeorico', '')[1],
@@ -358,13 +359,25 @@ const useMarcoState = () => {
     const i = idea || {};
     const t = tituloForm || {};
     return {
-        f, update, setForm, setters, guardados, titulo, pregunta, idea: i,
+        f, update, setForm, setters, guardados, titulo, pregunta, refs: Array.isArray(refs) ? refs : [], idea: i,
         quien: clean(t.quien || i.quien), donde: clean(t.donde || i.donde),
     };
 };
 
+// Solo enlaces web: lo que no empiece por http(s) no se guarda ni se muestra.
+const enlaceSeguro = (v) => (/^https?:\/\//i.test(String(v || '').trim()) ? String(v).trim() : '');
+// De dónde salió la ficha: el enlace guardado al usar la búsqueda o, en las fichas anteriores, el DOI de la
+// referencia con el mismo título. El título de la fuente va tras «|» en los conceptos.
+const origenDe = (item, refs) => {
+    const titulo = clean(String(item.fuente || '').split('|').pop());
+    if (!titulo) return null;
+    const ref = (refs || []).find((r) => clean(r.titulo).toLowerCase() === titulo.toLowerCase() && r.doi);
+    const enlace = enlaceSeguro(item.enlace) || (ref ? `https://doi.org/${String(ref.doi).replace(/^https?:\/\/doi\.org\//i, '')}` : '');
+    return { titulo, enlace };
+};
+
 // Lista de fichas editables (antecedentes, teorías, conceptos o normas).
-const Fichas = ({ items, vacio, max, onChange, render, agregar }) => (
+const Fichas = ({ items, vacio, max, onChange, render, agregar, refs }) => (
     <div className="mar-fichas">
         {items.map((item, index) => (
             <div className="input-group pla-part mar-ficha" key={index}>
@@ -375,6 +388,14 @@ const Fichas = ({ items, vacio, max, onChange, render, agregar }) => (
                     )}
                 </div>
                 {render(item, (patch) => onChange(items.map((it, i) => (i === index ? { ...it, ...patch } : it))), index)}
+                {origenDe(item, refs) && (
+                    <p className="mar-origen">
+                        <ExternalLink size={13} aria-hidden="true" /> Salió de:{' '}
+                        {origenDe(item, refs).enlace
+                            ? <a href={origenDe(item, refs).enlace} target="_blank" rel="noreferrer noopener">{origenDe(item, refs).titulo}</a>
+                            : <span>{origenDe(item, refs).titulo}</span>}
+                    </p>
+                )}
             </div>
         ))}
         {items.length < max && (
@@ -393,7 +414,7 @@ const Campo = ({ id, label, value, onChange, placeholder, rows = 1, className = 
 );
 
 const Constructor = ({ intro, onNavigate }) => {
-    const { f, update, setForm, setters, idea, quien, donde, titulo, pregunta } = useMarcoState();
+    const { f, update, setForm, setters, idea, quien, donde, titulo, pregunta, refs } = useMarcoState();
     const [tab, setTab] = useState('antecedentes');
     const [saved, setSaved] = useState(false);
     const partes = redactar(f);
@@ -404,8 +425,8 @@ const Constructor = ({ intro, onNavigate }) => {
 
     // «Usar como…» de la búsqueda: crea la ficha con lo que se sabe del artículo y, si trae resumen, la IA la llena con él.
     // La ficha se reconoce después por `fuente` (el título del artículo), y nunca se pisa lo que el estudiante ya escribió.
-    const usarArticulo = (cfg) => async (ref, resumen) => {
-        const ficha = { ...cfg.base(ref), fuente: clean(ref.titulo) };
+    const usarArticulo = (cfg) => async (ref, resumen, enlace) => {
+        const ficha = { ...cfg.base(ref), fuente: clean(ref.titulo), enlace: enlaceSeguro(enlace) };
         const actuales = f[cfg.lista];
         const libre = actuales.findIndex((x) => cfg.campos.every((k) => !clean(x[k])) && !clean(x.autor));
         set(cfg.lista)(libre >= 0 ? actuales.map((x, i) => (i === libre ? ficha : x)) : [...actuales, ficha].slice(0, cfg.max));
@@ -446,9 +467,9 @@ const Constructor = ({ intro, onNavigate }) => {
         });
     };
     // «Usar esta obra» de «Sugerir teorías»: el nombre viene de la propuesta; el autor y el año, de la obra encontrada.
-    const usarTeoria = async ({ nombre, ref, resumen, prestado }) => {
+    const usarTeoria = async ({ nombre, ref, resumen, prestado, enlace }) => {
         const fuente = clean(ref.titulo);
-        const ficha = { ...VACIO.teoria, nombre: clean(nombre), autor: autorCita(ref), anio: ref.anio, fuente };
+        const ficha = { ...VACIO.teoria, nombre: clean(nombre), autor: autorCita(ref), anio: ref.anio, fuente, enlace: enlaceSeguro(enlace) };
         ponerFicha('teorias', ficha, 5, (x) => !clean(x.nombre) && !clean(x.postulado) && !clean(x.autor));
         try {
             const datos = await teoriaDesdeObra({ nombre, ref, resumen, proyecto: { titulo, problema: clean(idea.problema), quien, donde } });
@@ -470,9 +491,9 @@ const Constructor = ({ intro, onNavigate }) => {
         }
     };
     // «Usar la definición de esta obra» de «Sugerir conceptos»: el término viene de la propuesta; la definición, del resumen.
-    const usarConcepto = async ({ nombre, ref, resumen }) => {
+    const usarConcepto = async ({ nombre, ref, resumen, enlace }) => {
         const fuente = `${clean(nombre)}|${clean(ref.titulo)}`;
-        const ficha = { ...VACIO.concepto, termino: clean(nombre), autor: autorCita(ref), anio: ref.anio, fuente };
+        const ficha = { ...VACIO.concepto, termino: clean(nombre), autor: autorCita(ref), anio: ref.anio, fuente, enlace: enlaceSeguro(enlace) };
         ponerFicha('conceptos', ficha, MAX_CONCEPTOS, (x) => !clean(x.termino) && !clean(x.definicion) && !clean(x.autor));
         if (clean(resumen).length < 80) return 'vacia';
         try {
@@ -561,6 +582,7 @@ const Constructor = ({ intro, onNavigate }) => {
                     )}
                     {tab === 'antecedentes' && (
                         <Fichas
+                            refs={refs}
                             items={f.antecedentes}
                             vacio={VACIO.antecedente}
                             max={10}
@@ -588,6 +610,7 @@ const Constructor = ({ intro, onNavigate }) => {
 
                     {tab === 'teorico' && (
                         <Fichas
+                            refs={refs}
                             items={f.teorias}
                             vacio={VACIO.teoria}
                             max={5}
@@ -607,6 +630,7 @@ const Constructor = ({ intro, onNavigate }) => {
 
                     {tab === 'conceptual' && (
                         <Fichas
+                            refs={refs}
                             items={f.conceptos}
                             vacio={VACIO.concepto}
                             max={MAX_CONCEPTOS}
@@ -636,11 +660,12 @@ const Constructor = ({ intro, onNavigate }) => {
                         <BuscarNormas
                             sugerencia={problema}
                             // La norma se trata como un «artículo»: su cita es el título y su extracto, el resumen.
-                            onUsar={(norma) => usarArticulo(FICHA_DE.legal)({ titulo: norma.cita, cita: norma.cita, anio: norma.anio, autores: norma.fuente }, norma.extracto)}
+                            onUsar={(norma) => usarArticulo(FICHA_DE.legal)({ titulo: norma.cita, cita: norma.cita, anio: norma.anio, autores: norma.fuente }, norma.extracto, norma.enlace)}
                         />
                     )}
                     {tab === 'legal' && (
                         <Fichas
+                            refs={refs}
                             items={f.normas}
                             vacio={VACIO.norma}
                             max={10}

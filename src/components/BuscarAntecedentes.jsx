@@ -209,7 +209,7 @@ const BuscarAntecedentes = ({ onUsar, sugerencia = '', usarComo = 'antecedente',
         if (!yaEsta(ref)) setRefs((prev) => [...(Array.isArray(prev) ? prev : []), { ...ref, id: uid() }]);
         // onUsar crea la ficha y, si el artículo trae resumen, la llena con él: dice cómo quedó ('llena' o 'vacia').
         if (usar && onUsar) setUsados((p) => ({ ...p, [item.clave]: 'llenando' }));
-        const quedo = usar && onUsar ? await onUsar(ref, item.resumen) : '';
+        const quedo = usar && onUsar ? await onUsar(ref, item.resumen, ref.doi ? `https://doi.org/${ref.doi}` : (item.enlace || item.clave)) : '';
         setUsados((p) => ({ ...p, [item.clave]: usar ? (quedo === 'llena' ? 'llena' : 'usado') : 'agregado' }));
     };
 

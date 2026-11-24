@@ -43,3 +43,7 @@
 .mar-table tbody td:last-child { border-radius: 0 0.55rem 0.55rem 0; }
 .mar-ejemplo h3 { display: flex; align-items: center; gap: 0.4rem; }
 .mar-ejemplo p { background: #fff; border-left: 3px solid #a5b4fc; border-radius: 0.5rem; padding: 0.6rem 0.8rem; margin: 0 0 0.5rem !important; font-size: 0.92rem; line-height: 1.55; color: #1e293b !important; }
+
+/* De dónde salió la ficha (informativo: no pasa al documento) */
+.mar-origen { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; margin: 0.5rem 0 0; font-size: 0.82rem; color: #64748b; }
+.mar-origen a { color: #4338ca; word-break: break-word; }
