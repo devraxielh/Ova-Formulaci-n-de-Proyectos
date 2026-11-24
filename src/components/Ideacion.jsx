@@ -1038,7 +1038,7 @@ const Ideacion = ({ onNavigate }) => {
         </>
     );
 
-    const renderSlide = ({ slide, heading, goTo, sectionMinutes, totalMinutes }) => ({
+    const renderSlide = ({ slide, heading, goToSection, sectionMinutes, totalMinutes }) => ({
         portada: (
             <>
                 <div>
@@ -1063,7 +1063,7 @@ const Ideacion = ({ onNavigate }) => {
                     <ol className="ide-agenda">
                         {SECTIONS.map((section) => (
                             <li key={section.id}>
-                                <button type="button" onClick={() => goTo(SLIDES.findIndex((item) => item.section === section.id))}>
+                                <button type="button" onClick={() => goToSection(section.id)}>
                                     <span>{section.label}</span>
                                     <small>{SLIDES.filter((item) => item.section === section.id).map((item) => item.title).join(' · ')}</small>
                                     <b>{sectionMinutes(section.id)} min</b>

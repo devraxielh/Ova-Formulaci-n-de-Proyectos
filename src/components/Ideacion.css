@@ -1362,3 +1362,17 @@
 @container (max-width: 760px) { .ide-btn--siguiente-paso { display: none; } }
 @media (max-width: 900px) { .ide-btn--siguiente-paso { display: none; } }
 .ide-elegir { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin: 0.75rem 0; }
+
+/* «Presentación»: la teoría de la clase en una ventana grande */
+.ide-section--pres { display: inline-flex; align-items: center; gap: 0.35rem; color: #3730a3; background: #eef2ff; font-weight: 600; }
+.ide-section--pres:hover { background: #e0e7ff; }
+.ide-pres-modal { position: fixed; inset: 0; margin: auto; width: min(96rem, calc(100vw - 1.5rem)); height: calc(100dvh - 1.5rem); max-width: none; max-height: none; padding: 0; border: 0; border-radius: 1.25rem; background: transparent; overflow: visible; }
+.ide-pres-modal::backdrop { background: rgb(15 23 42 / 0.6); }
+.ide-deck--modal { height: 100%; }
+.ide-deck.ide-deck--modal .ide-stage:not(:fullscreen) { height: 100%; min-height: 0; }
+/* En la página, las tres pestañas se ven siempre enteras: si no caben junto a las herramientas, estas bajan a otra línea. */
+.ide-deck:not(.ide-deck--modal) .ide-top { flex-wrap: wrap; row-gap: 0.4rem; }
+.ide-deck:not(.ide-deck--modal) .ide-sections { flex-shrink: 0; max-width: 100%; }
+.ide-deck:not(.ide-deck--modal) .ide-tools { flex-wrap: wrap; max-width: 100%; }
+/* En el teléfono la página crece con la diapositiva; la ventana no puede, así que su contenido se desplaza por dentro. */
+.ide-deck.ide-deck--modal .ide-stage:not(:fullscreen) .ide-viewport { flex: 1 1 auto; min-height: 0; overflow-y: auto; }

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowRight, CheckCircle2, Clock, Maximize2, Minimize2, Pause, Play, RotateCcw, XCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Clock, Maximize2, Minimize2, Pause, Play, Presentation, RotateCcw, X, XCircle } from 'lucide-react';
 import Citar from './Citar';
 import RevisarIA from './RevisarIA';
 import Redactar from './Redactar';
@@ -155,10 +155,15 @@ const fillExample = (event) => {
     fijarValor(el, text);
 };
 
-// `storageKey` se sigue aceptando para no cambiar las clases, pero ya no se usa.
-const SlideDeck = ({ sections, slides, label, renderSlide, finish }) => {
-    // La clase abre siempre en su primera diapositiva, que es «Construcción»: no se recuerda dónde quedó la vez anterior.
-    const [index, setIndex] = useState(0);
+/*
+ * Un mazo de diapositivas. Hay dos por clase:
+ * - el principal, en la página: «Construcción» y «Revisión»;
+ * - la «Presentación», en una ventana grande: la teoría de la clase (Apertura … Cierre).
+ * `onFuera(seccion)` avisa cuando se pide una sección que está en el otro mazo.
+ */
+const Mazo = ({ sections, slides, label, renderSlide, finish, enModal = false, activo = true, seccionInicial, salto, onPresentacion, onFuera, onCerrar, totalClase, minutosDe }) => {
+    // Abre siempre en su primera diapositiva (o en la sección pedida): no se recuerda dónde quedó la vez anterior.
+    const [index, setIndex] = useState(() => Math.max(0, slides.findIndex((item) => item.section === seccionInicial)));
     const [direction, setDirection] = useState(1);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const reduceMotion = useReducedMotion();
@@ -167,8 +172,9 @@ const SlideDeck = ({ sections, slides, label, renderSlide, finish }) => {
     const headingRef = useRef(null);
     const didMount = useRef(false);
 
-    const totalMinutes = slides.reduce((sum, slide) => sum + slide.min, 0);
-    const sectionMinutes = (id) => slides.filter((slide) => slide.section === id).reduce((sum, slide) => sum + slide.min, 0);
+    // Los minutos se cuentan sobre toda la clase, no solo sobre este mazo.
+    const totalMinutes = totalClase;
+    const sectionMinutes = minutosDe;
 
     const goTo = useCallback((next) => {
         setIndex((current) => {
@@ -178,10 +184,25 @@ const SlideDeck = ({ sections, slides, label, renderSlide, finish }) => {
         });
     }, [slides.length]);
 
-    const goToSection = useCallback((sectionId) => goTo(slides.findIndex((item) => item.section === sectionId)), [goTo, slides]);
+    const goToSection = useCallback((sectionId) => {
+        const destino = slides.findIndex((item) => item.section === sectionId);
+        if (destino >= 0) goTo(destino);
+        else onFuera?.(sectionId);
+    }, [goTo, slides, onFuera]);
+
+    // Cuando el otro mazo pide una sección de este, se salta a ella.
+    useEffect(() => {
+        if (!salto) return;
+        const destino = slides.findIndex((item) => item.section === salto.seccion);
+        if (destino >= 0) goTo(destino);
+        // Solo al recibir un salto nuevo: si dependiera de `slides`, cada cambio del proyecto devolvería la clase a esa sección.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [salto]);
 
     useEffect(() => {
         const onKey = (event) => {
+            // Con la presentación abierta, las flechas solo mueven la presentación.
+            if (!activo) return;
             if (event.altKey || event.ctrlKey || event.metaKey) return;
             if (event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
             if (event.key === 'ArrowRight' || event.key === 'PageDown') goTo(index + 1);
@@ -189,7 +210,7 @@ const SlideDeck = ({ sections, slides, label, renderSlide, finish }) => {
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [goTo, index]);
+    }, [goTo, index, activo]);
 
     useEffect(() => {
         if (!didMount.current) {
@@ -219,8 +240,8 @@ const SlideDeck = ({ sections, slides, label, renderSlide, finish }) => {
     const heading = <h2 ref={headingRef} tabIndex={-1}>{slide.title}</h2>;
 
     return (
-        <div className="ide-deck">
-            <section ref={stageRef} className="ide-stage" aria-roledescription="presentación" aria-label={label} onKeyDown={fillExample}>
+        <div className={`ide-deck${enModal ? ' ide-deck--modal' : ''}`}>
+            <section ref={stageRef} className="ide-stage" aria-roledescription="presentación" aria-label={enModal ? `Presentación de la clase: ${label}` : label} onKeyDown={fillExample}>
                 <header className="ide-top">
                     <div className="ide-sections" role="group" aria-label="Secciones de la clase">
                         {sections.map((section) => (
@@ -235,11 +256,16 @@ const SlideDeck = ({ sections, slides, label, renderSlide, finish }) => {
                                 {section.label}
                             </button>
                         ))}
+                        {onPresentacion && (
+                            <button type="button" className="ide-section ide-section--pres" title={`Presentación de la clase: ${totalClase - slides.reduce((sum, item) => sum + item.min, 0)} minutos`} onClick={() => onPresentacion()}>
+                                <Presentation size={15} aria-hidden="true" /> Presentación
+                            </button>
+                        )}
                     </div>
                     <div className="ide-tools">
-                        <RevisarIA etiqueta={label} />
-                        <Redactar stageRef={stageRef} />
-                        <Citar stageRef={stageRef} />
+                        {!enModal && <RevisarIA etiqueta={label} />}
+                        {!enModal && <Redactar stageRef={stageRef} />}
+                        {!enModal && <Citar stageRef={stageRef} />}
                         <Temporizador key={slide.id} minutes={slide.min} />
                         {canFullscreen && (
                             <button
@@ -250,6 +276,11 @@ const SlideDeck = ({ sections, slides, label, renderSlide, finish }) => {
                                 onClick={toggleFullscreen}
                             >
                                 {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                            </button>
+                        )}
+                        {enModal && (
+                            <button type="button" className="ide-icon-btn" aria-label="Cerrar la presentación" title="Cerrar la presentación" onClick={onCerrar}>
+                                <X size={16} />
                             </button>
                         )}
                     </div>
@@ -325,10 +356,70 @@ const SlideDeck = ({ sections, slides, label, renderSlide, finish }) => {
                 </nav>
             </section>
 
-            <p className="ide-keys">
-                Avanza con las teclas <kbd>←</kbd> y <kbd>→</kbd>. En un campo vacío, <kbd>Tab</kbd> escribe el ejemplo. Clase completa: {totalMinutes} minutos.
-            </p>
+            {!enModal && (
+                <p className="ide-keys">
+                    {slides.length > 1 && <>Avanza con las teclas <kbd>←</kbd> y <kbd>→</kbd>. </>}En un campo vacío, <kbd>Tab</kbd> escribe el ejemplo.{onPresentacion ? ` La presentación de la clase dura ${totalClase - slides.reduce((sum, item) => sum + item.min, 0)} minutos.` : ''}
+                </p>
+            )}
         </div>
+    );
+};
+
+// Secciones de trabajo, que se quedan en la página; el resto es la presentación de la clase.
+const DE_TRABAJO = new Set(['construccion', 'sintesis', 'revision']);
+
+// `storageKey` se sigue aceptando para no cambiar las clases, pero ya no se usa.
+const SlideDeck = ({ sections, slides, label, renderSlide, finish }) => {
+    const [presentacion, setPresentacion] = useState(null); // null = cerrada; { seccion } = abierta (en esa sección)
+    const [irA, setIrA] = useState(null); // { seccion }: sección de trabajo pedida desde la presentación
+    const dialog = useRef(null);
+
+    const trabajo = slides.filter((item) => DE_TRABAJO.has(item.section));
+    const teoria = slides.filter((item) => !DE_TRABAJO.has(item.section));
+    const comunes = {
+        label,
+        renderSlide,
+        totalClase: slides.reduce((sum, item) => sum + item.min, 0),
+        minutosDe: (id) => slides.filter((item) => item.section === id).reduce((sum, item) => sum + item.min, 0),
+    };
+
+    useEffect(() => {
+        const el = dialog.current;
+        if (!el) return;
+        if (presentacion && !el.open) el.showModal();
+        if (!presentacion && el.open) el.close();
+    }, [presentacion]);
+
+    // Una clase sin secciones de trabajo (o sin teoría) se muestra como un solo mazo.
+    if (trabajo.length === 0 || teoria.length === 0) return <Mazo {...comunes} sections={sections} slides={slides} finish={finish} />;
+
+    return (
+        <>
+            <Mazo
+                {...comunes}
+                sections={sections.filter((item) => DE_TRABAJO.has(item.id))}
+                slides={trabajo}
+                finish={finish}
+                activo={!presentacion}
+                salto={irA}
+                onPresentacion={() => setPresentacion({ seccion: teoria[0].section })}
+                onFuera={(seccion) => setPresentacion({ seccion })}
+            />
+            <dialog ref={dialog} className="ide-pres-modal" aria-label={`Presentación de la clase: ${label}`} onClose={() => setPresentacion(null)}>
+                {presentacion && (
+                    <Mazo
+                        {...comunes}
+                        key={presentacion.seccion}
+                        sections={sections.filter((item) => !DE_TRABAJO.has(item.id))}
+                        slides={teoria}
+                        enModal
+                        seccionInicial={presentacion.seccion}
+                        onCerrar={() => setPresentacion(null)}
+                        onFuera={(seccion) => { setPresentacion(null); setIrA({ seccion }); }}
+                    />
+                )}
+            </dialog>
+        </>
     );
 };
 
