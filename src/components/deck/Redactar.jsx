@@ -226,7 +226,7 @@ const Redactar = ({ stageRef }) => {
                                                 {trabajo.frases.map((f, i) => <li key={i}><blockquote>«{f.frase}»</blockquote><p>{f.porque}</p></li>)}
                                             </ol>
                                         )}
-                                        <p className="ria-vacio">Busca la fuente en Referencias › «Buscar artículos sobre tu tema» y agrégala con el botón «Citar».</p>
+                                        <p className="ria-vacio">Busca la fuente en Referencias › «Buscar artículos sobre tu tema», agrégala con «Agregar a mis referencias» y luego insértala en el párrafo con el botón «Citar».</p>
                                     </section>
                                 )}
                             </>

@@ -75,7 +75,7 @@ export const SLIDES = construccionPrimero([
     },
     {
         id: 'general', section: 'estructura', min: 4, title: 'La conclusión general',
-        lead: ['Integra las conclusiones específicas en una respuesta a tu pregunta de investigación. Si planteaste una hipótesis, di si se acepta o se rechaza.'],
+        lead: ['Integra las conclusiones específicas en una respuesta a tu pregunta de investigación. Si planteaste una hipótesis, di si los resultados la respaldan o no.'],
         panel: {
             type: 'example', title: 'Ejemplo', paragraphs: [
                 'En respuesta a la pregunta de investigación, los factores asociados a la inasistencia a citas médicas de los pacientes de consulta externa del hospital son principalmente el olvido de la cita y el costo del transporte, y su efecto es mayor en los pacientes jóvenes y de la zona rural. Estos hallazgos permitieron proponer una estrategia de recordatorios y flexibilización de horarios para reducir la inasistencia.',

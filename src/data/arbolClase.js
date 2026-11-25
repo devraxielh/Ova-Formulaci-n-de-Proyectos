@@ -70,7 +70,7 @@ export const SLIDES = construccionPrimero([
                 { label: 'Problema', text: 'Los pacientes no asisten a sus citas.' },
                 { label: '¿Por qué?', text: 'Porque olvidan la fecha.' },
                 { label: '¿Por qué la olvidan?', text: 'Porque la cita se asigna con varias semanas de anticipación y nadie la recuerda.' },
-                { label: '¿Por qué nadie la recuerda?', text: 'Porque el hospital no tiene un sistema de recordatorios.', note: 'Esta es una causa sobre la que un proyecto sí puede actuar.' },
+                { label: '¿Por qué nadie la recuerda?', text: 'Porque el hospital solo envía recordatorio a una parte de los pacientes.', note: 'Esta es una causa sobre la que un proyecto sí puede actuar.' },
             ],
         },
     },

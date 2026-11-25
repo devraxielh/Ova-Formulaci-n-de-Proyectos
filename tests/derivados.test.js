@@ -60,3 +60,14 @@ test('desfase del presupuesto: compara participantes, instrumentos, duración y 
     // Sin sesión no se conoce el equipo: no se avisa por eso.
     assert.deepEqual(desfasePresupuesto(antes, { ...antes, integrantes: 0 }), []);
 });
+
+test('una actividad repetida en dos fases no se reporta como fuera de fecha', () => {
+    const form = { unidad: 'semanas', fases: [{ nombre: 'Diagnóstico', duracion: 3, actividades: ['Reunión con la comunidad', 'Aplicar la encuesta'] }, { nombre: 'Cierre', duracion: 2, actividades: ['Reunión con la comunidad'] }] };
+    const d = cronogramaDesdeFases(form);
+    assert.deepEqual(desfaseCronograma({ fasesForm: form, cronogramaItems: d.filas, ganttUnidad: 'semanal', ganttPeriodos: 5 }), []);
+    // Y sí avisa si la actividad queda por fuera de todas las fases que la tienen.
+    const movida = d.filas.map((x, i) => (i === 0 ? { ...x, inicio: 4, fin: 4 } : x));
+    assert.equal(desfaseCronograma({ fasesForm: form, cronogramaItems: movida, ganttUnidad: 'semanal', ganttPeriodos: 5 }).length, 0); // la semana 4 es de «Cierre», que también la tiene
+    const fuera = d.filas.map((x, i) => (i === 1 ? { ...x, inicio: 4, fin: 5 } : x));
+    assert.match(desfaseCronograma({ fasesForm: form, cronogramaItems: fuera, ganttUnidad: 'semanal', ganttPeriodos: 5 })[0], /Aplicar la encuesta/);
+});

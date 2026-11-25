@@ -67,14 +67,14 @@ const CambioClave = ({ forced }) => {
 // Todo lo que hace la app, para quien llega al ingreso sin conocerla.
 const BENEFITS = [
     { icon: Presentation, title: '16 clases guiadas', text: 'De la idea al resumen, sección por sección.' },
-    { icon: Sparkles, title: 'Asistente de IA', text: 'Sugiere, redacta y revisa con el contexto de tu proyecto.' },
+    { icon: Sparkles, title: 'Asistente de IA', text: 'Sugiere, redacta y revisa con el contexto de tu proyecto (con un número de solicitudes por día).' },
     { icon: Link2, title: 'Coherencia entre secciones', text: 'Detecta lo que no encaja y propone el arreglo.' },
     { icon: Search, title: 'Fuentes reales', text: 'Artículos, teorías y normas, citados en APA 7.' },
     { icon: Compass, title: 'Metodología completa', text: 'Diseño, muestra calculada, cronograma y presupuesto.' },
     { icon: ClipboardList, title: 'Instrumentos y encuestas', text: 'Ármalos, valídalos y recoge respuestas con un enlace.' },
     { icon: BarChart3, title: 'Análisis de datos', text: 'Descriptivos, cruces, correlaciones y análisis cualitativo.' },
     { icon: Download, title: 'Documento listo', text: 'Word, PDF y diapositivas, con índice, tablas y anexos.' },
-    { icon: Users, title: 'Trabajo en equipo', text: 'Invita compañeros; cada uno edita su parte.' },
+    { icon: Users, title: 'Trabajo en equipo', text: 'Invita compañeros: todos editan el mismo proyecto y ven quién está en cada sección.' },
     { icon: History, title: 'Historial de versiones', text: 'Compara lado a lado y restaura una sección.' },
     { icon: GraduationCap, title: 'Acompañamiento del profesor', text: 'Organiza grupos, autoriza y revisa tu avance.' },
     { icon: FolderOpen, title: 'Se guarda solo', text: 'En cualquier equipo, incluso si se cae la conexión.' },
@@ -229,7 +229,7 @@ const Cuenta = ({ onNavigate, activation, resetToken, onResetDone }) => {
                     <h2>Hola, {user.name.split(' ')[0]}</h2>
                     <p>{isAdmin ? `Usuario: ${user.email}` : user.email}</p>
                     <dl className="acc-stats">
-                        <div><dt>Proyectos</dt><dd>{projects.length}</dd></div>
+                        {user.role !== 'guest' && <div><dt>Proyectos</dt><dd>{projects.length}</dd></div>}
                         <div><dt>Rol</dt><dd>{nombreRol(user.role)}</dd></div>
                     </dl>
                     {!user.mustChangePassword && (
@@ -293,7 +293,7 @@ const Cuenta = ({ onNavigate, activation, resetToken, onResetDone }) => {
                     <h2>Recupera tu contraseña</h2>
                     {olvido === 'form' && (
                         <>
-                            <p className="acc-lead">Escribe el correo con el que creaste tu cuenta y te enviaremos un enlace para crear una contraseña nueva.</p>
+                            <p className="acc-lead">Escribe el correo de tu cuenta y te enviaremos un enlace para crear una contraseña nueva.</p>
                             <form className="pro-form" onSubmit={pedir} noValidate>
                                 <div className="input-group">
                                     <label htmlFor="olvido-correo">Correo electrónico</label>
@@ -377,7 +377,7 @@ const Cuenta = ({ onNavigate, activation, resetToken, onResetDone }) => {
                 </div>
 
                 <p className="pro-fine">
-                    ¿No tienes cuenta? Aquí nadie se registra por su cuenta: la crea el administrador de la plataforma o tu profesor, y te llega un correo con el acceso.
+                    ¿No tienes cuenta? Aquí nadie se registra por su cuenta: la crea el administrador de la plataforma o tu profesor, que te entrega tu usuario y una contraseña temporal.
                 </p>
             </section>
         </AccountShell>

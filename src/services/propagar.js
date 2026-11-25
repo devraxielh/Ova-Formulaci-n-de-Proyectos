@@ -56,19 +56,23 @@ const comoElOriginal = (hallado, nuevo) => (hallado[0] === hallado[0].toUpperCas
 
 // Aplica los reemplazos a un texto: palabra completa, sin importar mayúsculas (y respetando la mayúscula inicial).
 // Los más largos van primero para que «citas médicas» no quede a medias por reemplazar antes «citas».
-export const reemplazarEnTexto = (texto, reemplazos) => [...(reemplazos || [])]
-    .filter((r) => t(r?.antes) && t(r?.despues) && plano(r.antes) !== plano(r.despues))
-    .sort((x, y) => y.antes.length - x.antes.length)
-    .reduce((s, r, i, todos) => {
-        // Si lo nuevo ya contiene lo viejo («citas» → «citas médicas»), no se vuelve a reemplazar donde ya está lo nuevo.
-        const protegido = `\u0000${i}\u0000`;
-        const yaNuevo = new RegExp(`(?<![\\p{L}\\p{N}])${escapar(t(r.despues))}(?![\\p{L}\\p{N}])`, 'giu');
-        const guardados = [];
-        const sinNuevo = plano(r.despues).includes(plano(r.antes)) ? s.replace(yaNuevo, (m) => { guardados.push(m); return protegido; }) : s;
-        const cambiado = sinNuevo.replace(new RegExp(`(?<![\\p{L}\\p{N}])${escapar(t(r.antes))}(?![\\p{L}\\p{N}])`, 'giu'), (m) => comoElOriginal(m, t(r.despues)));
-        void todos;
-        return cambiado.split(protegido).reduce((acc, parte, k) => acc + (k ? guardados[k - 1] : '') + parte, '');
-    }, String(texto ?? ''));
+export const reemplazarEnTexto = (texto, reemplazos) => {
+    const lista = [...(reemplazos || [])]
+        .filter((r) => t(r?.antes) && t(r?.despues) && plano(r.antes) !== plano(r.despues))
+        .sort((x, y) => y.antes.length - x.antes.length);
+    if (!lista.length) return String(texto ?? '');
+    // Una sola pasada: lo que sale de un reemplazo no vuelve a entrar en otro (así «A → B» y «B → A» se intercambian).
+    // Si lo nuevo contiene lo viejo («citas» → «citas médicas»), donde ya está lo nuevo no se toca.
+    const yaNuevos = lista.filter((r) => plano(r.despues).includes(plano(r.antes))).map((r) => t(r.despues)).sort((x, y) => y.length - x.length);
+    const alternativas = [...yaNuevos, ...lista.map((r) => t(r.antes))].map(escapar).join('|');
+    const porAntes = new Map(lista.map((r) => [plano(r.antes), t(r.despues)]));
+    const intactos = new Set(yaNuevos.map(plano));
+    return String(texto ?? '').replace(new RegExp(`(?<![\\p{L}\\p{N}])(?:${alternativas})(?![\\p{L}\\p{N}])`, 'giu'), (m) => {
+        if (intactos.has(plano(m))) return m;
+        const nuevo = porAntes.get(plano(m));
+        return nuevo ? comoElOriginal(m, nuevo) : m;
+    });
+};
 
 // Lo mismo en cualquier valor guardado (texto, lista u objeto): así cambian a la vez el texto ya redactado
 // y el formulario del módulo, y lo uno no deshace lo otro al volver a abrirlo.

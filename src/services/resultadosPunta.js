@@ -64,8 +64,7 @@ export const metaDePreguntas = (definition, instrumentoId, armados, matriz) => {
     const filas = lista(matriz);
     return Object.fromEntries(lista(definition?.preguntas).map((q) => {
         const armada = porId[q.id] || porTexto.get(plano(q.texto)) || {};
-        const propia = Number.isFinite(Number(q.objetivo)) && q.objetivo !== undefined ? q : null;
-        const base = { objetivo: Number((propia || armada).objetivo) || 0, variable: t(q.variable || armada.variable), dimension: t(q.dimension || armada.dimension), indicador: t(q.indicador || armada.indicador) };
+        const base = { objetivo: Number(q.objetivo) || Number(armada.objetivo) || 0, variable: t(q.variable || armada.variable), dimension: t(q.dimension || armada.dimension), indicador: t(q.indicador || armada.indicador) };
         const fila = filas.find((f) => (base.indicador && plano(f?.indicador) === plano(base.indicador)) || (plano(f?.item) && plano(f.item) === plano(q.texto)));
         if (fila) { base.variable = base.variable || t(fila.variable); base.dimension = base.dimension || t(fila.dimension); base.indicador = base.indicador || t(fila.indicador); if (!base.objetivo) base.objetivo = Number(fila.objetivo) || 0; }
         return [q.id, base];
@@ -83,7 +82,17 @@ export const analizarPorObjetivo = ({ encuestas, especificos, plan }) => {
     const tablas = [];
     const figuras = [];
     const porObjetivo = {};
-    const todas = lista(encuestas).filter((e) => lista(e.responses).length > 0).flatMap(variablesDe);
+    // Cada variable recuerda de qué encuesta viene: promediar, correlacionar o cruzar solo tiene sentido entre
+    // preguntas que respondieron las mismas personas.
+    const todas = lista(encuestas).filter((e) => lista(e.responses).length > 0).flatMap((e, fuente) => variablesDe(e).map((v) => ({ ...v, fuente })));
+    // De un grupo de ítems, los de la encuesta que más aporta.
+    const deUnaEncuesta = (items) => {
+        if (!items.length) return items;
+        const cuenta = new Map();
+        items.forEach((v) => cuenta.set(v.fuente, (cuenta.get(v.fuente) || 0) + 1));
+        const principal = [...cuenta.entries()].sort((a, b) => b[1] - a[1])[0][0];
+        return items.filter((v) => v.fuente === principal);
+    };
     const n = Math.max(0, ...lista(encuestas).map((e) => lista(e.responses).length));
     // Con varios instrumentos respondidos por distinto número de personas, la nota no puede dar un solo n.
     const enes = [...new Set(lista(encuestas).map((e) => lista(e.responses).length).filter((x) => x > 0))].sort((x, y) => x - y);
@@ -109,7 +118,7 @@ export const analizarPorObjetivo = ({ encuestas, especificos, plan }) => {
         if (!suyas.length) { porObjetivo[k] = { lineas, titulos, sinDatos: true }; return; }
 
         // Ítems de escala: una tabla con la media de cada ítem y el puntaje global del objetivo.
-        const escalas = suyas.filter((v) => v.puntos);
+        const escalas = deUnaEncuesta(suyas.filter((v) => v.puntos));
         if (escalas.length) {
             const global = descriptivos(compuesto(escalas).filter(Number.isFinite));
             const tope = Math.max(...escalas.map((v) => v.opciones.length));
@@ -141,9 +150,10 @@ export const analizarPorObjetivo = ({ encuestas, especificos, plan }) => {
         // Si el plan pide relacionar, se relaciona este objetivo con otro que también tenga medida.
         const tecnica = t(lista(plan).find((p) => objetivoDeFila(p?.objetivo, especificos) === k)?.tecnica);
         if (RELACIONAL.test(tecnica)) {
-            const otroK = especificos.map((_, j) => j + 1).find((j) => j !== k && escalasDe(j).length && escalas.length);
+            const enLaMisma = (j) => escalasDe(j).filter((v) => v.fuente === escalas[0]?.fuente);
+            const otroK = especificos.map((_, j) => j + 1).find((j) => j !== k && escalas.length && enLaMisma(j).length);
             if (otroK) {
-                const c = correlacion(compuesto(escalas), compuesto(escalasDe(otroK)));
+                const c = correlacion(compuesto(escalas), compuesto(enLaMisma(otroK)));
                 if (c) {
                     const titulo = `Correlación entre las escalas de los objetivos específicos ${Math.min(k, otroK)} y ${Math.max(k, otroK)}`;
                     if (!tablas.some((x) => x.titulo === titulo)) tablas.push({ objetivo: k, titulo, nota: `${nota} Puntaje promedio de cada escala por participante.`, head: ['n', 'r de Pearson', 'p', 'rho de Spearman', 'p'], rows: [[String(c.n), fmt(c.r, 2), fmtP(c.pR), fmt(c.rho, 2), fmtP(c.pRho)]] });
@@ -152,7 +162,7 @@ export const analizarPorObjetivo = ({ encuestas, especificos, plan }) => {
                 }
             } else {
                 const a = suyas.find((v) => v.clase === 'categorica' && !v.multiple && !v.puntos && v.frec?.items?.length >= 2);
-                const b = todas.find((v) => v !== a && v.objetivo !== k && v.clase === 'categorica' && !v.multiple && !v.puntos && v.frec?.items?.length >= 2);
+                const b = a && todas.find((v) => v !== a && v.fuente === a.fuente && v.objetivo !== k && v.clase === 'categorica' && !v.multiple && !v.puntos && v.frec?.items?.length >= 2);
                 if (a && b && a.valores.length === b.valores.length) {
                     const x = cruzar(a.valores, b.valores);
                     if (x.n >= 5 && x.gl > 0) {
@@ -168,7 +178,8 @@ export const analizarPorObjetivo = ({ encuestas, especificos, plan }) => {
     });
 
     // Confiabilidad de cada escala con las respuestas reales (alfa de Cronbach, con quienes respondieron todos sus ítems).
-    const alfaDe = (items) => {
+    const alfaDe = (todos) => {
+        const items = deUnaEncuesta(todos);
         const filas = (items[0]?.puntos || []).map((_, r) => items.map((v) => v.puntos[r])).filter((f) => f.every(Number.isFinite));
         if (items.length < 2 || filas.length < 3) return null;
         const c = cronbach(filas.map((f) => f.join('\t')).join('\n'));
@@ -190,8 +201,8 @@ export const analizarPorObjetivo = ({ encuestas, especificos, plan }) => {
     escalasPorVariable.forEach((items, variable) => {
         const porDimension = new Map();
         items.forEach((v) => porDimension.set(v.dimension || '—', [...(porDimension.get(v.dimension || '—') || []), v]));
-        porDimension.forEach((suyos, dimension) => { const d = descriptivos(compuesto(suyos).filter(Number.isFinite)); if (d.n) dimensiones.push({ variable, dimension, items: suyos.length, n: d.n, media: d.media, de: d.de, objetivo: suyos[0].objetivo }); });
-        if (porDimension.size > 1) { const d = descriptivos(compuesto(items).filter(Number.isFinite)); if (d.n) dimensiones.push({ variable, dimension: 'Total de la variable', items: items.length, n: d.n, media: d.media, de: d.de, objetivo: items[0].objetivo, total: true }); }
+        porDimension.forEach((todosLosSuyos, dimension) => { const suyos = deUnaEncuesta(todosLosSuyos); const d = descriptivos(compuesto(suyos).filter(Number.isFinite)); if (d.n) dimensiones.push({ variable, dimension, items: suyos.length, n: d.n, media: d.media, de: d.de, objetivo: suyos[0].objetivo }); });
+        if (porDimension.size > 1) { const d = descriptivos(compuesto(deUnaEncuesta(items)).filter(Number.isFinite)); if (d.n) dimensiones.push({ variable, dimension: 'Total de la variable', items: items.length, n: d.n, media: d.media, de: d.de, objetivo: items[0].objetivo, total: true }); }
     });
     if (dimensiones.length) {
         let anterior = '';

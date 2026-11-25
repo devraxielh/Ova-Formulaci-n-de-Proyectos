@@ -286,7 +286,7 @@ function App() {
                 <Suspense fallback={<Cargando pantalla />}>
                     <Cuenta onNavigate={handleTabChange} activation={activation} resetToken={resetToken} onResetDone={() => setResetToken('')} />
                 </Suspense>
-                <p className="app-acceso-pie">© Rodrigo García,PhD</p>
+                <p className="app-acceso-pie">© Rodrigo García, PhD</p>
             </div>
         );
     }
@@ -298,14 +298,14 @@ function App() {
                 <section className="app-espera" role="status">
                     <Layers size={30} color="#4f46e5" aria-hidden="true" />
                     <h1>Tu cuenta está activa</h1>
-                    <p><b>Falta un paso:</b> {user.role === 'student' ? 'tu profesor debe permitirte crear tu proyecto. Pídeselo: lo hace desde «Mis estudiantes».' : 'el administrador debe autorizarte para crear tu proyecto.'}</p>
+                    <p><b>Falta un paso:</b> {user.role === 'student' ? 'tu profesor debe permitirte crear tu proyecto: lo hace desde «Mis estudiantes». Si todavía no tienes profesor asignado, lo hace el administrador.' : 'el administrador debe autorizarte para crear tu proyecto.'}</p>
                     <p>Cuando lo haga, esta página se actualizará sola. Si un compañero te invita a su proyecto, también lo verás aquí.</p>
                     <div>
                         <button type="button" className="pro-btn pro-btn--primary" disabled={comprobando} onClick={async () => { setComprobando(true); try { await recheck(); } catch { /* se reintenta solo */ } finally { setComprobando(false); } }}>{comprobando ? 'Comprobando…' : 'Comprobar ahora'}</button>
                         <button type="button" className="pro-btn pro-btn--ghost" onClick={handleLogout} disabled={signingOut}>Cerrar sesión</button>
                     </div>
                 </section>
-                <p className="app-acceso-pie">© Rodrigo García,PhD</p>
+                <p className="app-acceso-pie">© Rodrigo García, PhD</p>
             </div>
         );
     }
@@ -316,7 +316,10 @@ function App() {
             {/* Mobile Header */}
             <header className="mobile-header">
                 <button
+                    type="button"
                     onClick={toggleSidebar}
+                    aria-label={isSidebarOpen ? 'Cerrar el menú' : 'Abrir el menú'}
+                    aria-expanded={isSidebarOpen}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.5rem', color: '#1e293b' }}
                 >
                     <Menu size={24} />
@@ -405,10 +408,10 @@ function App() {
                     <button
                         className={`nav-button ${activeTab === 'pregunta' ? 'active' : ''} ${doneTabs.has('pregunta') ? 'nav-button--done' : ''}`}
                         onClick={() => handleTabChange('pregunta')}
-                        title="Pregunta Investigación"
+                        title="Pregunta de investigación"
                     >
                         <HelpCircle size={20} />
-                        <span>Pregunta Investigación</span>
+                        <span>Pregunta de investigación</span>
                         {doneTabs.has('pregunta') && <CheckCircle2 size={16} className="nav-done-check" aria-label="completado" />}
                     </button>
 
@@ -435,10 +438,10 @@ function App() {
                     <button
                         className={`nav-button ${activeTab === 'planteamiento' ? 'active' : ''} ${doneTabs.has('planteamiento') ? 'nav-button--done' : ''}`}
                         onClick={() => handleTabChange('planteamiento')}
-                        title="Planteamiento Problema"
+                        title="Planteamiento del problema"
                     >
                         <FileText size={20} />
-                        <span>Planteamiento Problema</span>
+                        <span>Planteamiento del problema</span>
                         {doneTabs.has('planteamiento') && <CheckCircle2 size={16} className="nav-done-check" aria-label="completado" />}
                     </button>
 
@@ -475,10 +478,10 @@ function App() {
                     <button
                         className={`nav-button ${activeTab === 'alcances' ? 'active' : ''} ${doneTabs.has('alcances') ? 'nav-button--done' : ''}`}
                         onClick={() => handleTabChange('alcances')}
-                        title="Alcances y Limites"
+                        title="Alcances y limitaciones"
                     >
                         <Compass size={20} />
-                        <span>Alcances y Limites</span>
+                        <span>Alcances y limitaciones</span>
                         {doneTabs.has('alcances') && <CheckCircle2 size={16} className="nav-done-check" aria-label="completado" />}
                     </button>
 
@@ -590,7 +593,7 @@ function App() {
                             <small>{user.name}</small>
                         </button>
                     )}
-                    <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>© Rodrigo García,PhD</p>
+                    <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>© Rodrigo García, PhD</p>
                 </div>
             </aside>
             {pista && <div className="sidebar-pista" role="tooltip" style={{ top: pista.y, left: pista.x }}>{pista.texto}</div>}

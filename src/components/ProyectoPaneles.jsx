@@ -48,7 +48,7 @@ export const Equipo = () => {
             const r = await api.addMember(project.id, email);
             setMembers(r.members);
             window.dispatchEvent(new Event('projectsia:equipo')); // el documento vuelve a leer sus autores
-            setMsg(r.mailed ? `Invitación enviada a ${email.trim()}.` : `${email.trim()} ya puede abrir el proyecto al iniciar sesión con ese correo.`);
+            setMsg(r.mailed ? `Invitación enviada a ${email.trim()}.` : `${email.trim()} verá el proyecto cuando inicie sesión con ese correo. Si aún no tiene cuenta, debe pedirla a su profesor o al administrador.`);
             setEmail('');
         } catch (err) {
             setError(err.message);
@@ -78,7 +78,7 @@ export const Equipo = () => {
                     <li key={m.email}>
                         <span>
                             <b>{m.name || m.email}</b>
-                            <small>{m.owner ? 'Creó el proyecto' : m.registered ? m.email : `${m.email} · aún no ha creado su cuenta`}</small>
+                            <small>{m.owner ? 'Creó el proyecto' : m.registered ? m.email : `${m.email} · aún no tiene cuenta: debe pedirla a su profesor o al administrador`}</small>
                         </span>
                         {!m.owner && isOwner && <button type="button" className="pro-link pro-link--danger" onClick={() => quitar(m)}><Trash2 size={14} /> Quitar</button>}
                         {!m.owner && !isOwner && m.email === yo && <button type="button" className="pro-link pro-link--danger" onClick={() => quitar(m)}><LogOut size={14} /> Salir del proyecto</button>}

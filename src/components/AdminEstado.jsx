@@ -81,7 +81,7 @@ const AdminEstado = ({ fijo = false, onRestaurada }) => {
                 <span data-ok={copiaHoy}>{copiaHoy ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />} Copia de hoy</span>
                 <span data-ok={iaBien}>{iaBien ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />} IA</span>
                 <span data-ok={estado.mail}>{estado.mail ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />} Correo</span>
-                <span data-ok={estado.errors.length === 0}>{estado.errors.length === 0 ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />} {estado.errors.length} errores</span>
+                <span data-ok={estado.errors.length === 0}>{estado.errors.length === 0 ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />} {estado.errors.length === 0 ? 'Sin errores' : estado.errors.length === 1 ? '1 error' : `${estado.errors.length} errores`}</span>
             </button>
             {abierto && (
                 <div className="adm-estado-body">
@@ -117,8 +117,8 @@ const AdminEstado = ({ fijo = false, onRestaurada }) => {
                     </div>
                     <div>
                         <h3><Activity size={16} aria-hidden="true" /> Servicios</h3>
-                        <p className="adm-muted">Servidor activo desde {fecha(estado.startedAt)}. IA: {estado.ai.configured ? (estado.ai.fails ? `${estado.ai.fails} fallos seguidos (${estado.ai.lastError})` : `funcionando${estado.ai.lastOk ? `, última respuesta ${fecha(estado.ai.lastOk)}` : ''}`) : 'sin configurar'}. Si el sitio o la IA fallan, llega un aviso por correo.</p>
-                        <h3><AlertTriangle size={16} aria-hidden="true" /> Errores recientes {estado.errors.length > 0 && <button type="button" className="pro-link" onClick={limpiar}><Trash2 size={13} /> Limpiar</button>}</h3>
+                        <p className="adm-muted">Servidor activo desde {fecha(estado.startedAt)}. IA: {estado.ai.configured ? (estado.ai.fails ? `${estado.ai.fails} fallos seguidos (${estado.ai.lastError})` : `funcionando${estado.ai.lastOk ? `, última respuesta ${fecha(estado.ai.lastOk)}` : ''}`) : 'sin configurar'}. {estado.mail ? 'Si el sitio o la IA fallan, llega un aviso por correo.' : 'Sin correo configurado no llegan avisos de fallas: revisa esta página.'}</p>
+                        <h3><AlertTriangle size={16} aria-hidden="true" /> Errores recientes {estado.errors.length > 0 && <button type="button" className="pro-link" onClick={limpiar}><Trash2 size={13} /> Borrar registro</button>}</h3>
                         {estado.errors.length === 0 ? <p className="adm-muted">Sin errores registrados.</p> : (
                             <ul className="adm-errores">
                                 {estado.errors.slice(0, 20).map((e) => (

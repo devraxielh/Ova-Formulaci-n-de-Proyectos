@@ -61,7 +61,7 @@ export const VALIDACION_DETALLE = [
             'Organiza los datos en una hoja: una fila por persona y una columna por ítem. Invierte los ítems redactados en sentido negativo.',
             'Calcula el alfa por cada dimensión: α = [k / (k − 1)] · [1 − (Σ varianzas de los ítems / varianza del total)], donde k es el número de ítems.',
             'En Jamovi: Factor → Reliability Analysis. En SPSS: Analizar → Escala → Análisis de fiabilidad. En Excel, con las fórmulas VAR.S y SUMA.',
-            'Interpreta el resultado (George y Mallery, 2003): ≥ 0,9 excelente; ≥ 0,8 bueno; ≥ 0,7 aceptable; < 0,7 cuestionable.',
+            'Interpreta el resultado (George y Mallery, 2003): ≥ 0,9 excelente; ≥ 0,8 bueno; ≥ 0,7 aceptable; ≥ 0,6 cuestionable; < 0,6 pobre.',
             'Revisa «alfa si se elimina el ítem»: si al quitar un ítem el alfa sube de forma clara, revísalo o elimínalo.',
             'Reporta el alfa de cada dimensión y del instrumento completo.',
         ],

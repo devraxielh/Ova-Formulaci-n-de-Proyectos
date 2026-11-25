@@ -219,7 +219,7 @@ const Profesor = () => {
                             <Search size={16} aria-hidden="true" />
                             <input className="input-field" type="search" placeholder="Buscar por nombre o correo" aria-label="Buscar estudiantes" value={query} onChange={(e) => setQuery(e.target.value)} />
                         </div>
-                        <Selector buscar etiqueta="Filtrar por grupo" value={fGrupo} onChange={setFGrupo} opciones={[{ value: '', label: 'Todos los grupos' }, { value: SIN_GRUPO, label: 'Sin grupo' }, ...grupos.map((g) => ({ value: g, label: g, nota: `${students.filter((x) => x.grupo === g).length} estudiantes` }))]} />
+                        <Selector buscar etiqueta="Filtrar por grupo" value={fGrupo} onChange={setFGrupo} opciones={[{ value: '', label: 'Todos los grupos' }, { value: SIN_GRUPO, label: 'Sin grupo' }, ...grupos.map((g) => ({ value: g, label: g, nota: ((n) => `${n} ${n === 1 ? 'estudiante' : 'estudiantes'}`)(students.filter((x) => x.grupo === g).length) }))]} />
                         <button type="button" className="pro-btn pro-btn--ghost" disabled={busy || visibles.length === 0} onClick={permitirVisibles}>Permitir un proyecto a los que ves</button>
                         <span className="adm-muted">{visibles.length} de {students.length}</span>
                     </div>

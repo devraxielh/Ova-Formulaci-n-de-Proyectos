@@ -1,7 +1,7 @@
 // Vocabulario y estilo del proyecto.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { aplicarEstilo, aplicarEstiloEnValor, estiloVacio, hallazgosDeEstilo, normalizarEstilo, revisarProyecto, textoEstilo } from '../src/services/estilo.js';
+import { aplicarEstilo, aplicarEstiloEnJson, aplicarEstiloEnValor, estiloVacio, hallazgosDeEstilo, normalizarEstilo, revisarProyecto, textoEstilo } from '../src/services/estilo.js';
 
 const estilo = { persona: 'impersonal', tiempo: 'pasado', terminos: [{ usar: 'inasistencia', enLugarDe: 'no-show' }, { usar: 'pacientes', enLugarDe: 'usuarios' }, { usar: 'x', enLugarDe: 'x' }, { usar: '', enLugarDe: 'vacío' }], evitar: ['hoy en día', ''], notas: 'Frases cortas.' };
 
@@ -51,4 +51,16 @@ test('revisar el proyecto: cuenta, corrige lo del estudiante y no toca los datos
     assert.deepEqual(r.cambios.marcoForm.antecedentes[0], { autor: 'Usuarios et al.', titulo: 'Reducing no-show rates', hallazgo: 'redujo el inasistencia de 18 % a 7 %' });
     assert.deepEqual(aplicarEstiloEnValor({ id: 'no-show', nota: 'no-show' }, estilo), { id: 'no-show', nota: 'inasistencia' });
     assert.deepEqual(revisarProyecto({ titulo: 'Sin problemas' }, estilo), { hallazgos: [], cambios: {} });
+});
+
+test('respuesta de la IA en JSON: el vocabulario no toca las claves ni las etiquetas cortas', () => {
+    const e = { terminos: [{ usar: 'categoría', enLugarDe: 'variable' }, { usar: 'propósito', enLugarDe: 'objetivo' }] };
+    const cruda = 'Aquí va: {"filas":[{"variable":"inasistencia","objetivo":2,"tipo":"variable","item":"¿Cuál es la variable que más pesa en el objetivo del estudio?"}]} fin';
+    const r = JSON.parse(aplicarEstiloEnJson(cruda, e));
+    assert.deepEqual(Object.keys(r.filas[0]), ['variable', 'objetivo', 'tipo', 'item']); // las claves que el código lee siguen ahí
+    assert.equal(r.filas[0].tipo, 'variable'); // etiqueta corta: se compara con listas fijas
+    assert.equal(r.filas[0].item, '¿Cuál es la categoría que más pesa en el propósito del estudio?');
+    // Sin términos o sin JSON legible, la respuesta queda intacta.
+    assert.equal(aplicarEstiloEnJson(cruda, {}), cruda);
+    assert.equal(aplicarEstiloEnJson('{"a": roto', e), '{"a": roto');
 });

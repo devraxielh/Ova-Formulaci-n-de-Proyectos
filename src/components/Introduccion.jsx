@@ -79,7 +79,7 @@ const PARTES = [
     },
     {
         key: 'objetivo', label: 'Objetivo y pregunta', color: 'donde',
-        what: 'Presenta lo que busca tu investigación.',
+        what: 'Presenta lo que busca tu investigación: tu objetivo general y tu pregunta, tal como están en tu proyecto.',
         hint: 'Escribe tu objetivo general y tu pregunta tal como están en tu proyecto.',
         placeholder: 'Ej: En consecuencia, esta investigación tiene como objetivo analizar los factores asociados a…, para responder a la pregunta: ¿…?',
         conectores: ['En consecuencia,', 'Por lo anterior,', 'Este estudio tiene como objetivo', 'Así, se busca responder'],
@@ -135,6 +135,13 @@ export const metodoDesdeMetodologia = (data) => {
     return `Para ello, se desarrolla un estudio ${lista(rasgos)}${quien ? `, con ${conLos(quien)}` : ''}${quien && donde ? ` de ${donde}` : ''}${tecnicas.length ? `, mediante ${lista(tecnicas)}` : ''}.`;
 };
 
+// «Objetivo y pregunta» también es automático: sale de los Objetivos y de la Pregunta, tal como están en el proyecto.
+export const objetivoDesdeProyecto = (data) => {
+    const general = generalDe(data.objetivos, data.objetivoGeneral);
+    const pregunta = clean(data.pregunta);
+    return general ? `En consecuencia, esta investigación tiene como objetivo ${lower(general.replace(/\.$/, ''))}${pregunta ? `, para responder a la pregunta: ${pregunta}` : '.'}` : '';
+};
+
 // Borradores de cada movimiento armados con lo que ya está en el proyecto.
 const borradores = (data) => {
     const idea = data.idea || {};
@@ -158,7 +165,7 @@ const borradores = (data) => {
         contexto: primeraOracion(pf.contexto) || (problema ? `En la actualidad, ${problema} es una situación que preocupa [agrega un dato del país o la región y su fuente].` : ''),
         problema: problema ? `${donde ? `En ${donde}, ` : ''}${quien ? `${conLos(quien)} presentan` : 'se presenta'} ${problema}${idea.efecto1 ? `, lo que genera ${lower(clean(idea.efecto1))}` : ''}.` : '',
         importancia: primeraOracion(jf.importancia) || (problema ? `Aunque ${problema} es conocido, no se han estudiado sus causas en esta población, lo que impide [di qué no se puede hacer sin este conocimiento].` : ''),
-        objetivo: general ? `En consecuencia, esta investigación tiene como objetivo ${lower(general.replace(/\.$/, ''))}${pregunta ? `, para responder a la pregunta: ${pregunta}` : '.'}` : '',
+        objetivo: objetivoDesdeProyecto(data),
         metodo: metodoDesdeMetodologia(data) || (tipo || enfoque
             ? `Para ello, se desarrolla un estudio${enfoque ? ` de enfoque ${enfoque.toLowerCase()}` : ''}${tipo ? ` de alcance ${tipo.toLowerCase()}` : ''}${quien ? ` con ${lower(quien)}` : ''}${donde ? ` de ${donde}` : ''}, mediante [nombra la técnica principal, por ejemplo una encuesta].`
             : ''),
@@ -365,6 +372,17 @@ const Constructor = ({ intro, onNavigate }) => {
         if (metodoAuto && f.metodo !== metodoAuto) update({ metodo: metodoAuto });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [metodoAuto]);
+    // «Objetivo y pregunta» funciona igual: se llena sola con el objetivo general y la pregunta, y se actualiza con ellos.
+    const objetivoAuto = objetivoDesdeProyecto(data);
+    useEffect(() => {
+        if (objetivoAuto && f.objetivo !== objetivoAuto) update({ objetivo: objetivoAuto });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [objetivoAuto]);
+    // Partes que no se escriben aquí: de dónde salen y qué decir mientras falta su origen.
+    const AUTO = {
+        metodo: { valor: metodoAuto, falta: 'Se llenará sola cuando completes tu Metodología (enfoque y tipo de investigación).', lista: 'Sale de tu Metodología y se actualiza sola. Para cambiarla, edita la Metodología.', pendiente: 'Esta parte no se escribe aquí: sale de tu Metodología.', destino: 'metodologia', ir: 'Ir a Metodología', definir: 'Definir la Metodología' },
+        objetivo: { valor: objetivoAuto, falta: 'Se llenará sola cuando redactes tu objetivo general (y tu pregunta de investigación).', lista: `Sale de tus Objetivos${clean(data.pregunta) ? ' y de tu Pregunta' : ''} y se actualiza sola. Para cambiarla, edita ${clean(data.pregunta) ? 'esas clases' : 'los Objetivos'}.`, pendiente: 'Esta parte no se escribe aquí: sale de tus Objetivos y de tu Pregunta.', destino: 'objetivos', ir: 'Ir a Objetivos', definir: 'Redactar los Objetivos' },
+    };
 
     const text = assemble(f);
     const words = countWords(text);
@@ -380,7 +398,7 @@ const Constructor = ({ intro, onNavigate }) => {
     const componer = () => {
         setSaved(false);
         const patch = {};
-        PARTES.forEach((parte) => { if (parte.key !== 'metodo' && !String(f[parte.key] || '').trim() && ejemplos[parte.key]) patch[parte.key] = ejemplos[parte.key]; });
+        PARTES.forEach((parte) => { if (!AUTO[parte.key] && !String(f[parte.key] || '').trim() && ejemplos[parte.key]) patch[parte.key] = ejemplos[parte.key]; });
         update(patch);
     };
     const save = () => {
@@ -391,7 +409,7 @@ const Constructor = ({ intro, onNavigate }) => {
     // Guardado automático: lo redactado pasa a Mi proyecto sin tener que tocar «Guardar».
     useAutoGuardar(text, save);
     const meterState = words === 0 ? 'empty' : words < MIN_PALABRAS ? 'short' : words <= MAX_PALABRAS ? 'ok' : 'over';
-    const vacios = PARTES.filter((parte) => parte.key !== 'metodo' && !String(f[parte.key] || '').trim() && ejemplos[parte.key]).length;
+    const vacios = PARTES.filter((parte) => !AUTO[parte.key] && !String(f[parte.key] || '').trim() && ejemplos[parte.key]).length;
 
     return (
         <div className="pla-builder-wrap">
@@ -423,12 +441,12 @@ const Constructor = ({ intro, onNavigate }) => {
                                 <mark data-part={parte.color} data-active="true">{index + 1}</mark> {parte.label}
                             </label>
                             <small className="jus-what">{parte.what}</small>
-                            {parte.key === 'metodo' ? (
-                                <div className="int-auto" data-lista={Boolean(metodoAuto)} aria-live="polite">
-                                    <p id="int-metodo" className="int-auto-texto">{metodoAuto || clean(f.metodo) || 'Se llenará sola cuando completes tu Metodología (enfoque y tipo de investigación).'}</p>
+                            {AUTO[parte.key] ? (
+                                <div className="int-auto" data-lista={Boolean(AUTO[parte.key].valor)} aria-live="polite">
+                                    <p id={`int-${parte.key}`} className="int-auto-texto">{AUTO[parte.key].valor || clean(f[parte.key]) || AUTO[parte.key].falta}</p>
                                     <small>
-                                        {metodoAuto ? 'Sale de tu Metodología y se actualiza sola. Para cambiarla, edita la Metodología.' : 'Esta parte no se escribe aquí: sale de tu Metodología.'}
-                                        {onNavigate && <> <button type="button" className="ide-link" onClick={() => onNavigate('metodologia')}>{metodoAuto ? 'Ir a Metodología' : 'Definir la Metodología'}</button></>}
+                                        {AUTO[parte.key].valor ? AUTO[parte.key].lista : AUTO[parte.key].pendiente}
+                                        {onNavigate && <> <button type="button" className="ide-link" onClick={() => onNavigate(AUTO[parte.key].destino)}>{AUTO[parte.key].valor ? AUTO[parte.key].ir : AUTO[parte.key].definir}</button></>}
                                     </small>
                                 </div>
                             ) : (
@@ -763,7 +781,7 @@ const Introduccion = ({ onNavigate }) => {
             label="Introducción"
             teoria={TEORIA}
             renderSlide={renderSlide}
-            finish={onNavigate ? { label: 'Ver mi proyecto completo', onClick: () => onNavigate('proyecto') } : null}
+            finish={onNavigate ? { label: 'Escribir el resumen', onClick: () => onNavigate('resumen') } : null}
         />
     );
 };

@@ -1083,3 +1083,112 @@ test('grupos con profesor, cuota de IA y estado de los servicios', async () => {
         ia.close();
     }
 });
+
+test('auditoría: IA solo con sesión, cuota por respuestas, contraseña temporal, grupos coherentes, encuestas y restauración', async () => {
+    const http = await import('node:http');
+    let falla = false;
+    const ia = http.createServer((req, res) => {
+        req.resume();
+        req.on('end', () => {
+            res.setHeader('Content-Type', 'application/json');
+            if (falla) { res.statusCode = 500; return res.end(JSON.stringify({ error: { message: 'se cayó' } })); }
+            return res.end(JSON.stringify({ choices: [{ message: { content: 'hola' } }] }));
+        });
+    });
+    await new Promise((r) => { ia.listen(0, '127.0.0.1', r); });
+    const puerto = PORT + 4;
+    const dir = path.join(tmp, 'auditoria');
+    const hijo = spawn(process.execPath, ['index.js'], { cwd: path.join(root, 'server'), env: { ...process.env, PORT: String(puerto), DB_PATH: path.join(dir, 'a.db'), BACKUP_DIR: path.join(dir, 'copias'), NODE_ENV: 'test', OPENALEX_API_KEY: '', SEMANTIC_SCHOLAR_API_KEY: '', SMTP_HOST: '', RULEX_API_KEY: '', GROQ_API_KEY: 'clave-de-prueba', GROQ_URL: `http://127.0.0.1:${ia.address().port}/v1/chat/completions`, AI_DAILY_LIMIT: '2', ADMIN_INITIAL_PASSWORD: 'inicial-de-prueba' } });
+    try {
+        const base = `http://127.0.0.1:${puerto}/api`;
+        for (let i = 0; i < 50; i += 1) { try { if ((await fetch(`${base}/health`)).ok) break; } catch { /* arrancando */ } await new Promise((r) => setTimeout(r, 100)); }
+        const nav = () => { let cookie = ''; return async (ruta, method = 'GET', body) => { const res = await fetch(base + ruta, { method, headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) }, body: method === 'GET' ? undefined : JSON.stringify(body || {}) }); const set = res.headers.get('set-cookie'); if (set) cookie = set.split(';')[0]; return { status: res.status, body: await res.json().catch(() => ({})) }; }; };
+        const admin = nav();
+        const claveAdmin = clave();
+        await admin('/auth/login', 'POST', { email: 'admin', password: 'inicial-de-prueba' });
+        await admin('/auth/password', 'POST', { current: 'inicial-de-prueba', next: claveAdmin });
+        const crear = async (nombre, role, extra = {}, estrenarla = true) => {
+            const r = await admin('/admin/users', 'POST', { name: nombre, email: `${nombre}@example.test`, role, ...extra });
+            assert.equal(r.status, 201);
+            const api = nav();
+            await api('/auth/login', 'POST', { email: `${nombre}@example.test`, password: r.body.clave });
+            if (estrenarla) await api('/auth/password', 'POST', { current: r.body.clave, next: clave() });
+            return { api, id: r.body.user.id, user: r.body.user };
+        };
+        const cuenta = async (id) => (await admin('/admin/users')).body.users.find((u) => u.id === id);
+        const grupo = async (name) => (await admin('/admin/groups')).body.groups.find((g) => g.name === name);
+        const pedir = (api, messages = [{ role: 'user', content: 'hola' }]) => api('/ai/chat', 'POST', { messages });
+
+        /* IA: sin sesión no hay IA; una cookie rota no tumba nada. */
+        assert.equal((await pedir(nav())).status, 401);
+        const rota = await fetch(`${base}/health`, { headers: { Cookie: 'psia_session=%E0%A4%A' } });
+        assert.equal(rota.status, 200);
+
+        /* La cuota (2 por día) cuenta respuestas: los intentos que fallan no la gastan. */
+        const ana = await crear('ana', 'student', { grupo: 'G1' });
+        await admin(`/admin/users/${ana.id}/limit`, 'POST', { limit: 1 });
+        assert.equal((await pedir(ana.api, [])).status, 400);
+        falla = true;
+        assert.equal((await pedir(ana.api)).status, 502);
+        assert.equal((await pedir(ana.api)).status, 502);
+        falla = false;
+        assert.equal((await pedir(ana.api)).status, 200);
+        assert.equal((await pedir(ana.api)).status, 200);
+        assert.equal((await pedir(ana.api)).status, 429);
+
+        /* Con la contraseña temporal no se trabaja: primero hay que cambiarla. */
+        const temporal = await crear('temporal', 'researcher', {}, false);
+        const bloqueada = await pedir(temporal.api);
+        assert.deepEqual([bloqueada.status, bloqueada.body.code], [403, 'must_change_password']);
+        assert.equal((await temporal.api('/projects', 'POST', { name: 'X', data: {} })).status, 403);
+        assert.equal((await temporal.api('/projects')).status, 200); // leer lo propio sí
+
+        /* Grupos: un profesor no usa el grupo de otro; quien pasa a estudiante hereda; un grupo vacío deja de existir. */
+        const profA = await crear('profa', 'teacher');
+        const profB = await crear('profb', 'teacher');
+        assert.equal((await admin('/admin/groups/teacher', 'POST', { grupo: 'G1', teacherId: profA.id })).status, 200);
+        const ajeno = await profB.api('/teacher/students', 'POST', { name: 'Intruso', email: 'intruso@example.test', grupo: 'G1' });
+        assert.deepEqual([ajeno.status, /a cargo de otro profesor/.test(ajeno.body.error)], [400, true]);
+        const propio = await profB.api('/teacher/students', 'POST', { name: 'Beto', email: 'beto@example.test', grupo: 'G2' });
+        assert.equal(propio.status, 201);
+        assert.equal((await profB.api('/teacher/students/bulk', 'POST', { ids: [propio.body.student.id], action: 'group', value: 'G1' })).status, 400);
+        const inv = await crear('inv', 'researcher', { grupo: 'G1' });
+        await admin(`/admin/users/${inv.id}/role`, 'POST', { role: 'student' });
+        assert.equal((await cuenta(inv.id)).teacherId, profA.id);
+        // Se vacía G1: desaparecen su profesor y su cuota, y quien reutilice el nombre no hereda nada.
+        await admin('/admin/groups/ai-limit', 'POST', { grupo: 'G1', limit: 9 });
+        await admin('/admin/users/bulk', 'POST', { ids: [ana.id, inv.id], action: 'group', value: '' });
+        assert.equal(await grupo('G1'), undefined);
+        const nuevo = await crear('nuevo', 'student', { grupo: 'G1' });
+        assert.deepEqual([nuevo.user.teacherId, (await grupo('G1')).teacherId, (await grupo('G1')).aiLimit], [null, null, null]);
+
+        /* Proyectos: no se traspasan ni se duplican a un invitado. */
+        const p = (await ana.api('/projects', 'POST', { name: 'Tesis', data: { titulo: 'T' } })).body.project;
+        const invitado = await admin('/admin/users', 'POST', { name: 'Visita', email: 'visita@example.test', role: 'guest' });
+        assert.equal((await admin(`/admin/projects/${p.id}/transfer`, 'POST', { userId: invitado.body.user.id })).status, 400);
+        assert.equal((await admin(`/admin/projects/${p.id}/duplicate`, 'POST', { userId: invitado.body.user.id })).status, 400);
+
+        /* Encuestas: una pregunta de opciones necesita dos opciones; se puede cerrar sin volver a publicar. */
+        const mala = await ana.api(`/projects/${p.id}/surveys/ins1`, 'PUT', { definition: { titulo: 'E', preguntas: [{ id: 'q1', texto: '¿Cuál?', tipo: 'opcion', opciones: ['Única'] }] }, open: true });
+        assert.deepEqual([mala.status, /al menos dos opciones/.test(mala.body.error)], [400, true]);
+        const buena = await ana.api(`/projects/${p.id}/surveys/ins1`, 'PUT', { definition: { titulo: 'E', preguntas: [{ id: 'q1', texto: '¿Cuál?', tipo: 'opcion', opciones: ['A', 'B'] }] }, open: true });
+        assert.equal(buena.status, 200);
+        const cerrada = await ana.api(`/projects/${p.id}/surveys/ins1`, 'PUT', { open: false });
+        assert.deepEqual([cerrada.status, cerrada.body.survey.open], [200, false]);
+        assert.equal((await fetch(`${base}/encuestas/${buena.body.survey.token}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answers: { q1: 'A' } }) })).status >= 400, true);
+        assert.equal((await ana.api(`/projects/${p.id}/surveys/ins1`, 'PUT', { open: true })).body.survey.open, true);
+
+        /* Restaurar una copia: los grupos vuelven como estaban ese día y nada queda a cargo de quien ya no existe. */
+        const copia = (await admin('/admin/backups', 'POST')).body.backup.name; // en la copia: G2 sin profesor de grupo
+        const profC = await crear('profc', 'teacher');
+        await admin('/admin/groups/teacher', 'POST', { grupo: 'G2', teacherId: profC.id });
+        assert.equal((await grupo('G2')).teacherId, profC.id);
+        assert.equal((await admin(`/admin/backups/${copia}/restore`, 'POST', { confirm: 'RESTAURAR', password: claveAdmin })).status, 200);
+        const g2 = await grupo('G2');
+        assert.deepEqual([g2.teacherId, g2.historial.filter((h) => !h.hasta).length], [null, 0]);
+        assert.equal((await admin('/admin/users')).body.users.some((u) => u.teacherId === profC.id), false);
+    } finally {
+        hijo.kill();
+        ia.close();
+    }
+});

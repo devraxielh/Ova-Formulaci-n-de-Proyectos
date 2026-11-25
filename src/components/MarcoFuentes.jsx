@@ -46,8 +46,9 @@ export const Integrado = ({ apartado, f, valor, onChange, proyecto }) => {
             const usadas = new Set(r.aceptados.flatMap((p) => p.fuentes));
             const sinUsar = fuentes.filter((x) => !usadas.has(x.clave));
             avisar(`Texto integrado con ${usadas.size} de tus ${fuentes.length} fuentes.${r.descartados.length ? ` Se descartaron ${r.descartados.length} párrafos porque citaban algo que no está en tus fichas.` : ''}${sinUsar.length ? ` No se usó: ${sinUsar.map((x) => `${x.autor} (${x.anio})`).join('; ')}.` : ''}`);
-        } catch {
-            avisar('No se pudo redactar con tus fuentes. Inténtalo de nuevo.', 'error');
+        } catch (err) {
+            // La cuota de IA agotada ya la avisa el cliente del API con su propio mensaje.
+            if (err?.code !== 'cuota_ia') avisar('No se pudo redactar con tus fuentes. Inténtalo de nuevo.', 'error');
         } finally {
             setEstado('');
         }

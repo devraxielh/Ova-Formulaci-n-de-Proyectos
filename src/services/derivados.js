@@ -40,14 +40,16 @@ export const desfaseCronograma = (data) => {
     if (!mismaUnidad) avisos.push(`Las fases están en ${nombreUnidad(d.unidad, 2)} y el cronograma en ${nombreUnidad(unidadCrono, 2)}.`);
     else if (periodos && periodos !== d.periodos) avisos.push(`Las fases suman ${d.periodos} ${nombreUnidad(d.unidad, d.periodos)} y el cronograma dura ${periodos}.`);
     const enCrono = new Set(items.map((x) => plano(x.actividad)));
-    const enFases = new Map(d.filas.map((x) => [plano(x.actividad), x]));
+    // Una misma actividad puede estar en varias fases: se guardan todos sus tramos.
+    const enFases = new Map();
+    d.filas.forEach((x) => enFases.set(plano(x.actividad), [...(enFases.get(plano(x.actividad)) || []), x]));
     const faltan = d.filas.filter((x) => !enCrono.has(plano(x.actividad))).map((x) => x.actividad);
     if (faltan.length) avisos.push(`${plural(faltan.length, 'actividad de tus fases no está', 'actividades de tus fases no están')} en el cronograma: ${nombres(faltan)}.`);
     // Solo se revisan las filas que vinieron de las fases («Fase 2. …»): las que el estudiante agregó a mano son suyas.
     const sobran = items.filter((x) => /^Fase \d+\./.test(t(x.fase)) && !enFases.has(plano(x.actividad))).map((x) => t(x.actividad));
     if (sobran.length) avisos.push(`${plural(sobran.length, 'actividad del cronograma ya no está', 'actividades del cronograma ya no están')} en tus fases: ${nombres(sobran)}.`);
     if (mismaUnidad) {
-        const fuera = items.filter((x) => { const f = enFases.get(plano(x.actividad)); return f && (Number(x.inicio) < f.inicio || Number(x.fin) > f.fin); }).map((x) => t(x.actividad));
+        const fuera = items.filter((x) => { const tramos = enFases.get(plano(x.actividad)); return tramos && !tramos.some((f) => Number(x.inicio) >= f.inicio && Number(x.fin) <= f.fin); }).map((x) => t(x.actividad));
         if (fuera.length) avisos.push(`${plural(fuera.length, 'actividad quedó', 'actividades quedaron')} por fuera de las fechas de su fase: ${nombres(fuera)}.`);
     }
     return avisos;

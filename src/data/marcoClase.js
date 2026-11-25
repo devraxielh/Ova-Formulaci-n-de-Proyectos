@@ -84,7 +84,7 @@ export const SLIDES = construccionPrimero([
         panel: {
             type: 'tabs', title: 'Lo que debe tener cada ficha', items: [
                 { id: 'quien', label: 'Quién y cuándo', what: 'Autor(es) y año.', example: 'Pérez y Gómez (2022)' },
-                { id: 'que', label: 'Qué hizo', what: 'Título, lugar, objetivo y método.', example: 'Analizaron la inasistencia en 1.200 pacientes de un hospital de Bogotá con una encuesta.' },
+                { id: 'que', label: 'Qué hizo', what: 'Título, lugar, objetivo y método.', example: 'Analizaron las causas de la inasistencia en 380 pacientes de una IPS de Bogotá con una encuesta.' },
                 { id: 'hallo', label: 'Qué encontró', what: 'El hallazgo principal, con cifras si las hay.', example: 'El olvido explicó el 41 % de las citas perdidas.' },
                 { id: 'relacion', label: 'Qué te aporta', what: 'Cómo se relaciona con tu estudio.', example: 'Aporta una de las variables que se medirán y el instrumento que se adaptará.' },
                 { id: 'fuente', label: 'Fuente', what: 'Revista, repositorio o base de datos, y su DOI o enlace.', example: 'Revista de Salud Pública, 24(3). https://doi.org/…' },
@@ -238,7 +238,7 @@ export const SLIDES = construccionPrimero([
                 { id: 'piaget', label: 'Constructivismo', what: 'Piaget (1952): el conocimiento se construye por la interacción del sujeto con el medio, mediante asimilación y acomodación.', example: 'Sirve para: estrategias activas, desarrollo cognitivo.' },
                 { id: 'vygotsky', label: 'Sociocultural', what: 'Vygotsky (1978): se aprende en interacción social; la zona de desarrollo próximo es lo que el estudiante logra con ayuda.', example: 'Sirve para: trabajo colaborativo, tutorías, mediación docente.' },
                 { id: 'ausubel', label: 'Aprendizaje significativo', what: 'Ausubel (1963): se aprende cuando la nueva información se relaciona con lo que el estudiante ya sabe.', example: 'Sirve para: secuencias didácticas, organizadores previos.' },
-                { id: 'gardner', label: 'Inteligencias múltiples', what: 'Gardner (1983): existen varias inteligencias (lingüística, lógico-matemática, espacial, musical, corporal, interpersonal, intrapersonal, naturalista).', example: 'Sirve para: diversificar la enseñanza y la evaluación.' },
+                { id: 'gardner', label: 'Inteligencias múltiples', what: 'Gardner (1983; ampliada en 1995): existen varias inteligencias (lingüística, lógico-matemática, espacial, musical, corporal, interpersonal, intrapersonal, naturalista).', example: 'Sirve para: diversificar la enseñanza y la evaluación.' },
             ],
         },
     },
@@ -596,7 +596,7 @@ export const SLIDES = construccionPrimero([
         panel: {
             type: 'tabs', title: 'Formas de citar', items: [
                 { id: 'parafrasis', label: 'Paráfrasis', what: 'Dices con tus palabras lo que dijo el autor. Es la forma más usada.', example: 'La inasistencia se asocia con el olvido de la cita (Pérez, 2022).' },
-                { id: 'narrativa', label: 'Cita narrativa', what: 'El autor es parte de la oración.', example: 'Pérez (2022) encontró que el olvido explica la mayoría de las citas perdidas.' },
+                { id: 'narrativa', label: 'Cita narrativa', what: 'El autor es parte de la oración.', example: 'Pérez (2022) encontró que el olvido es la causa más frecuente de las citas perdidas.' },
                 { id: 'textual', label: 'Cita textual corta', what: 'Menos de 40 palabras: entre comillas y con página.', example: '«El olvido es la principal barrera» (Pérez, 2022, p. 15).' },
                 { id: 'larga', label: 'Cita textual larga', what: '40 palabras o más: en bloque aparte, con sangría y sin comillas.', example: 'Úsala muy poco: es mejor parafrasear.' },
             ],
@@ -608,7 +608,7 @@ export const SLIDES = construccionPrimero([
         panel: {
             type: 'tabs', title: 'Referencias por tipo de fuente', items: [
                 { id: 'art', label: 'Artículo', what: 'Autor, A. A. (año). Título del artículo. Nombre de la Revista, volumen(número), páginas. https://doi.org/…', example: 'Pérez, A. y Gómez, L. (2022). Inasistencia a citas médicas en consulta externa. Revista de Salud Pública, 24(3), 10–25. https://doi.org/…' },
-                { id: 'libro', label: 'Libro', what: 'Autor, A. A. (año). Título del libro (ed.). Editorial.', example: 'Hernández-Sampieri, R. y Mendoza, C. (2018). Metodología de la investigación. McGraw-Hill.' },
+                { id: 'libro', label: 'Libro', what: 'Autor, A. A. (año). Título del libro (ed.). Editorial.', example: 'Hernández-Sampieri, R. y Mendoza, C. (2018). Metodología de la investigación: las rutas cuantitativa, cualitativa y mixta. McGraw-Hill.' },
                 { id: 'tesis', label: 'Tesis', what: 'Autor, A. A. (año). Título [Tesis de maestría, Universidad]. Repositorio. URL', example: 'Díaz, M. (2023). Inasistencia en un centro de salud de Corozal [Tesis de pregrado, Universidad de Sucre]. Repositorio institucional.' },
                 { id: 'ley', label: 'Ley', what: 'Nombre de la ley [entidad]. Número de ley. Fecha. Diario Oficial No.', example: 'Ley 1751 de 2015. Por medio de la cual se regula el derecho fundamental a la salud. 16 de febrero de 2015. Diario Oficial No. 49.427.' },
                 { id: 'web', label: 'Página web', what: 'Autor u organización. (año, día mes). Título. Sitio. URL', example: 'Organización Mundial de la Salud. (2023). Determinantes sociales de la salud. https://www.who.int/…' },
@@ -623,7 +623,7 @@ export const SLIDES = construccionPrimero([
             type: 'table', title: 'Del original a la paráfrasis', head: ['', 'Texto'], rows: [
                 ['Original', '«El olvido de la fecha de la cita fue la causa más frecuente de inasistencia entre los pacientes encuestados» (Pérez, 2022, p. 15).'],
                 ['Plagio', 'El olvido de la fecha de la cita fue la causa más común de inasistencia entre los pacientes.'],
-                ['Paráfrasis', 'Entre los pacientes encuestados, la mayoría no asistió porque olvidó su cita (Pérez, 2022).'],
+                ['Paráfrasis', 'Entre los pacientes encuestados, el olvido de la fecha fue el motivo de inasistencia más común (Pérez, 2022).'],
             ],
         },
     },

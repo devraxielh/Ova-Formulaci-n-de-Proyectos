@@ -159,7 +159,7 @@ const FRONTERAS = [
 ];
 
 const LOQUESI = [
-    { si: 'Identificar los factores asociados a la inasistencia.', no: 'Diseñar ni aplicar un sistema de recordatorios.' },
+    { si: 'Identificar los factores asociados a la inasistencia.', no: 'Aplicar la estrategia de recordatorios ni medir su efecto.' },
     { si: 'Pacientes adultos de consulta externa.', no: 'Pacientes de urgencias, hospitalización ni menores de edad.' },
     { si: 'Un hospital de Sincelejo.', no: 'Otros hospitales del departamento.' },
     { si: 'Citas del primer semestre de 2026.', no: 'Datos de años anteriores.' },
@@ -585,7 +585,7 @@ const AlcancesLimitaciones = ({ onNavigate }) => {
             <>
                 <div>
                     {heading}
-                    <p>Según Hernández Sampieri, el alcance indica el nivel de conocimiento al que llega el estudio. Lo define lo que quieres lograr: tu pregunta y el verbo más alto de tus objetivos específicos.</p>
+                    <p>El alcance indica el nivel de conocimiento al que llega el estudio. Hernández Sampieri distingue cuatro (exploratorio, descriptivo, correlacional y explicativo); aquí se añaden el evaluativo y el propositivo, de otras clasificaciones. Lo define lo que quieres lograr: tu pregunta y el verbo más alto de tus objetivos específicos.</p>
                     {tipoEsperado
                         ? <div className="tit-saved"><span>Según tu idea, tu alcance es</span><p>{capital(tipoEsperado)}</p></div>
                         : <p className="ide-hint">Completa la Ideación y aquí verás cuál es el tuyo.</p>}

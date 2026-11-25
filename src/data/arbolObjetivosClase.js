@@ -45,7 +45,7 @@ export const SLIDES = construccionPrimero([
     /* ---------- Las tres partes (11) ---------- */
     {
         id: 'tronco', section: 'partes', min: 4, title: 'El tronco: el objetivo central',
-        lead: ['Es el problema central **dado vuelta**: la misma población y el mismo lugar, pero con la situación resuelta. De él sale tu **objetivo general**.'],
+        lead: ['Es el problema central **dado vuelta**: la misma población y el mismo lugar, pero con la situación resuelta. Orienta tu **objetivo general**, que dice qué conocimiento o propuesta aporta tu estudio para acercarse a esa situación.'],
         bullets: [
             'Conserva quiénes y dónde: no cambies de población.',
             'Dice el cambio que se busca, no la actividad que harás.',
@@ -67,7 +67,7 @@ export const SLIDES = construccionPrimero([
         ],
         panel: {
             type: 'table', title: 'De causa a medio, y de medio a objetivo específico', head: ['Causa', 'Medio', 'Objetivo específico'], rows: [
-                ['Los pacientes olvidan la fecha', 'Los pacientes recuerdan su cita', '**Implementar** recordatorios de cita por mensaje de texto.'],
+                ['Los pacientes olvidan la fecha', 'Los pacientes recuerdan su cita', '**Diseñar** un sistema de recordatorios de cita por mensaje de texto.'],
                 ['Es difícil reprogramar por teléfono', 'Reprogramar la cita es sencillo', '**Diseñar** un canal de reprogramación en línea.'],
                 ['El transporte rural es costoso', 'Las citas se ajustan al transporte disponible', '**Proponer** horarios acordes con las rutas rurales.'],
             ],
@@ -119,7 +119,7 @@ export const SLIDES = construccionPrimero([
         lead: ['El árbol de objetivos es el puente entre el problema y lo que vas a hacer. En PROJECTSIA, además, la figura entra sola en tu documento, justo debajo del árbol del problema.'],
         panel: {
             type: 'table', title: 'Para qué te sirve cada nivel', head: ['Del árbol', 'Sale'], rows: [
-                ['Objetivo central', 'Tu **objetivo general**.'],
+                ['Objetivo central', 'Orienta tu **objetivo general**.'],
                 ['Medios', 'Tus **objetivos específicos** (elige los que sí puedes cumplir).'],
                 ['Fines', 'Los argumentos de la **justificación** y el **impacto** esperado.'],
                 ['La figura', 'La **Figura** «Árbol de objetivos», debajo del árbol del problema.'],
@@ -157,7 +157,7 @@ export const SLIDES = construccionPrimero([
         lead: ['Tres preguntas antes de armar tu árbol.'],
         quiz: [
             q('¿En qué se convierten las causas?', ['En fines', 'En medios', 'En el objetivo central'], 1, 'Las raíces del problema son las raíces de la solución.'),
-            q('¿De dónde sale el objetivo general?', ['Del objetivo central', 'De los fines', 'De la justificación'], 0, 'El tronco del árbol de objetivos es tu objetivo general.'),
+            q('¿Qué parte del árbol orienta tu objetivo general?', ['El objetivo central', 'Los fines', 'La justificación'], 0, 'El tronco es la situación deseada; tu objetivo general dice qué aporta tu estudio para acercarse a ella y se redacta con el título y la pregunta.'),
             q('¿Qué pregunta responden los fines?', ['¿Cómo se logra?', '¿Para qué se logra?', '¿Por qué ocurre?'], 1, 'Son los beneficios a los que contribuye lograr el objetivo.'),
         ],
     },
@@ -167,7 +167,7 @@ export const SLIDES = construccionPrimero([
         bullets: [
             'El árbol de objetivos es el árbol del problema **en positivo**.',
             'Causas → **medios**; problema → **objetivo central**; efectos → **fines**.',
-            'El objetivo central es tu objetivo general.',
+            'El objetivo central orienta tu objetivo general.',
             'De los medios salen tus objetivos específicos.',
             'Los fines alimentan la justificación.',
         ],

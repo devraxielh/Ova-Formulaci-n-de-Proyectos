@@ -49,7 +49,7 @@ export const SLIDES = construccionPrimero([
             type: 'chain', title: 'Un objetivo, todo su método', items: [
                 { label: 'Objetivo específico', text: 'Establecer la relación entre el olvido de la cita y la inasistencia.', note: 'Lo que quieres lograr.' },
                 { label: 'Enfoque, tipo y diseño', text: 'Cuantitativo, correlacional, no experimental transversal.', note: '«Establecer la relación» pide medir y correlacionar.' },
-                { label: 'Población e instrumento', text: '278 pacientes; encuesta con un cuestionario validado.', note: 'De quiénes y con qué.' },
+                { label: 'Población, muestra e instrumento', text: '1.000 pacientes; muestra de 278; encuesta con un cuestionario validado.', note: 'De quiénes y con qué.' },
                 { label: 'Análisis', text: 'Correlación de Spearman en Jamovi.', note: 'Cómo se responde el objetivo.' },
             ],
         },

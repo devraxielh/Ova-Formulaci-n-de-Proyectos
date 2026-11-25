@@ -59,8 +59,8 @@ const Operacionalizacion = () => {
             setGuardadas((prev) => { if (sola && filasValidas(prev).length) { puesta = false; return prev; } return nuevas; });
             setYaSugerida(true);
             if (puesta) avisar(sola ? 'Llenamos la tabla con las variables de tus objetivos. Revísala y ajústala: cada ítem pasará a ser una pregunta de tu instrumento.' : 'Tabla lista. Revísala: cada ítem pasará a ser una pregunta de tu instrumento.');
-        } catch {
-            if (!sola) avisar('No se pudo generar la tabla. Inténtalo de nuevo.', 'error');
+        } catch (err) {
+            if (!sola && err?.code !== 'cuota_ia') avisar('No se pudo generar la tabla. Inténtalo de nuevo.', 'error');
         } finally {
             setEstado('');
         }

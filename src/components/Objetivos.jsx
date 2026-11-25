@@ -50,7 +50,7 @@ const countWords = (text) => String(text || '').trim().split(/\s+/).filter(Boole
 const capital = (text) => (text ? text.charAt(0).toUpperCase() + text.slice(1) : '');
 const firstWord = (text) => clean(text).split(/\s+/)[0] || '';
 const isInfinitive = (word) => /^[a-záéíóúñ]+(ar|er|ir)$/i.test(word);
-const VERBOS_DEBILES = ['conocer', 'saber', 'entender', 'comprender', 'aprender', 'estudiar', 'investigar', 'ver', 'mirar', 'lograr', 'tratar', 'intentar', 'buscar', 'realizar', 'hacer'];
+const VERBOS_DEBILES = ['conocer', 'saber', 'entender', 'aprender', 'estudiar', 'investigar', 'ver', 'mirar', 'lograr', 'tratar', 'intentar', 'buscar', 'realizar', 'hacer'];
 const ACTIVIDADES = /\b(aplicar (una |la |las |el )?(encuesta|entrevista)s?|encuestar|entrevistar|tabular|recolectar (los )?datos|revisar (la )?bibliograf|buscar informaci|hacer (una |la )?encuesta)/i;
 const SOLUCION_IMPLEMENTADA = /\b(implementar|ejecutar|instalar|capacitar a todos|solucionar|resolver (el|la) problema|eliminar (el|la))\b/i;
 
@@ -719,7 +719,7 @@ const Objetivos = ({ onNavigate }) => {
                     {heading}
                     <p>El verbo dice qué tan lejos llega tu investigación. Escoge el que corresponde a lo que quieres lograr y úsalo en infinitivo.</p>
                     <ul className="ide-list">
-                        <li><XCircle size={18} /><span><b>Evita</b>Conocer, saber, entender, comprender, aprender, investigar, estudiar: no se pueden verificar.</span></li>
+                        <li><XCircle size={18} /><span><b>Evita</b>Conocer, saber, entender, aprender, investigar, estudiar: no se pueden verificar. «Comprender» e «interpretar» sí valen en objetivos cualitativos.</span></li>
                         <li><CheckCircle2 size={18} /><span><b>Prefiere</b>Verbos que dejan un producto: una descripción, una relación, una comparación, una propuesta.</span></li>
                     </ul>
                 </div>

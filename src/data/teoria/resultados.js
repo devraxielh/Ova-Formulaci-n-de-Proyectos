@@ -78,7 +78,7 @@ export default {
             ['Dirección y magnitud', '«Positiva» indica que las dos variables aumentan juntas; «moderada» califica el tamaño del coeficiente. Son descripciones del número, no interpretaciones: por eso caben en los resultados.'],
             ['Descriptivo e inferencial', 'La correlación resume la relación en un número; los porcentajes de la tabla 3 la hacen visible. Presentar ambos permite que el lector vea el dato y su respaldo estadístico.'],
         ],
-        ejemplo: 'Misma estructura con un resultado no significativo: «La inasistencia fue de 27,5 % en los pacientes rurales y de 19,7 % en los urbanos; la diferencia no fue estadísticamente significativa, χ²(1, N = 278) = 2,03; p = 0,155».',
+        ejemplo: 'Misma estructura con un resultado no significativo: «La inasistencia fue de 23,0 % en las mujeres y de 20,5 % en los hombres; la diferencia no fue estadísticamente significativa, χ²(1, N = 278) = 0,24; p = 0,623».',
         ojo: 'El ejemplo dice «relación», no «efecto» ni «causa». Una correlación muestra que dos variables varían juntas, no que una produzca la otra.',
     },
     'res-cuali': {

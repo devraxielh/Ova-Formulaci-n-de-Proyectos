@@ -139,7 +139,7 @@ const VARIABLES_QUIZ = [
         why: 'El rendimiento es lo que se mide y cambia como resultado. Las tutorías son la variable independiente; los estudiantes, la población.',
     },
     {
-        text: 'En «Relación entre el uso de redes sociales y la ansiedad en adolescentes de Sincelejo», ¿cuál es la variable independiente?',
+        text: 'En «Efecto del uso de redes sociales en la ansiedad de adolescentes de Sincelejo», ¿cuál es la variable independiente?',
         options: ['El uso de redes sociales', 'La ansiedad', 'Sincelejo'],
         answer: 0,
         why: 'Es el factor que se supone influye en la ansiedad, que es la variable dependiente.',

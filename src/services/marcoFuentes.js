@@ -27,7 +27,7 @@ export const fuentesDeFichas = (f, apartado) => {
 };
 
 // Apellidos de un autor («Guevara Cando y Chafla Romero» → guevara, cando, chafla, romero), sin partículas.
-const apellidos = (autor) => plano(autor).replace(/\bet al\.?/g, '').split(/[^a-zñ]+/).filter((p) => p.length > 2 && !['los', 'las', 'del'].includes(p));
+const apellidos = (autor) => plano(autor).replace(/\bet al\.?/g, '').split(/[^a-zñ]+/).filter((p) => p.length > 1 && !['los', 'las', 'del', 'de', 'la', 'el', 'da', 'do', 'di', 'du', 'le', 'al', 'van', 'von', 'et'].includes(p));
 // La cita corresponde a la fuente si comparten algún apellido y el año: el detector de citas a veces solo ve
 // el último apellido de un autor con dos («Chafla Romero (2025)» → «Romero (2025)»).
 const mismaFuente = (cita, fuente) => apellidos(cita.autor).some((a) => apellidos(fuente.autor).includes(a))
@@ -59,7 +59,7 @@ export const revisarFuentes = (texto, fuentes) => {
             total += 1;
             const citas = citasEnTexto(o);
             // También cuenta como apoyo nombrar al autor de una fuente («Según Bandura…»), aunque falte el año.
-            const nombraAutor = lista(fuentes).some((f) => apellidos(f.autor).some((a) => a.length > 3 && new RegExp(`\\b${a}\\b`).test(plano(o))));
+            const nombraAutor = lista(fuentes).some((f) => apellidos(f.autor).some((a) => a.length > 3 && new RegExp(`(?<![\\p{L}])${a}(?![\\p{L}])`, 'u').test(plano(o))));
             if (citas.length || nombraAutor) apoyado = true;
             if (!apoyado && !PROPIA.test(o)) sinFuente.push(o);
             citas.forEach((c) => { if (lista(fuentes).length && !lista(fuentes).some((f) => mismaFuente(c, f)) && !ajenas.some((x) => x.texto === c.texto)) ajenas.push(c); });

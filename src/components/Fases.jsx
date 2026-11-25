@@ -702,7 +702,7 @@ const Fases = ({ onNavigate }) => {
             label="Desarrollo de las fases del proyecto"
             teoria={TEORIA}
             renderSlide={renderSlide}
-            finish={onNavigate ? { label: 'Resultados y discusión', onClick: () => onNavigate('resultados') } : null}
+            finish={onNavigate ? { label: 'Escribir resultados y discusión', onClick: () => onNavigate('resultados') } : null}
         />
     );
 };

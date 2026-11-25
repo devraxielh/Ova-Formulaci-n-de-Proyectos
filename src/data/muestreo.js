@@ -52,7 +52,7 @@ export const MUESTREO_DETALLE = {
             'Sortea m conglomerados.',
             'Estudia a todas las personas de los conglomerados sorteados.',
         ],
-        ejemplo: 'Un colegio tiene 40 cursos de unos 30 estudiantes. Para una muestra de 290 se sortean 10 cursos y se encuesta a todos sus estudiantes.',
+        ejemplo: 'Un colegio tiene 40 cursos de unos 30 estudiantes. Para una muestra cercana a 292 se sortean 10 cursos y se encuesta a todos sus estudiantes.',
         ventajas: 'No necesita la lista de personas y reduce costos de desplazamiento.',
         limites: 'Las personas de un mismo grupo se parecen entre sí, así que el error es mayor que en el aleatorio simple con la misma muestra.',
     },

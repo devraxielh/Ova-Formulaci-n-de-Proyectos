@@ -58,6 +58,23 @@ export const aplicarEstilo = (texto, crudo) => normalizarEstilo(crudo).terminos
     .slice().sort((a, b) => b.enLugarDe.length - a.enLugarDe.length)
     .reduce((s, x) => s.replace(patron(x.enLugarDe), (m) => comoElOriginal(m, x.usar)), String(texto ?? ''));
 
+// Respuesta de la IA en JSON: el código lee sus claves («variable», «objetivo»…) y compara etiquetas cortas con
+// listas fijas («likert», «Recursos Humanos»). Por eso el vocabulario se aplica solo a los textos redactados
+// (cuatro palabras o más) y nunca a las claves. Si no se puede leer como JSON, se devuelve tal cual.
+const enProsa = (valor, crudo) => {
+    if (typeof valor === 'string') return valor.trim().split(/\s+/).length >= 4 ? aplicarEstilo(valor, crudo) : valor;
+    if (Array.isArray(valor)) return valor.map((x) => enProsa(x, crudo));
+    if (valor && typeof valor === 'object') return Object.fromEntries(Object.entries(valor).map(([k, v]) => [k, enProsa(v, crudo)]));
+    return valor;
+};
+export const aplicarEstiloEnJson = (texto, crudo) => {
+    const s = String(texto ?? '');
+    const a = s.indexOf('{');
+    const b = s.lastIndexOf('}');
+    if (a < 0 || b <= a || !normalizarEstilo(crudo).terminos.length) return s;
+    try { return JSON.stringify(enProsa(JSON.parse(s.slice(a, b + 1)), crudo)); } catch { return s; }
+};
+
 // Términos «en lugar de» y «evitar» que todavía aparecen en un texto, con cuántas veces.
 export const hallazgosDeEstilo = (texto, crudo) => {
     const e = normalizarEstilo(crudo);

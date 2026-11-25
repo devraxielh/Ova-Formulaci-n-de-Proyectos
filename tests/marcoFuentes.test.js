@@ -66,3 +66,9 @@ test('párrafos de la IA: se descarta el que cita algo ajeno o no cita nada; se 
     assert.match(descartados[0].motivo, /López, 2023/);
     assert.match(descartados[1].motivo, /no cita ninguna/);
 });
+
+test('apellidos de dos letras (Li, Wu, Ng) también cuentan como fuente propia', () => {
+    const fuentes = [{ autor: 'Li, W.', anio: '2020', clave: 'F1' }, { autor: 'De la Ossa, P.', anio: '2021', clave: 'F2' }];
+    assert.deepEqual(revisarFuentes('Según Li (2020), los recordatorios reducen la inasistencia a las citas médicas.', fuentes).ajenas, []);
+    assert.equal(revisarFuentes('Según Wu (2019), los recordatorios reducen la inasistencia a las citas médicas.', fuentes).ajenas.length, 1);
+});

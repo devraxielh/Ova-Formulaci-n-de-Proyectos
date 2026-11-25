@@ -25,7 +25,7 @@ const SLIDES = construccionPrimero([
     { id: 'portada', section: 'apertura', min: 3, title: 'La pregunta: el corazón de tu investigación' },
     { id: 'funcion', section: 'apertura', min: 3, title: 'Título, pregunta y objetivo' },
     { id: 'camino', section: 'apertura', min: 3, title: 'Del título a la pregunta' },
-    { id: 'tipos', section: 'tipos', min: 5, title: 'Ocho tipos de pregunta' },
+    { id: 'tipos', section: 'tipos', min: 5, title: 'Once tipos de pregunta' },
     { id: 'interrogativas', section: 'tipos', min: 4, title: 'Las palabras con que empieza' },
     { id: 'variables', section: 'tipos', min: 3, title: 'Las variables en la pregunta' },
     { id: 'delimitar', section: 'tipos', min: 3, title: 'Delimitar la pregunta' },
@@ -41,7 +41,7 @@ const SLIDES = construccionPrimero([
 
 const SLIDE_KEY = 'projectsia:pregunta:diapositiva';
 
-/* ---------- Los ocho tipos ---------- */
+/* ---------- Los once tipos ---------- */
 
 /*
  * Cada tipo trae: qué busca, un ejemplo, con qué palabras suele empezar, los inicios que ofrece
@@ -702,7 +702,7 @@ const PreguntaInvestigacion = ({ onNavigate }) => {
                     <p><strong>Al terminar esta clase podrás:</strong></p>
                     <ul className="ide-bullets">
                         <li>Distinguir el título, la pregunta y el objetivo.</li>
-                        <li>Reconocer los ocho tipos de pregunta y elegir el tuyo.</li>
+                        <li>Reconocer los once tipos de pregunta y elegir el tuyo.</li>
                         <li>Evitar preguntas amplias, obvias o de sí o no.</li>
                         <li>Formular una pregunta coherente con tu título.</li>
                         <li>Revisarla con criterios de calidad.</li>
@@ -758,7 +758,7 @@ const PreguntaInvestigacion = ({ onNavigate }) => {
             <>
                 <div>
                     {heading}
-                    <p>El tipo de pregunta depende de lo que quieres lograr. Son los mismos objetivos que elegiste en la Ideación.</p>
+                    <p>El tipo de pregunta depende de lo que quieres lograr. Se corresponde con lo que elegiste en la Ideación.</p>
                     <ul className="ide-list">
                         <li><ListChecks size={18} /><span><b>Conocer o describir</b>Exploratoria, descriptiva, diagnóstica, interpretativa.</span></li>
                         <li><Users size={18} /><span><b>Comparar o relacionar</b>Comparativa, correlacional.</span></li>
@@ -908,7 +908,7 @@ const PreguntaInvestigacion = ({ onNavigate }) => {
             label="Pregunta de investigación"
             teoria={TEORIA}
             renderSlide={renderSlide}
-            finish={onNavigate ? { label: 'Plantear el problema', onClick: () => onNavigate('planteamiento') } : null}
+            finish={onNavigate ? { label: 'Armar el árbol del problema', onClick: () => onNavigate('arbol') } : null}
         />
     );
 };

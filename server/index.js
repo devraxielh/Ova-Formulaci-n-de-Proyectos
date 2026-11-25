@@ -218,7 +218,7 @@ const readCookie = (req, name) => {
     const header = req.headers.cookie || '';
     for (const part of header.split(';')) {
         const [key, ...rest] = part.trim().split('=');
-        if (key === name) return decodeURIComponent(rest.join('='));
+        if (key === name) { try { return decodeURIComponent(rest.join('=')); } catch { return ''; } }
     }
     return '';
 };
@@ -453,6 +453,25 @@ const heredarProfesor = (ids) => {
                             WHERE id = ? AND role = 'student' AND EXISTS (SELECT 1 FROM grupos WHERE name = users.grupo AND teacher_id IS NOT NULL)`);
     ids.forEach((id) => upd.run(id));
 };
+const limpiarGruposVacios = () => {
+    try {
+        db.prepare("UPDATE grupo_profesores SET hasta = ? WHERE hasta IS NULL AND grupo NOT IN (SELECT grupo FROM users WHERE grupo != '')").run(Date.now());
+        db.prepare("DELETE FROM grupos WHERE name NOT IN (SELECT grupo FROM users WHERE grupo != '')").run();
+    } catch { /* la limpieza nunca debe tumbar la solicitud */ }
+};
+// 5. Un profesor no mete a sus estudiantes en el grupo que está a cargo de otro profesor.
+const grupoDeOtroProfesor = (grupo, teacherId) => {
+    const g = grupo ? db.prepare('SELECT teacher_id FROM grupos WHERE name = ?').get(grupoLimpio(grupo)) : null;
+    return Boolean(g?.teacher_id && g.teacher_id !== teacherId);
+};
+const GRUPO_AJENO = 'Ese grupo está a cargo de otro profesor. Usa otro nombre de grupo o pide al administrador que lo cambie.';
+// Tras restaurar datos: ningún grupo ni estudiante queda a cargo de quien ya no existe o ya no es profesor.
+const sanearProfesores = () => {
+    const noProfesor = "NOT IN (SELECT id FROM users WHERE role = 'teacher')";
+    db.prepare(`UPDATE grupo_profesores SET hasta = ? WHERE hasta IS NULL AND (teacher_id IS NULL OR teacher_id ${noProfesor})`).run(Date.now());
+    db.prepare(`UPDATE grupos SET teacher_id = NULL WHERE teacher_id IS NOT NULL AND teacher_id ${noProfesor}`).run();
+    db.prepare(`UPDATE users SET teacher_id = NULL WHERE teacher_id IS NOT NULL AND teacher_id ${noProfesor}`).run();
+};
 // Quien deja de ser profesor (o se elimina) deja sus grupos sin profesor; el historial conserva su paso.
 const soltarGrupos = (teacherId) => {
     db.prepare('UPDATE grupo_profesores SET hasta = ? WHERE teacher_id = ? AND hasta IS NULL').run(Date.now(), teacherId);
@@ -579,6 +598,12 @@ setInterval(() => {
 /* ---------- App ---------- */
 
 const app = express();
+['get', 'post', 'put', 'delete'].forEach((metodo) => {
+    const original = app[metodo].bind(app);
+    app[metodo] = (ruta, ...manejadores) => original(ruta, ...manejadores.map((h) => (
+        typeof h === 'function' && h.constructor.name === 'AsyncFunction' ? (req, res, next) => h(req, res, next).catch(next) : h
+    )));
+});
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 const jsonSmall = express.json({ limit: '1mb' });
@@ -622,6 +647,13 @@ app.use(['/api/projects', '/api/ai', '/api/buscar'], (req, res, next) => {
     if (req.user?.role !== 'guest') return next();
     if (req.method === 'GET' && req.baseUrl === '/api/projects' && req.path === '/') return res.json({ projects: [] });
     return res.status(403).json({ error: 'Tu cuenta es de invitado: solo puedes ver las presentaciones.', code: 'guest' });
+});
+
+// Quien todavía tiene la contraseña temporal (la conoce quien creó la cuenta) no trabaja con ella: primero la cambia.
+app.use(['/api/projects', '/api/ai', '/api/buscar'], (req, res, next) => {
+    if (!req.user?.must_change_password) return next();
+    if (req.method === 'GET' && req.baseUrl === '/api/projects') return next(); // leer lo propio no hace daño
+    return res.status(403).json({ error: 'Cambia tu contraseña temporal antes de continuar.', code: 'must_change_password' });
 });
 
 const requireAdmin = (req, res, next) => {
@@ -809,7 +841,7 @@ app.get('/api/projects', requireUser, (req, res) => {
 app.post('/api/projects', requireUser, (req, res) => {
     const count = db.prepare('SELECT COUNT(*) AS n FROM projects WHERE user_id = ?').get(req.user.id).n;
     const limit = req.user.role === 'admin' ? MAX_PROJECTS : Number(req.user.project_limit) || 0;
-    const quien = req.user.role === 'student' ? 'tu profesor' : 'el administrador';
+    const quien = req.user.role === 'student' ? 'tu profesor o el administrador' : 'el administrador';
     if (limit === 0) return res.status(403).json({ error: `Tu cuenta todavía no tiene permiso para crear proyectos: ${quien} debe permitirlo.`, code: 'no_quota' });
     if (count >= limit) return res.status(403).json({ error: `Tu cuenta puede tener hasta ${limit} ${limit === 1 ? 'proyecto' : 'proyectos'}. Pide a ${quien} que amplíe tu cupo o elimina uno.`, code: 'quota_full' });
     const data = serializeData(req.body?.data ?? {});
@@ -947,8 +979,8 @@ app.post('/api/projects/:id/members', requireUser, ownProject, inviteLimit, asyn
                 from: MAIL_FROM,
                 to: email,
                 subject: `${req.user.name} te invitó a un proyecto en PROJECTSIA`,
-                text: `Hola:\n\n${req.user.name} te invitó a trabajar en el proyecto «${req.project.name}» en PROJECTSIA.\n\nEntra a ${APP_URL} e inicia sesión (o crea tu cuenta) con este correo: ${email}. El proyecto aparecerá en «Mi proyecto», en la lista «Tus proyectos».`,
-                html: `<p>Hola:</p><p><strong>${escapeHtml(req.user.name)}</strong> te invitó a trabajar en el proyecto «${escapeHtml(req.project.name)}» en PROJECTSIA.</p><p>Entra a <a href="${APP_URL}">${APP_URL}</a> e inicia sesión (o crea tu cuenta) con este correo: <strong>${escapeHtml(email)}</strong>. El proyecto aparecerá en «Mi proyecto», en la lista «Tus proyectos».</p>`,
+                text: `Hola:\n\n${req.user.name} te invitó a trabajar en el proyecto «${req.project.name}» en PROJECTSIA.\n\nEntra a ${APP_URL} e inicia sesión con este correo: ${email}. Si todavía no tienes cuenta, pídela a tu profesor o al administrador. El proyecto aparecerá en «Mi proyecto», en la lista «Tus proyectos».`,
+                html: `<p>Hola:</p><p><strong>${escapeHtml(req.user.name)}</strong> te invitó a trabajar en el proyecto «${escapeHtml(req.project.name)}» en PROJECTSIA.</p><p>Entra a <a href="${APP_URL}">${APP_URL}</a> e inicia sesión con este correo: <strong>${escapeHtml(email)}</strong>. Si todavía no tienes cuenta, pídela a tu profesor o al administrador. El proyecto aparecerá en «Mi proyecto», en la lista «Tus proyectos».</p>`,
             });
             mailed = true;
         } catch (error) {
@@ -1019,7 +1051,7 @@ const sendFile = (res, projectId, fileId) => {
 
 app.get('/api/projects/:id/files/:fid', requireUser, (req, res) => {
     // El administrador puede ver las figuras de cualquier proyecto (solo lectura).
-    if (req.user.role === 'admin') return sendFile(res, Number(req.params.id), req.params.fid);
+    if (req.user.role === 'admin' && !req.user.must_change_password) return sendFile(res, Number(req.params.id), req.params.fid);
     // El profesor ve las figuras de los proyectos de los estudiantes a su cargo (los supervisa en solo lectura).
     if (req.user.role === 'teacher') {
         const suyo = db.prepare("SELECT 1 FROM projects p JOIN users u ON u.id = p.user_id WHERE p.id = ? AND u.role = 'student' AND u.teacher_id = ?").get(Number(req.params.id), req.user.id);
@@ -1075,10 +1107,17 @@ app.get('/api/projects/:id/surveys', requireUser, memberProject, (req, res) => {
 // Publica o actualiza la versión en línea de un instrumento (y la abre o la cierra).
 app.put('/api/projects/:id/surveys/:iid', requireUser, memberProject, (req, res) => {
     const instrumentId = corto(req.params.iid, 20);
-    const definition = cleanSurvey(req.body?.definition);
-    if (!instrumentId || !definition) return res.status(400).json({ error: 'El instrumento necesita al menos una pregunta.' });
     const open = req.body?.open === false ? 0 : 1;
     const existing = db.prepare('SELECT * FROM surveys WHERE project_id = ? AND instrument_id = ?').get(req.project.id, instrumentId);
+    // Solo abrir o cerrar: no toca las preguntas publicadas (sirve aunque el instrumento ya no exista o esté a medio editar).
+    if (existing && req.body?.definition === undefined && typeof req.body?.open === 'boolean') {
+        db.prepare('UPDATE surveys SET open = ? WHERE id = ?').run(open, existing.id);
+        return res.json({ survey: surveyRow({ ...existing, open }) });
+    }
+    const definition = cleanSurvey(req.body?.definition);
+    if (!instrumentId || !definition) return res.status(400).json({ error: 'El instrumento necesita al menos una pregunta.' });
+    const sinOpciones = definition.preguntas.find((q) => ['opcion', 'multiple'].includes(q.tipo) && q.opciones.length < 2);
+    if (sinOpciones) return res.status(400).json({ error: `La pregunta «${sinOpciones.texto.slice(0, 60)}» necesita al menos dos opciones: nadie podría responderla.` });
     if (existing) {
         db.prepare('UPDATE surveys SET definition = ?, open = ? WHERE id = ?').run(JSON.stringify(definition), open, existing.id);
     } else {
@@ -1244,6 +1283,7 @@ app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
             db.prepare('DELETE FROM email_tokens WHERE user_id = ?').run(target.id);
         }
     })();
+    limpiarGruposVacios();
     bitacora(req, 'Modificó una cuenta', `${target.name} (${target.email})${email !== target.email ? ` → ${email}` : ''}${name !== target.name ? ` → ${name}` : ''}${grupo !== (target.grupo || '') ? ` → grupo «${grupo || 'ninguno'}»` : ''}`);
     const row = db.prepare(`${ADMIN_USERS_SQL} WHERE users.id = ? GROUP BY users.id`).get(target.id);
     return res.json({ user: adminUserRow(row) });
@@ -1269,6 +1309,7 @@ app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
     const proyectos = db.prepare('SELECT COUNT(*) AS n FROM projects WHERE user_id = ?').get(target.id).n;
     if (proyectos > 0 && !(await runBackup())) return res.status(500).json({ error: 'No se pudo crear la copia de seguridad previa, así que la cuenta no se eliminó. Inténtalo de nuevo.' });
     borrarCuenta(target, req.user.name);
+    limpiarGruposVacios();
     bitacora(req, 'Eliminó una cuenta', `${target.name} (${target.email}), ${ROL_NOMBRE[target.role] || target.role}, ${proyectos} ${proyectos === 1 ? 'proyecto' : 'proyectos'}`);
     return res.json({ ok: true, proyectos });
 });
@@ -1326,6 +1367,7 @@ app.post('/api/admin/users/bulk', requireAdmin, async (req, res) => {
             const cupo = cupoAlCambiar(value, u.project_limit);
             upd.run(value, value === 'student' ? u.teacher_id : null, cupo, u.id);
             if (u.role === 'teacher') { soltar.run(u.id); soltarGrupos(u.id); }
+            if (value === 'student' && !u.teacher_id) heredarProfesor([u.id]);
         };
         texto = `Cambió el rol a ${ROL_NOMBRE[value] || value}`;
     } else if (action === 'access') {
@@ -1346,6 +1388,7 @@ app.post('/api/admin/users/bulk', requireAdmin, async (req, res) => {
     }
 
     if (hacer) db.transaction(() => aplica.forEach(hacer))();
+    limpiarGruposVacios();
     if (aplica.length) bitacora(req, `${texto}: ${aplica.length} ${aplica.length === 1 ? 'cuenta' : 'cuentas'}`, aplica.slice(0, 12).map((u) => u.email).join(', ') + (aplica.length > 12 ? '…' : ''));
     return res.json({ hechas: aplica.length, omitidas: ids.length - aplica.length, ...(action === 'access' ? { cuentas: credenciales, mail: Boolean(mailer) } : {}) });
 });
@@ -1498,8 +1541,9 @@ app.post('/api/admin/users/:id/ia', requireAdmin, (req, res) => {
 app.post('/api/admin/projects/:id/transfer', requireAdmin, (req, res) => {
     const row = db.prepare('SELECT * FROM projects WHERE id = ?').get(Number(req.params.id));
     if (!row) return res.status(404).json({ error: 'No se encontró el proyecto.' });
-    const nuevo = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(Number(req.body?.userId));
+    const nuevo = db.prepare('SELECT id, name, email, role FROM users WHERE id = ?').get(Number(req.body?.userId));
     if (!nuevo) return res.status(400).json({ error: 'La cuenta de destino no existe.' });
+    if (nuevo.role === 'guest') return res.status(400).json({ error: 'Un invitado no tiene proyectos: elige otra cuenta o cámbiale el rol primero.' });
     if (nuevo.id === row.user_id) return res.status(400).json({ error: 'El proyecto ya es de esa cuenta.' });
     const anterior = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(row.user_id);
     db.transaction(() => {
@@ -1516,8 +1560,9 @@ app.post('/api/admin/projects/:id/transfer', requireAdmin, (req, res) => {
 app.post('/api/admin/projects/:id/duplicate', requireAdmin, (req, res) => {
     const row = db.prepare('SELECT * FROM projects WHERE id = ?').get(Number(req.params.id));
     if (!row) return res.status(404).json({ error: 'No se encontró el proyecto.' });
-    const destino = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(Number(req.body?.userId) || row.user_id);
+    const destino = db.prepare('SELECT id, name, email, role FROM users WHERE id = ?').get(Number(req.body?.userId) || row.user_id);
     if (!destino) return res.status(400).json({ error: 'La cuenta de destino no existe.' });
+    if (destino.role === 'guest') return res.status(400).json({ error: 'Un invitado no tiene proyectos: elige otra cuenta o cámbiale el rol primero.' });
     const nombre = cleanName(req.body?.name || `${row.name} (copia)`);
     let nuevoId;
     db.transaction(() => {
@@ -1612,6 +1657,7 @@ app.post('/api/admin/trash/:id/restore', requireAdmin, (req, res) => {
             // Si era profesor, vuelven a su cargo los estudiantes que siguen sin profesor.
             const volver = db.prepare("UPDATE users SET teacher_id = ? WHERE id = ? AND role = 'student' AND teacher_id IS NULL");
             if (user.role === 'teacher') (copia.estudiantes || []).forEach((id) => volver.run(user.id, id));
+            if (user.role === 'student' && !user.teacher_id) heredarProfesor([user.id]);
             db.prepare('DELETE FROM deleted_users WHERE id = ?').run(row.id);
         })();
     } catch (error) {
@@ -1801,7 +1847,9 @@ app.post('/api/admin/users/batch', requireAdmin, crearLimit, async (req, res) =>
             if (cambios.length) {
                 const cupo = cupoAlCambiar(rolNuevo, existente.project_limit);
                 db.prepare('UPDATE users SET role = ?, teacher_id = ?, grupo = ?, project_limit = ? WHERE id = ?').run(rolNuevo, profesorId, grupo, cupo, existente.id);
-                if (existente.role === 'teacher' && rolNuevo !== 'teacher') db.prepare('UPDATE users SET teacher_id = NULL WHERE teacher_id = ?').run(existente.id);
+                if (existente.role === 'teacher' && rolNuevo !== 'teacher') { db.prepare('UPDATE users SET teacher_id = NULL WHERE teacher_id = ?').run(existente.id); soltarGrupos(existente.id); }
+                if (rolNuevo === 'student' && !profesorId) heredarProfesor([existente.id]);
+                limpiarGruposVacios();
             }
             resultados.push({ ...base, role: rolNuevo, ok: true, actualizada: true, cambios });
             continue;
@@ -1838,6 +1886,7 @@ app.post('/api/admin/users/:id/role', requireAdmin, (req, res) => {
     // Quien pasa a profesor o investigador recibe el cupo propio de ese rol si no tenía ninguno.
     const cupo = cupoAlCambiar(role, target.project_limit);
     db.prepare('UPDATE users SET role = ?, teacher_id = ?, project_limit = ? WHERE id = ?').run(role, teacherId, cupo, target.id);
+    if (role === 'student' && !teacherId) heredarProfesor([target.id]);
     bitacora(req, role !== target.role ? 'Cambió un rol' : 'Cambió el profesor a cargo', `${target.name} (${target.email}): ${ROL_NOMBRE[role] || role}${teacherId ? `, profesor #${teacherId}` : ''}`);
     // Si deja de ser profesor, sus estudiantes quedan sin profesor a cargo (el administrador los reasigna).
     if (target.role === 'teacher' && role !== 'teacher') { db.prepare('UPDATE users SET teacher_id = NULL WHERE teacher_id = ?').run(target.id); soltarGrupos(target.id); }
@@ -1882,6 +1931,7 @@ app.get('/api/teacher/students', requireTeacher, (req, res) => {
 app.post('/api/teacher/students', requireTeacher, crearLimit, async (req, res) => {
     const total = db.prepare("SELECT COUNT(*) AS n FROM users WHERE teacher_id = ?").get(req.user.id).n;
     if (total >= 300) return res.status(400).json({ error: 'Llegaste al máximo de 300 estudiantes a tu cargo.' });
+    if (grupoDeOtroProfesor(req.body?.grupo, req.user.id)) return res.status(400).json({ error: GRUPO_AJENO });
     const r = await crearCuenta({ name: req.body?.name, email: req.body?.email, role: 'student', teacherId: req.user.id, projectLimit: req.body?.permitir ? 1 : 0, grupo: req.body?.grupo }, `Tu profesor, ${req.user.name},`);
     if (r.error) return res.status(400).json({ error: r.error });
     bitacora(req, 'Creó a un estudiante', `${r.user.name} (${r.user.email})${r.user.grupo ? `, grupo «${r.user.grupo}»` : ''}`);
@@ -1897,6 +1947,7 @@ app.post('/api/teacher/students/batch', requireTeacher, crearLimit, async (req, 
     for (const fila of filas) {
         const base = { email: String(fila?.email || '').trim().toLowerCase(), name: String(fila?.name || '') };
         if (total >= 300) { resultados.push({ ...base, ok: false, error: 'Llegaste al máximo de 300 estudiantes a tu cargo.' }); continue; }
+        if (grupoDeOtroProfesor(fila?.group || req.body?.group, req.user.id)) { resultados.push({ ...base, ok: false, error: GRUPO_AJENO }); continue; }
         // eslint-disable-next-line no-await-in-loop
         const r = await crearCuenta({ name: fila?.name, email: fila?.email, role: 'student', teacherId: req.user.id, projectLimit: req.body?.permitir ? 1 : 0, grupo: fila?.group || req.body?.group }, `Tu profesor, ${req.user.name},`);
         if (r.error) { resultados.push({ ...base, ok: false, error: r.error }); continue; }
@@ -1918,8 +1969,10 @@ app.post('/api/teacher/students/bulk', requireTeacher, (req, res) => {
     let texto;
     if (action === 'group') {
         const grupo = grupoLimpio(req.body?.value);
+        if (grupoDeOtroProfesor(grupo, req.user.id)) return res.status(400).json({ error: GRUPO_AJENO });
         const upd = db.prepare('UPDATE users SET grupo = ? WHERE id = ?');
         db.transaction(() => mios.forEach((u) => upd.run(grupo, u.id)))();
+        limpiarGruposVacios();
         texto = grupo ? `Puso en el grupo «${grupo}»` : 'Sacó del grupo';
     } else if (action === 'limit') {
         const limit = parseInt(req.body?.value, 10);
@@ -2042,7 +2095,7 @@ app.post('/api/admin/backups', requireAdmin, async (_req, res) => {
 // Restaurar una copia: deja usuarios, proyectos, versiones, figuras y encuestas como estaban ese día.
 // Exige escribir RESTAURAR y la contraseña del administrador; antes guarda una copia del estado actual.
 // No se reinicia el servidor: los datos se cambian dentro de una sola transacción (si algo falla, no cambia nada).
-const TABLAS_RESTAURAR = ['users', 'projects', 'project_members', 'project_versions', 'project_files', 'surveys', 'survey_responses', 'deleted_users'];
+const TABLAS_RESTAURAR = ['users', 'projects', 'project_members', 'project_versions', 'project_files', 'surveys', 'survey_responses', 'deleted_users', 'grupos', 'grupo_profesores'];
 let restaurando = false;
 app.post('/api/admin/backups/:name/restore', requireAdmin, rateLimit({ name: 'restaurar', limit: 6, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const found = [...listBackups(), ...listSafety()].find((b) => b.name === req.params.name);
@@ -2093,6 +2146,11 @@ app.post('/api/admin/backups/:name/restore', requireAdmin, rateLimit({ name: 're
                 // Las sesiones y enlaces de cuentas que ya no existen se van; las demás siguen abiertas.
                 db.exec('DELETE FROM sessions WHERE user_id NOT IN (SELECT id FROM users)');
                 db.exec('DELETE FROM email_tokens WHERE user_id NOT IN (SELECT id FROM users)');
+                // Una copia anterior a los grupos con profesor no trae esas tablas: lo que había no vale para los datos restaurados.
+                if (!tablas.includes('grupos')) db.exec('DELETE FROM grupos');
+                if (!tablas.includes('grupo_profesores')) db.exec('DELETE FROM grupo_profesores');
+                sanearProfesores();
+                limpiarGruposVacios();
                 if (db.pragma('foreign_key_check').length) throw new Error('La copia tiene datos que no encajan entre sí.');
             })();
         } finally {
@@ -2383,13 +2441,13 @@ const aiLimit = rateLimit({
     key: (req) => (req.user ? `u${req.user.id}` : req.ip),
 });
 
-app.post('/api/ai/chat', aiLimit, async (req, res) => {
+app.post('/api/ai/chat', requireUser, aiLimit, async (req, res) => {
     if (!GROQ_API_KEY) return res.status(503).json({ error: 'El asistente de IA no está configurado en el servidor.' });
 
     const messages = Array.isArray(req.body?.messages) ? req.body.messages : null;
     if (!messages || messages.length === 0 || messages.length > 12) return res.status(400).json({ error: 'Solicitud de IA no válida.' });
     // Cuota diaria de la cuenta (el administrador no tiene).
-    if (req.user && req.user.role !== 'admin') {
+    if (req.user.role !== 'admin') {
         const c = cuotaDe(req.user);
         if (c.usadas >= c.limite + c.extra) {
             return res.status(429).json({
@@ -2400,7 +2458,6 @@ app.post('/api/ai/chat', aiLimit, async (req, res) => {
             });
         }
     }
-    contarUso('ia', req.user?.id);
 
     let total = 0;
     const clean = [];
@@ -2448,6 +2505,7 @@ app.post('/api/ai/chat', aiLimit, async (req, res) => {
         aiState.fails = 0;
         aiState.lastOk = Date.now();
         marcarServicio('ia', true);
+        contarUso('ia', req.user.id); // la cuota del día cuenta respuestas recibidas, no intentos fallidos
         return res.json({ choices: (body.choices || []).map((choice) => ({ message: { role: 'assistant', content: choice?.message?.content || '' } })) });
     } catch (error) {
         console.error('Groq request failed', error?.name, error?.message);

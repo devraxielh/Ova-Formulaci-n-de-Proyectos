@@ -292,7 +292,7 @@ export const SLIDES = construccionPrimero([
         lead: ['Decide si cada fase está bien planteada.'],
         quiz: [
             q('«Fase 1: Investigar el tema. Actividades: leer.»', ['Bien planteada', 'Hay que mejorarla'], 1, 'No tiene objetivo, actividades concretas ni producto.'),
-            q('«Fase 2. Validación. Objetivo: validar la estrategia. Actividades: seleccionar tres expertos; enviar la estrategia y la rúbrica; ajustar según sus conceptos. Producto: estrategia validada. Duración: 4 semanas.»', ['Bien planteada', 'Hay que mejorarla'], 0, 'Tiene todos los elementos.'),
+            q('«Fase 2. Validación. Objetivo: validar la estrategia. Actividades: seleccionar tres expertos; enviar la estrategia y la rúbrica; ajustar según sus conceptos. Producto: estrategia validada. Duración: 4 semanas.»', ['Bien planteada', 'Hay que mejorarla'], 0, 'Tiene objetivo, actividades, producto y duración. Para completarla, añade las técnicas (juicio de expertos, rúbrica) y el responsable.'),
         ],
     },
     {

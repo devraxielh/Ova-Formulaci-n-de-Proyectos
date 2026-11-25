@@ -71,7 +71,9 @@ const Propagar = () => {
         const terminos = lista.filter((p) => p.usar && p.antes.trim() && p.despues.trim());
         const nuevas = [];
         let fallos = 0;
+        let sinCuota = false;
         for (const id of REESCRIBIBLES) {
+            if (sinCuota) break; // la cuota de IA del día se agotó: no tiene sentido seguir ni reintentar
             const hojas = hojasDeSeccion(data, id);
             if (!hojas.length) continue;
             const nombre = SECTIONS.find((s) => s.id === id)?.label || id;
@@ -85,7 +87,7 @@ const Propagar = () => {
                     if (intento) await new Promise((r) => { setTimeout(r, 8000); });
                     // eslint-disable-next-line no-await-in-loop
                     propuestas = await reescribir({ cambios, data, seccion: nombre, hojas });
-                } catch { /* se reintenta */ }
+                } catch (err) { if (err?.code === 'cuota_ia') { sinCuota = true; break; } /* si no, se reintenta */ }
             }
             if (propuestas) propuestas.forEach((p) => { if (!nuevas.some((x) => x.antes === p.antes)) nuevas.push(p); });
             else fallos += 1;
@@ -93,6 +95,7 @@ const Propagar = () => {
         setPensando('');
         setFondo(nuevas);
         void terminos;
+        if (sinCuota && !nuevas.length) return; // el aviso de cuota agotada ya salió
         if (!nuevas.length) avisar(fallos ? 'No se pudo revisar con la IA. Inténtalo de nuevo.' : 'La IA no encontró frases que deban reescribirse por este cambio.', fallos ? 'error' : 'ok');
         else avisar(`La IA propone reescribir ${nuevas.length} ${nuevas.length === 1 ? 'frase' : 'frases'}. Revisa cada sección antes de actualizarla.${fallos ? ` ${fallos === 1 ? 'No se pudo revisar una sección' : `No se pudieron revisar ${fallos} secciones`}: vuelve a revisar en un minuto.` : ''}`);
     };

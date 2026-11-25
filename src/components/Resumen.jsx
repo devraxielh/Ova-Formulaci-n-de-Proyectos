@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, FileSignature, Languages, Loader2, Plus, RefreshCw, Tags, Wand2, X } from 'lucide-react';
 import SlideDeck from './deck/SlideDeck';
 import { Generica } from './deck/Contenido';
@@ -6,6 +6,8 @@ import { useProject, useProjectField } from '../context/ProjectContext';
 import { useAutoGuardar } from '../hooks/useAutoGuardar';
 import { DECLARACION_EXONERACION, DECLARACION_ORIGINALIDAD } from '../services/projectDoc';
 import { groq } from '../services/api';
+import { ORIGEN, PARTES_IA, fuentesResumen, mensajesResumen, revisarParte } from '../services/resumenIA';
+import { avisar, confirmar } from './Avisos';
 import { partesObjetivos } from '../services/coherencia';
 import { MUESTREOS, tamanoMuestra } from '../data/metodologia';
 import { MAX_PALABRAS, MIN_PALABRAS, SECTIONS, SLIDES } from '../data/resumenClase';
@@ -95,6 +97,7 @@ const useResumenState = () => {
 
 const Constructor = ({ intro }) => {
     const { data, f, update, setResumen, setClaves } = useResumenState();
+    const { project } = useProject();
     const [saved, setSaved] = useState(false);
     const [nueva, setNueva] = useState('');
     const [active, setActive] = useState('objetivo');
@@ -103,13 +106,53 @@ const Constructor = ({ intro }) => {
     const texto = unir(f);
     const words = countWords(texto);
     const touch = () => setSaved(false);
-    const vacios = PARTES.filter((p) => !String(f[p.key] || '').trim() && ejemplos[p.key]).length;
-    const armar = () => {
-        touch();
+    const conPunto = (txt) => `${txt}${/[.?!]$/.test(txt) ? '' : '.'}`;
+    const vacia = (key) => !String(f[key] || '').trim();
+    // Lo que ya está escrito en Objetivos, Metodología, Resultados y Conclusiones: de ahí sale cada parte del resumen.
+    const fuentes = useMemo(() => fuentesResumen(data), [data]);
+    const conOrigen = PARTES_IA.filter((key) => fuentes[key]);
+    const porRedactar = conOrigen.filter(vacia);
+    const [redactando, setRedactando] = useState(false);
+    // Redacta con IA las partes que tienen su sección escrita. Si la IA falla o trae algo que no está en la sección
+    // (una cifra, por ejemplo), esa parte queda con el borrador armado con los datos del proyecto.
+    const redactar = async (partes) => {
+        if (!partes.length || redactando) return;
+        setRedactando(true);
         const patch = {};
-        PARTES.forEach((p) => { if (!String(f[p.key] || '').trim() && ejemplos[p.key]) patch[p.key] = `${ejemplos[p.key]}${/[.?!]$/.test(ejemplos[p.key]) ? '' : '.'}`; });
-        update(patch);
+        const deRespaldo = [];
+        const respaldo = (key) => { if (ejemplos[key]) { patch[key] = conPunto(ejemplos[key]); deRespaldo.push(key); } };
+        let sinCuota = false;
+        try {
+            const { messages } = mensajesResumen(Object.fromEntries(PARTES_IA.map((key) => [key, partes.includes(key) ? fuentes[key] : ''])), data.titulo);
+            const r = await groq.chat.completions.create({ messages, temperature: 0.2, max_tokens: 900, response_format: { type: 'json_object' } });
+            const content = r.choices?.[0]?.message?.content || '';
+            const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+            partes.forEach((key) => { const rev = revisarParte(json[key], fuentes[key]); if (rev.ok) patch[key] = rev.texto; else respaldo(key); });
+        } catch (err) {
+            sinCuota = err?.code === 'cuota_ia';
+            partes.forEach(respaldo);
+        }
+        // El contexto es opcional y no se redacta con IA: si está vacío, se toma del planteamiento.
+        if (vacia('contexto') && ejemplos.contexto) patch.contexto = conPunto(ejemplos.contexto);
+        if (Object.keys(patch).length) { touch(); update(patch); }
+        const hechas = partes.filter((key) => patch[key] && !deRespaldo.includes(key)).length;
+        if (hechas) avisar(`Se ${hechas === 1 ? 'redactó 1 parte' : `redactaron ${hechas} partes`} del resumen con lo que ya escribiste. Revísalas y ajústalas.${deRespaldo.length ? ` ${deRespaldo.length === 1 ? 'Otra quedó' : `Otras ${deRespaldo.length} quedaron`} con un borrador de tus datos.` : ''}`);
+        else if (!sinCuota) avisar(deRespaldo.length ? 'No se pudo redactar con la IA: quedó un borrador armado con los datos de tu proyecto.' : 'No se pudo redactar con la IA. Inténtalo de nuevo.', 'error');
+        setRedactando(false);
     };
+    const pedirRedaccion = async () => {
+        if (porRedactar.length) return redactar(porRedactar);
+        if (!(await confirmar({ texto: '¿Volver a redactar el resumen?', detalle: `Se ${conOrigen.length === 1 ? 'reemplaza la parte' : `reemplazan las ${conOrigen.length} partes`} que ${conOrigen.length === 1 ? 'sale' : 'salen'} de tu proyecto (${conOrigen.map((key) => PARTES.find((x) => x.key === key).label.toLowerCase()).join(', ')}) con lo que tienes escrito hoy. Lo anterior queda en el historial de versiones.`, aceptar: 'Volver a redactar' }))) return undefined;
+        return redactar(conOrigen);
+    };
+    // La primera vez, con el resumen vacío, se redacta solo con lo que ya haya en el proyecto.
+    const yaRedacto = useRef(false);
+    useEffect(() => {
+        if (yaRedacto.current || !project?.id || !conOrigen.length || PARTES_IA.some((key) => !vacia(key))) return;
+        yaRedacto.current = true;
+        redactar(conOrigen);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [project?.id, conOrigen.length]);
     const agregarClave = (valor) => {
         const v = clean(valor).toLowerCase();
         if (!v || f.claves.includes(v) || f.claves.length >= 6) return;
@@ -134,7 +177,12 @@ const Constructor = ({ intro }) => {
                         <div className="tit-meter-bar" aria-hidden="true"><span style={{ width: `${Math.min(words, MAX_PALABRAS) / MAX_PALABRAS * 100}%` }} /></div>
                         <p><b>{words} palabras</b> · {estado === 'short' ? `faltan ${MIN_PALABRAS - words} para el mínimo` : estado === 'over' ? `sobran ${words - MAX_PALABRAS}` : estado === 'ok' ? 'extensión correcta' : `entre ${MIN_PALABRAS} y ${MAX_PALABRAS}`} · {f.claves.length} palabras clave</p>
                     </div>
-                    {vacios > 0 && <button type="button" className="ide-btn ide-btn--ghost" onClick={armar}><Wand2 size={16} /> Armar un borrador con mi proyecto</button>}
+                    {conOrigen.length > 0 && (
+                        <button type="button" className="ide-btn ide-btn--ghost" onClick={pedirRedaccion} disabled={redactando}>
+                            {redactando ? <Loader2 size={16} className="res-gira" /> : <Wand2 size={16} />} {redactando ? 'Redactando tu resumen…' : porRedactar.length ? 'Redactar con mi proyecto' : 'Volver a redactar con mi proyecto'}
+                        </button>
+                    )}
+                    {conOrigen.length < PARTES_IA.length && <p className="res-faltan">{conOrigen.length === 0 ? 'El resumen se redacta solo con lo que escribas en ' : 'Falta por escribir: '}{PARTES_IA.filter((key) => !fuentes[key]).map((key) => ORIGEN[key].nombre).join(', ')}.{conOrigen.length > 0 ? ' Cuando lo completes, vuelve aquí para redactar esa parte.' : ''}</p>}
                     <button type="button" className="ide-btn ide-btn--primary" disabled={!texto} onClick={save}><CheckCircle2 size={17} /> Guardar mi resumen</button>
                     {saved && <p className="ide-feedback ide-feedback--ok" role="status"><CheckCircle2 size={16} /><span>Guardado. Ya aparece después del título en Mi proyecto.</span></p>}
                 </div>
@@ -146,7 +194,7 @@ const Constructor = ({ intro }) => {
                         <div className="input-group pla-part" data-active={active === p.key} key={p.key}>
                             <label htmlFor={`res-${p.key}`}><mark data-part={p.color} data-active="true">{PARTES.indexOf(p) || '·'}</mark> {p.label} <small className="res-cuenta">{countWords(f[p.key])} palabras</small></label>
                             <textarea id={`res-${p.key}`} className="textarea-field" rows={p.key === 'resultados' ? 4 : 3} value={f[p.key]} onFocus={() => setActive(p.key)} onChange={(e) => { touch(); update({ [p.key]: e.target.value }); }} placeholder={`Ej: ${ejemplos[p.key] || p.placeholder}`} />
-                            <small className="ide-field-hint">{p.hint}</small>
+                            <small className="ide-field-hint">{p.hint}{ORIGEN[p.key] && !fuentes[p.key] ? ` Se redacta sola cuando completes «${ORIGEN[p.key].nombre}».` : ''}</small>
                         </div>
                     ))}
 
@@ -184,7 +232,7 @@ const Constructor = ({ intro }) => {
                                 ))}</p>
                                 {f.claves.length > 0 && <p className="res-pc"><i>Palabras clave:</i> {f.claves.join(', ')}.</p>}
                             </>
-                        ) : <span className="tit-empty">Toca «Armar un borrador con mi proyecto» o escribe cada parte.</span>}
+                        ) : <span className="tit-empty">{conOrigen.length ? 'Toca «Redactar con mi proyecto» o escribe cada parte.' : 'Se redactará solo cuando escribas tus Objetivos, tu Metodología, tus Resultados y tus Conclusiones. También puedes escribir cada parte.'}</span>}
                     </div>
                 </aside>
             </div>
@@ -231,7 +279,7 @@ const traducirResumen = async (resumen, claves) => {
 };
 
 const Preliminares = () => {
-    const { data } = useProject();
+    const { data, setField } = useProject();
     const [, setAbstract] = useProjectField('abstract', '');
     const [, setKeywords] = useProjectField('keywords', '');
     // Texto del resumen del que salió el abstract; si el estudiante edita el abstract a mano, deja de actualizarse solo.
@@ -309,9 +357,9 @@ const Preliminares = () => {
                 <Campo id="dedicatoria" label="Dedicatoria (opcional)" rows={2} />
                 <Campo id="agradecimientos" label="Agradecimientos (opcional)" rows={2} />
                 <Campo id="declaracionOriginalidad" label="Declaración de originalidad y autonomía" rows={4} placeholder={DECLARACION_ORIGINALIDAD(String(data.titulo || '').trim())} />
-                {!String(data.declaracionOriginalidad || '').trim() && <button type="button" className="ide-btn ide-btn--ghost" onClick={() => setOriginalidad(DECLARACION_ORIGINALIDAD(String(data.titulo || '').trim()))}>Usar el texto modelo para editarlo</button>}
+                {!String(data.declaracionOriginalidad || '').trim() && <button type="button" className="ide-btn ide-btn--ghost" onClick={() => setField('declaracionOriginalidad', DECLARACION_ORIGINALIDAD(String(data.titulo || '').trim()))}>Usar el texto modelo para editarlo</button>}
                 <Campo id="declaracionExoneracion" label="Declaración de exoneración de responsabilidad" rows={3} placeholder={DECLARACION_EXONERACION()} />
-                {!String(data.declaracionExoneracion || '').trim() && <button type="button" className="ide-btn ide-btn--ghost" onClick={() => setExoneracion(DECLARACION_EXONERACION())}>Usar el texto modelo para editarlo</button>}
+                {!String(data.declaracionExoneracion || '').trim() && <button type="button" className="ide-btn ide-btn--ghost" onClick={() => setField('declaracionExoneracion', DECLARACION_EXONERACION())}>Usar el texto modelo para editarlo</button>}
             </section>
         </div>
     );
@@ -409,7 +457,7 @@ const Resumen = ({ onNavigate }) => {
             <Constructor intro={(
                 <>
                     {heading}
-                    <p>Toca «Armar un borrador con mi proyecto»: cada parte se llena con tu objetivo, tu metodología, tus resultados y tus conclusiones. Ajusta hasta quedar entre {MIN_PALABRAS} y {MAX_PALABRAS} palabras y agrega tus palabras clave.</p>
+                    <p>El resumen se redacta solo con lo que ya escribiste: objetivo, metodología, resultados y conclusiones, cada uno en una o dos oraciones. Las partes cuya sección aún no está escrita quedan pendientes; cuando la completes, toca «Redactar con mi proyecto». Ajusta hasta quedar entre {MIN_PALABRAS} y {MAX_PALABRAS} palabras y agrega tus palabras clave.</p>
                 </>
             )}
             />
@@ -439,7 +487,7 @@ const Resumen = ({ onNavigate }) => {
             label="Resumen"
             teoria={TEORIA}
             renderSlide={renderSlide}
-            finish={onNavigate ? { label: 'Ver mi proyecto completo', onClick: () => onNavigate('proyecto') } : null}
+            finish={onNavigate ? { label: 'Revisar las referencias', onClick: () => onNavigate('referencias') } : null}
         />
     );
 };

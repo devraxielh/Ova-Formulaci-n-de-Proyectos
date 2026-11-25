@@ -19,7 +19,7 @@ export const SECTIONS = construccionPrimero([
 
 const q = (text, options, answer, why) => ({ text, options, answer, why });
 
-export const EJEMPLO_RESUMEN = 'La inasistencia a citas médicas reduce la oportunidad de la atención y genera pérdidas para los servicios de salud. Esta investigación tuvo como objetivo analizar los factores asociados a la inasistencia a citas médicas en los pacientes de consulta externa de un hospital de Sincelejo, Sucre. Se desarrolló un estudio cuantitativo, correlacional y de diseño no experimental transversal, con una muestra aleatoria de 278 pacientes, a quienes se aplicó un cuestionario validado por juicio de expertos (α = 0,81). Los resultados mostraron que el 22 % de las citas programadas se perdió; el olvido de la cita fue la causa más frecuente (41 %), seguido del costo del transporte (22 %), y se encontró una relación positiva moderada entre el olvido y la inasistencia (rho = 0,41; p < 0,001). La inasistencia fue mayor en los pacientes menores de 30 años y en los residentes de la zona rural. Se concluye que la inasistencia en esta población está asociada principalmente a factores organizacionales y económicos, más que a la voluntad del paciente, por lo que estrategias como los recordatorios automáticos y la flexibilización de horarios podrían reducirla.';
+export const EJEMPLO_RESUMEN = 'La inasistencia a citas médicas reduce la oportunidad de la atención y genera pérdidas para los servicios de salud. Esta investigación tuvo como objetivo analizar los factores asociados a la inasistencia a citas médicas en los pacientes de consulta externa de un hospital de Sincelejo, Sucre. Se desarrolló un estudio cuantitativo, correlacional y de diseño no experimental transversal, con una muestra aleatoria de 278 pacientes, a quienes se aplicó un cuestionario validado por juicio de expertos y con confiabilidad adecuada (α = 0,81). Los resultados mostraron que el 22 % de las citas programadas se perdió; el olvido de la cita fue la causa más frecuente (41 %), seguido del costo del transporte (22 %), y se encontró una relación positiva moderada entre el olvido y la inasistencia (rho = 0,41; p < 0,001). La inasistencia fue mayor en los pacientes menores de 30 años y en los residentes de la zona rural. Se concluye que la inasistencia en esta población está asociada principalmente a factores organizacionales y económicos, más que a la voluntad del paciente, por lo que estrategias como los recordatorios automáticos y la flexibilización de horarios podrían reducirla.';
 
 export const SLIDES = construccionPrimero([
     /* ---------- Apertura (9) ---------- */
@@ -86,7 +86,7 @@ export const SLIDES = construccionPrimero([
     {
         id: 'ejemplo', section: 'estructura', min: 5, title: 'Un resumen completo',
         lead: ['Lee el ejemplo e identifica las cuatro partes. Los datos son ilustrativos.'],
-        panel: { type: 'example', title: 'Resumen (ejemplo, 187 palabras)', paragraphs: [EJEMPLO_RESUMEN, '**Palabras clave:** inasistencia, citas médicas, consulta externa, barreras de acceso, servicios de salud.'] },
+        panel: { type: 'example', title: 'Resumen (ejemplo, 191 palabras)', paragraphs: [EJEMPLO_RESUMEN, '**Palabras clave:** inasistencia, citas médicas, consulta externa, barreras de acceso, servicios de salud.'] },
     },
     {
         id: 'verbos', section: 'estructura', min: 4, title: 'Frases para cada parte',

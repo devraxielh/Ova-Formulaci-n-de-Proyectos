@@ -156,3 +156,19 @@ test('con dos encuestas de distinto tamaño, la nota no afirma un solo n', () =>
     const sola = analizarPorObjetivo({ encuestas: [una('a', 6)], especificos: ['Uno'], plan: [] });
     assert.match(sola.tablas[0].nota, /\(n = 6\)/);
 });
+
+test('no se relacionan preguntas de encuestas distintas (las respondieron personas distintas)', () => {
+    const escala = ['Nunca', 'A veces', 'Siempre'];
+    const likert = (id, n, objetivo) => ({ definition: { preguntas: [{ id: `${id}1`, texto: `Ítem 1 de ${id}`, tipo: 'likert', opciones: escala }, { id: `${id}2`, texto: `Ítem 2 de ${id}`, tipo: 'likert', opciones: escala }] }, responses: Array.from({ length: n }, (_, i) => ({ answers: { [`${id}1`]: escala[i % 3], [`${id}2`]: escala[(i + 1) % 3] } })), meta: { [`${id}1`]: { objetivo }, [`${id}2`]: { objetivo } } });
+    const plan = [{ objetivo: 'el objetivo específico 1', tecnica: 'Correlación de Spearman' }, { objetivo: 'el objetivo específico 2', tecnica: 'Correlación de Spearman' }];
+    const separadas = analizarPorObjetivo({ encuestas: [likert('est', 30, 1), likert('doc', 12, 2)], especificos: ['Uno', 'Dos'], plan });
+    assert.equal(separadas.tablas.some((x) => /^Correlación/.test(x.titulo)), false);
+    // En una misma encuesta sí se relacionan.
+    const juntas = likert('a', 30, 1);
+    juntas.definition.preguntas.push({ id: 'b1', texto: 'Ítem del dos', tipo: 'likert', opciones: escala });
+    juntas.responses.forEach((r, i) => { r.answers.b1 = escala[i % 3]; });
+    juntas.meta.b1 = { objetivo: 2 };
+    assert.equal(analizarPorObjetivo({ encuestas: [juntas], especificos: ['Uno', 'Dos'], plan }).tablas.some((x) => /^Correlación/.test(x.titulo)), true);
+    // El objetivo que se asigna después de publicar (la encuesta guardó 0) se toma del instrumento.
+    assert.equal(metaDePreguntas({ preguntas: [{ id: 'q', texto: 'P', objetivo: 0 }] }, 'ins', [{ id: 'ins', preguntas: [{ id: 'q', texto: 'P', objetivo: 2 }] }], []).q.objetivo, 2);
+});

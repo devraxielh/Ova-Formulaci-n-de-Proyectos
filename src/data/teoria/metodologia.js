@@ -63,7 +63,7 @@ export default {
             ['Relación con los participantes', 'El cuantitativo busca distancia para no influir en las respuestas: mismo cuestionario, mismas instrucciones. El cualitativo busca cercanía y confianza, porque sin ellas nadie cuenta su experiencia.'],
             ['Cómo se escriben los resultados', 'Los cuantitativos se presentan en tablas, gráficos y pruebas estadísticas. Los cualitativos, en categorías sustentadas con fragmentos textuales de los participantes, identificados con un código para proteger su identidad.'],
         ],
-        ejemplo: 'Resultado cuantitativo: «El 41 % de los pacientes perdió al menos una cita en el semestre». Resultado cualitativo: «Barreras económicas: “Si pago el bus para ir al hospital, ese día no almuerzo” (P7, mujer, zona rural)».',
+        ejemplo: 'Resultado cuantitativo: «El 59 % de los pacientes perdió al menos una cita en el semestre». Resultado cualitativo: «Barreras económicas: “Si pago el bus para ir al hospital, ese día no almuerzo” (P7, mujer, zona rural)».',
         ojo: 'Revisa todos tus objetivos, no solo el general. Si uno dice «medir» y otro «comprender», o el estudio es mixto o uno de los dos verbos está mal elegido.',
     },
 
@@ -317,7 +317,7 @@ export default {
             ['Centro y dispersión juntos', 'Una medida de tendencia central sin su dispersión es media información. Dos grupos pueden tener la misma edad media y ser muy distintos: uno homogéneo y otro con edades de extremo a extremo.'],
         ],
         ejemplo: 'En 278 pacientes, la mayoría perdió 0 o 1 citas y unos pocos perdieron 8 o más. La media es 1,9, pero la mediana es 1: la mediana describe mejor al paciente típico porque no la inflan los casos extremos.',
-        ojo: 'Reporta siempre el número de casos junto al porcentaje: «41 % (n = 120)». Y no uses gráfico de sectores con muchas categorías: no se lee.',
+        ojo: 'Reporta siempre el número de casos junto al porcentaje: «41 % (n = 114)». Y no uses gráfico de sectores con muchas categorías: no se lee.',
     },
     'an-inferencial': {
         claves: [

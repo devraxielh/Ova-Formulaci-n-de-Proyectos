@@ -88,3 +88,10 @@ test('cambios de fondo: las frases de una sección y lo que la IA puede cambiar 
     assert.equal(s[0].valores.justificacionForm.id, data.justificacionForm.id); // los identificadores no se tocan
     assert.deepEqual(paresDeReescritura(h, null), []);
 });
+
+test('intercambiar dos términos los intercambia, no los deja iguales', () => {
+    const pares = [{ antes: 'docentes', despues: 'estudiantes' }, { antes: 'estudiantes', despues: 'docentes' }];
+    assert.equal(reemplazarEnTexto('Los docentes evalúan a los estudiantes. Docentes y estudiantes.', pares), 'Los estudiantes evalúan a los docentes. Estudiantes y docentes.');
+    // Sigue valiendo lo de antes: el más largo primero y sin duplicar cuando lo nuevo contiene lo viejo.
+    assert.equal(reemplazarEnTexto('Las citas y las citas médicas.', [{ antes: 'citas', despues: 'citas médicas' }]), 'Las citas médicas y las citas médicas.');
+});

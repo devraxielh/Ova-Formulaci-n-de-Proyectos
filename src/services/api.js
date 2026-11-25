@@ -1,4 +1,4 @@
-import { aplicarEstilo, estiloVacio, textoEstilo } from './estilo.js';
+import { aplicarEstilo, aplicarEstiloEnJson, estiloVacio, textoEstilo } from './estilo.js';
 // Cliente del API propio (/api). La sesión viaja en una cookie httpOnly.
 
 export class ApiError extends Error {
@@ -145,7 +145,7 @@ export const groq = {
             create: async ({ messages, temperature, max_tokens, response_format }) => {
                 const r = await api.chat({ messages: conEstilo(messages), temperature, max_tokens, response_format });
                 const content = r?.choices?.[0]?.message?.content;
-                if (estiloIA && typeof content === 'string') r.choices[0].message.content = aplicarEstilo(content, estiloIA);
+                if (estiloIA && typeof content === 'string') r.choices[0].message.content = response_format?.type === 'json_object' ? aplicarEstiloEnJson(content, estiloIA) : aplicarEstilo(content, estiloIA);
                 return r;
             },
         },

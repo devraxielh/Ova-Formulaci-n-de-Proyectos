@@ -14,10 +14,13 @@ import './Cuentas.css';
 import './Admin.css';
 
 /*
- * Administración. Tres pestañas:
+ * Administración. Seis pestañas:
  *  - Usuarios: buscar, filtrar, ordenar, crear cuentas, cambiar varias a la vez y abrir la ficha de cada una.
  *  - Proyectos: todos los proyectos de la plataforma con su dueño, avance y coherencia.
- *  - Sistema: copias de seguridad, servicios y errores.
+ *  - Grupos: resumen por grupo y por profesor, profesor a cargo y cuota de IA de cada grupo.
+ *  - Papelera: cuentas eliminadas en los últimos 30 días.
+ *  - Uso: cuota de IA y actividad por día, por grupo y por cuenta.
+ *  - Sistema: servicios externos, copias de seguridad, errores y registro de cambios.
  */
 
 const TAMANOS = [25, 50, 100, 200];
@@ -92,7 +95,7 @@ const Cupo = ({ user, onChange, busy }) => {
     const limit = user.projectLimit || 0;
     return (
         <span className="adm-cupo" data-cero={limit === 0}>
-            <button type="button" disabled={busy || limit <= 0} onClick={() => onChange(user, limit - 1)} aria-label={`Quitar un proyecto a ${user.name}`}>−</button>
+            <button type="button" disabled={busy || limit <= 0} onClick={() => onChange(user, limit - 1)} aria-label={`Permitir un proyecto menos a ${user.name}`}>−</button>
             <b title={limit === 0 ? 'Sin permiso para crear proyectos' : `Puede crear hasta ${limit}`}>{limit}</b>
             <button type="button" disabled={busy || limit >= 20} onClick={() => onChange(user, limit + 1)} aria-label={`Autorizar un proyecto más a ${user.name}`}>+</button>
         </span>
@@ -375,7 +378,7 @@ const Admin = () => {
         const alumnos = users.filter((u) => u.teacherId === user.id).length;
         const detalle = [
             n ? `Se ${n === 1 ? 'borra su proyecto' : `borran sus ${n} proyectos`}, con versiones, figuras y encuestas. Antes se guarda una copia de seguridad.` : 'No tiene proyectos.',
-            alumnos ? `Sus ${alumnos} estudiantes quedan sin profesor a cargo.` : '',
+            alumnos ? (alumnos === 1 ? 'Su estudiante queda sin profesor a cargo.' : `Sus ${alumnos} estudiantes quedan sin profesor a cargo.`) : '',
             'Queda 30 días en la papelera, desde donde se puede restaurar.',
         ].filter(Boolean).join(' ');
         if (!(await confirmar({ texto: `¿Eliminar la cuenta de ${user.name}?`, detalle, aceptar: 'Eliminar', peligro: true }))) return undefined;
@@ -468,7 +471,7 @@ const Admin = () => {
             await load();
             setMarcados(new Set());
             setGrupoNuevo(null);
-            setNotice(r.hechas ? `${hecho}: ${r.hechas} ${r.hechas === 1 ? 'cuenta' : 'cuentas'}.${r.omitidas ? ` A las otras ${r.omitidas} no les aplicaba.` : ''}` : 'A ninguna de las cuentas seleccionadas le aplicaba ese cambio.');
+            setNotice(r.hechas ? `${hecho}: ${r.hechas} ${r.hechas === 1 ? 'cuenta' : 'cuentas'}.${r.omitidas ? (r.omitidas === 1 ? ' A la otra no le aplicaba.' : ` A las otras ${r.omitidas} no les aplicaba.`) : ''}` : 'A ninguna de las cuentas seleccionadas le aplicaba ese cambio.');
         });
     };
     const loteProfesor = (v) => {
@@ -549,7 +552,7 @@ const Admin = () => {
                                 : 'Crea un proyecto nuevo con el mismo contenido y las mismas figuras. No copia el historial, los invitados ni las encuestas con sus respuestas.'}</p>
                             <div className="adm-mover-campos">
                                 <div className="cue-campo"><span>{mover.modo === 'traspasar' ? 'Nuevo dueño' : 'Cuenta donde se crea'}</span>
-                                    <Selector buscar etiqueta="Cuenta de destino" vacio="Elegir cuenta…" value={mover.userId} onChange={(v) => setMover({ ...mover, userId: v })} opciones={users.filter((u) => mover.modo === 'duplicar' || u.id !== openProject.owner?.id).map((u) => ({ value: u.id, label: u.name, nota: `${u.email} · ${nombreRol(u.role)}${u.grupo ? ` · ${u.grupo}` : ''}` }))} />
+                                    <Selector buscar etiqueta="Cuenta de destino" vacio="Elegir cuenta…" value={mover.userId} onChange={(v) => setMover({ ...mover, userId: v })} opciones={users.filter((u) => u.role !== 'guest').filter((u) => mover.modo === 'duplicar' || u.id !== openProject.owner?.id).map((u) => ({ value: u.id, label: u.name, nota: `${u.email} · ${nombreRol(u.role)}${u.grupo ? ` · ${u.grupo}` : ''}` }))} />
                                 </div>
                                 {mover.modo === 'duplicar' && <label className="cue-campo"><span>Nombre del proyecto nuevo</span><input className="input-field" maxLength={120} value={mover.name} onChange={(e) => setMover({ ...mover, name: e.target.value })} /></label>}
                                 {mover.modo === 'traspasar' && <label className="cue-check"><input type="checkbox" checked={mover.keep} onChange={(e) => setMover({ ...mover, keep: e.target.checked })} /> {openProject.owner?.name || 'El dueño anterior'} sigue pudiendo abrirlo, como invitado</label>}
@@ -754,7 +757,7 @@ const Admin = () => {
             {vista === 'usuarios' && (
                 <>
                     <dl className="adm-resumen">
-                        <div><dt>Usuarios</dt><dd><button type="button" aria-pressed={!hayFiltros} onClick={() => { limpiarFiltros();  }} title="Ver solo usuarios">{resumen.total}</button></dd></div>
+                        <div><dt>Usuarios</dt><dd><button type="button" aria-pressed={!hayFiltros} onClick={() => { limpiarFiltros();  }} title="Ver todos los usuarios">{resumen.total}</button></dd></div>
                         <div><dt>Profesores</dt><dd><button type="button" aria-pressed={fRol === 'teacher'} onClick={() => { limpiarFiltros(); setFRol('teacher'); }} title="Ver solo profesores">{resumen.teacher}</button></dd></div>
                         <div><dt>Estudiantes</dt><dd><button type="button" aria-pressed={fRol === 'student'} onClick={() => { limpiarFiltros(); setFRol('student'); }} title="Ver solo estudiantes">{resumen.student}</button></dd></div>
                         <div><dt>Investigadores</dt><dd><button type="button" aria-pressed={fRol === 'researcher'} onClick={() => { limpiarFiltros(); setFRol('researcher'); }} title="Ver solo investigadores">{resumen.researcher}</button></dd></div>

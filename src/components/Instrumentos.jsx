@@ -149,12 +149,27 @@ const Instrumentos = ({ onNavigate, embebido = false, fila = null }) => {
         setActivo(base.id);
     };
     const eliminar = () => {
+        // Si estaba publicado, su encuesta se cierra: sin el instrumento ya no habría desde dónde cerrarla.
+        if (publicadas[ins.id]?.open && project.id) api.publishSurvey(project.id, ins.id, { open: false }).catch(() => {});
         setLista((prev) => (Array.isArray(prev) ? prev : []).filter((i) => i.id !== ins.id));
         setActivo('');
     };
 
     const pub = ins ? publicadas[ins.id] : null;
     const enlace = pub ? `${window.location.origin}/?encuesta=${pub.token}` : '';
+    // Abrir o cerrar no vuelve a publicar las preguntas: lo que está en línea queda como estaba.
+    const abrirOCerrar = async (open) => {
+        setError('');
+        setEstado('publicando');
+        try {
+            const { survey } = await api.publishSurvey(project.id, ins.id, { open });
+            setPublicadas((prev) => ({ ...prev, [ins.id]: { ...prev[ins.id], ...survey } }));
+        } catch (err) {
+            setError(err.message || 'No se pudo cambiar el estado de la encuesta.');
+        } finally {
+            setEstado('');
+        }
+    };
     const publicar = async (open) => {
         setError('');
         setEstado('publicando');
@@ -263,8 +278,8 @@ const Instrumentos = ({ onNavigate, embebido = false, fila = null }) => {
                                         <div className="ins-enlace"><input className="input-field" readOnly value={enlace} onFocus={(e) => e.target.select()} aria-label="Enlace de la encuesta" /><button type="button" className="pro-btn pro-btn--primary" onClick={copiar}><Copy size={15} /> {copiado ? 'Copiado' : 'Copiar enlace'}</button></div>
                                         <a className="pro-link" href={enlace} target="_blank" rel="noreferrer noopener">Abrir la encuesta como la ve un participante</a>
                                         <div className="ins-acciones">
-                                            <button type="button" className="pro-btn pro-btn--ghost" onClick={() => publicar(pub.open)} disabled={estado === 'publicando'}>Actualizar preguntas en línea</button>
-                                            <button type="button" className="pro-btn pro-btn--ghost" onClick={() => publicar(!pub.open)} disabled={estado === 'publicando'}>{pub.open ? 'Cerrar encuesta' : 'Volver a abrir'}</button>
+                                            <button type="button" className="pro-btn pro-btn--ghost" onClick={() => publicar(pub.open)} disabled={estado === 'publicando' || validas.length === 0 || sinOpciones > 0} title={sinOpciones > 0 ? 'Hay preguntas de opciones con menos de dos opciones' : undefined}>Actualizar preguntas en línea</button>
+                                            <button type="button" className="pro-btn pro-btn--ghost" onClick={() => abrirOCerrar(!pub.open)} disabled={estado === 'publicando'}>{pub.open ? 'Cerrar encuesta' : 'Volver a abrir'}</button>
                                             <button type="button" className="pro-btn pro-btn--primary" onClick={() => { try { window.sessionStorage.setItem('projectsia:analisis:fuente', ins.id); } catch { /* noop */ } onNavigate('analisis'); }}><BarChart3 size={15} /> Analizar respuestas</button>
                                         </div>
                                         <small className="adm-muted">Si cambias las preguntas después de recibir respuestas, usa «Actualizar preguntas en línea». No cambies el sentido de una pregunta ya respondida.</small>
