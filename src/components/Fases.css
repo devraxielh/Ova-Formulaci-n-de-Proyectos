@@ -31,3 +31,9 @@
 .fas-barra span[data-n='2'] { background: #6ee7b7; }
 .fas-barra span[data-n='3'] { background: #fcd34d; }
 .fas-barra span[data-n='4'] { background: #fda4af; }
+
+/* Recomendación de fases con la IA */
+.fas-recomendar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.8rem; margin: 0.6rem 0; font-size: 0.84rem; color: #64748b; }
+.pla-part .fas-recomendar { margin: 0 0 0.3rem; padding-bottom: 0.7rem; border-bottom: 1px solid #eef2f7; }
+.fas-gira { animation: fas-gira 1s linear infinite; }
+@keyframes fas-gira { to { transform: rotate(360deg); } }

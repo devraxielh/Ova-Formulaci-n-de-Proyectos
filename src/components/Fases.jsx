@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import EditorRico from './EditorRico';
-import { AlertTriangle, ArrowDown, ArrowUp, CalendarDays, CheckCircle2, Plus, Target, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, CalendarDays, CheckCircle2, Loader2, Plus, Sparkles, Target, Trash2 } from 'lucide-react';
 import SlideDeck from './deck/SlideDeck';
 import { Generica } from './deck/Contenido';
 import { useProject, useProjectField } from '../context/ProjectContext';
 import { useAutoGuardar } from '../hooks/useAutoGuardar';
 import { partesObjetivos } from '../services/coherencia';
+import { groq } from '../services/api';
+import { preguntasDe } from '../services/instrumentos';
 import { INFINITIVO } from '../data/ejemplos';
 import { nivelDe } from '../data/nivelesVerbos';
 import { SECTIONS, SLIDES } from '../data/fasesClase';
@@ -53,6 +55,84 @@ const productoSugerido = (objetivo) => {
     return 'Propuesta validada (documento o prototipo)';
 };
 
+// Lo que la IA necesita saber del proyecto para recomendar las fases: objetivos y metodología ya definidos.
+const contextoFases = (data, especificos, unidad) => {
+    const t = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
+    const met = data.metodologiaForm || {};
+    const armados = Array.isArray(data.instrumentosGen) ? data.instrumentosGen : [];
+    const instrumentos = (Array.isArray(met.instrumentos) ? met.instrumentos : [])
+        .filter((it) => t(it.tecnica))
+        .map((it) => {
+            const armado = armados.find((a) => a && it.id && a.filaId === it.id);
+            const n = armado ? preguntasDe(armado).length : 0;
+            return `${t(it.tecnica)} (${t(it.instrumento) || 'instrumento'}${n ? `, ${n} preguntas` : ''}) aplicada a ${t(it.aplicaA) || 'los participantes'} para ${t(it.objetivo) || 'el estudio'}; validación: ${(it.validaciones || [it.validez]).filter(Boolean).join(', ') || 'sin definir'}`;
+        });
+    const analisis = (Array.isArray(met.analisis) ? met.analisis : []).filter((x) => t(x.tecnica)).map((x) => `«${t(x.objetivo)}»: ${t(x.tecnica)}${t(x.software) ? ` en ${t(x.software)}` : ''}`);
+    const general = t(data.objetivoGeneral) || t(partesObjetivos(data.objetivos).general);
+    const crono = Number(data.ganttPeriodos) > 0 && (data.ganttUnidad === 'semanal') === (unidad === 'semanas') ? Number(data.ganttPeriodos) : 0;
+    return {
+        crono,
+        texto: `PROYECTO\nTítulo: ${t(data.titulo) || '(sin título)'}\nPregunta: ${t(data.pregunta) || '(sin definir)'}\nObjetivo general: ${general || '(sin definir)'}\nObjetivos específicos:\n${especificos.map((o, i) => `${i + 1}. ${o}`).join('\n') || '(sin definir)'}\n\nMETODOLOGÍA\nEnfoque: ${t(data.enfoque) || '(sin definir)'} · Tipo: ${t(data.tipoInvestigacion) || '(sin definir)'} · Diseño: ${t(data.diseno) || '(sin definir)'}\nPoblación: ${t(met.poblacion?.descripcion) || '(sin describir)'} · Muestreo: ${t(met.poblacion?.muestreo) || '(sin definir)'}${Number(data.poblacionTamano) > 0 ? ` · Población de ${Number(data.poblacionTamano)}` : ''}\nInstrumentos:\n${instrumentos.map((x) => `- ${x}`).join('\n') || '(sin definir)'}\nPlan de análisis:\n${analisis.map((x) => `- ${x}`).join('\n') || '(sin definir)'}`,
+    };
+};
+
+const REGLAS_FASE = `Cada fase:\n- "objetivo": el NÚMERO del objetivo específico que cumple (1, 2, 3…), o 0 si es una fase de cierre o de socialización.\n- "nombre": nombre corto de la fase con un sustantivo de acción (por ejemplo «Caracterización de la población»), de 3 a 9 palabras, sin «Fase» ni número.\n- "descripcion": una o dos frases que digan qué se hace en la fase y para qué, con los datos del proyecto (población, lugar, instrumento). Sin punto final.\n- "actividades": de 4 a 6 actividades en orden, cada una empezando con un verbo en infinitivo y concreta (qué, a quién, con qué). Usa los instrumentos, la muestra y las técnicas de análisis que ya definió el proyecto; no inventes instrumentos nuevos. La validación de un instrumento (juicio de expertos, prueba piloto, alfa de Cronbach) es una actividad propia, antes de aplicarlo; no la mezcles con la aplicación.\n- "tecnicas": las técnicas, instrumentos y software que usa la fase, separados por coma, tomados de la metodología.\n- "productos": el entregable verificable de la fase, en minúscula.\n- "duracion": número entero de unidades de tiempo.\n- "responsable": quién la lidera (por ejemplo «investigadores» o «investigador principal con el asesor»).\nNo inventes cifras, fechas ni nombres de personas.`;
+
+const leerFase = (x, especificos) => {
+    const t = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
+    const sinPunto = (v) => t(v).replace(/[.\s]+$/, '');
+    const k = Math.round(Number(x?.objetivo) || 0);
+    return {
+        nombre: capital(sinPunto(x?.nombre).replace(/^fase\s*\d*[.:-]?\s*/i, '')).slice(0, 90),
+        objetivo: k >= 1 && k <= especificos.length ? especificos[k - 1] : 'Socializar los resultados del proyecto',
+        descripcion: sinPunto(x?.descripcion).slice(0, 400),
+        actividades: (Array.isArray(x?.actividades) ? x.actividades : []).map((a) => capital(sinPunto(a))).filter(Boolean).slice(0, 7),
+        tecnicas: sinPunto(x?.tecnicas).slice(0, 200),
+        productos: lower(sinPunto(x?.productos)).slice(0, 160),
+        duracion: Math.max(1, Math.min(52, Math.round(Number(x?.duracion) || 4))),
+        responsable: sinPunto(x?.responsable).slice(0, 80),
+    };
+};
+
+// Recomienda todas las fases del proyecto: una por objetivo específico y, al final, la socialización.
+const recomendarFases = async ({ data, especificos, unidad }) => {
+    const ctx = contextoFases(data, especificos, unidad);
+    const r = await groq.chat.completions.create({
+        messages: [
+            { role: 'system', content: 'Eres asesor de proyectos de investigación formativa. Organizas la ejecución de un proyecto en fases coherentes con sus objetivos específicos y con la metodología que ya definió el estudiante. Escribes en español, en forma impersonal. Respondes solo JSON válido.' },
+            { role: 'user', content: `${ctx.texto}\n\nRecomienda las fases del proyecto: una fase por cada objetivo específico, en el mismo orden, y una fase final de socialización de resultados (objetivo 0). Si el proyecto necesita preparar o validar sus instrumentos antes de recoger los datos, incluye esas actividades al inicio de la primera fase, no como fase aparte. La unidad de tiempo es ${unidad}.${ctx.crono ? ` La suma de las duraciones debe ser exactamente ${ctx.crono} ${unidad}, como en el cronograma.` : ` Usa duraciones realistas para un proyecto de estudiantes (en total, entre ${unidad === 'meses' ? '4 y 8 meses' : '16 y 32 semanas'}).`}\n\n${REGLAS_FASE}\n\nResponde exactamente con este JSON: {"fases": [{"objetivo": 1, "nombre": "…", "descripcion": "…", "actividades": ["…"], "tecnicas": "…", "productos": "…", "duracion": 4, "responsable": "…"}]}` },
+        ],
+        temperature: 0.3,
+        max_tokens: 3500,
+        response_format: { type: 'json_object' },
+    });
+    const content = r.choices?.[0]?.message?.content || '';
+    const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+    const fases = (Array.isArray(json.fases) ? json.fases : []).map((x) => leerFase(x, especificos)).filter((x) => x.nombre && x.actividades.length >= 2).slice(0, 8);
+    if (!fases.length) throw new Error('vacio');
+    return fases;
+};
+
+// Recomienda una sola fase (la que está abierta), para su objetivo, sin tocar las demás.
+const recomendarUnaFase = async ({ data, especificos, unidad, fase, otras }) => {
+    const ctx = contextoFases(data, especificos, unidad);
+    const k = especificos.findIndex((o) => clean(o).toLowerCase() === clean(fase.objetivo).toLowerCase());
+    const r = await groq.chat.completions.create({
+        messages: [
+            { role: 'system', content: 'Eres asesor de proyectos de investigación formativa. Diseñas una fase de ejecución coherente con su objetivo específico y con la metodología que ya definió el estudiante. Escribes en español, en forma impersonal. Respondes solo JSON válido.' },
+            { role: 'user', content: `${ctx.texto}\n\nOTRAS FASES DEL PROYECTO (no repitas sus actividades)\n${otras.map((o, i) => `- ${o}`).join('\n') || '(ninguna)'}\n\nRecomienda la fase que cumple ${k >= 0 ? `el objetivo específico ${k + 1}: «${especificos[k]}»` : clean(fase.objetivo) ? `«${clean(fase.objetivo)}»` : 'la socialización de los resultados'}. La unidad de tiempo es ${unidad}; la duración actual es ${Number(fase.duracion) || 4}: consérvala salvo que sea claramente irreal.\n\n${REGLAS_FASE}\n\nResponde exactamente con este JSON: {"objetivo": ${k >= 0 ? k + 1 : 0}, "nombre": "…", "descripcion": "…", "actividades": ["…"], "tecnicas": "…", "productos": "…", "duracion": 4, "responsable": "…"}` },
+        ],
+        temperature: 0.3,
+        max_tokens: 1500,
+        response_format: { type: 'json_object' },
+    });
+    const content = r.choices?.[0]?.message?.content || '';
+    const x = leerFase(JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1)), especificos);
+    if (!x.nombre || x.actividades.length < 2) throw new Error('vacio');
+    // La fase sigue asociada al objetivo que ya tenía.
+    return { ...x, objetivo: clean(fase.objetivo) ? fase.objetivo : x.objetivo };
+};
+
 const FASE_VACIA = () => ({ id: uid(), nombre: '', objetivo: '', descripcion: '', actividades: [''], tecnicas: '', productos: '', duracion: 4, responsable: '' });
 
 const redactarFases = (fases, unidad) => fases
@@ -90,7 +170,7 @@ const useFasesState = () => {
 /* ---------- Constructor ---------- */
 
 const Constructor = ({ intro, onNavigate }) => {
-    const { f, update, setFasesTexto, metForm, setMetForm, setCronoItems, setUnidadGantt, setPeriodos, especificos } = useFasesState();
+    const { data, f, update, setFasesTexto, metForm, setMetForm, setCronoItems, setUnidadGantt, setPeriodos, especificos } = useFasesState();
     const [saved, setSaved] = useState('');
     const [active, setActive] = useState(0);
     const prefilled = useRef(false);
@@ -117,6 +197,43 @@ const Constructor = ({ intro, onNavigate }) => {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Recomendación con la IA: todas las fases (reemplaza las actuales) o solo la que está abierta.
+    const [recomendando, setRecomendando] = useState(''); // '' | 'todas' | 'una' | 'fallo'
+    const sinTrabajar = (x) => !clean(x.descripcion) && !clean(x.tecnicas) && !clean(x.responsable);
+    const recomendarTodas = async (preguntar = true) => {
+        if (preguntar && fases.length && !fases.every(sinTrabajar) && !window.confirm('Se reemplazarán tus fases actuales por las recomendadas. ¿Continuar?')) return;
+        setRecomendando('todas');
+        try {
+            const nuevas = await recomendarFases({ data, especificos, unidad: f.unidad });
+            touch();
+            update({ fases: nuevas.map((x) => ({ ...FASE_VACIA(), ...x, recomendada: true })), recomendadas: true });
+            setActive(0);
+            setRecomendando('');
+        } catch {
+            setRecomendando('fallo');
+        }
+    };
+    const recomendarActiva = async () => {
+        const actual = fases[ai];
+        if (!actual) return;
+        setRecomendando('una');
+        try {
+            const x = await recomendarUnaFase({ data, especificos, unidad: f.unidad, fase: actual, otras: fases.filter((_, k) => k !== ai).map((o) => `${clean(o.nombre)}: ${o.actividades.filter((a) => clean(a)).join('; ')}`) });
+            setFase(ai, { ...x, recomendada: true });
+            setRecomendando('');
+        } catch {
+            setRecomendando('fallo');
+        }
+    };
+    // La primera vez, si las fases son solo las armadas desde los objetivos (sin trabajar), se recomiendan solas.
+    const yaRecomendo = useRef(false);
+    useEffect(() => {
+        if (yaRecomendo.current || f.recomendadas || !especificos.length || !fases.every(sinTrabajar)) return;
+        yaRecomendo.current = true;
+        recomendarTodas(false);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [especificos.length]);
 
     const total = fases.reduce((sum, x) => sum + (Number(x.duracion) || 0), 0);
     const texto = redactarFases(fases, f.unidad);
@@ -188,6 +305,14 @@ const Constructor = ({ intro, onNavigate }) => {
                         </label>
                         {especificos.length === 0 && <p className="obj-warn"><AlertTriangle size={14} aria-hidden="true" /> Guarda tus objetivos específicos para crear una fase por objetivo.</p>}
                     </div>
+                    {especificos.length > 0 && (
+                        <div className="fas-recomendar">
+                            <button type="button" className="ide-btn ide-btn--ghost" disabled={Boolean(recomendando) && recomendando !== 'fallo'} onClick={() => recomendarTodas(true)}>
+                                {recomendando === 'todas' ? <Loader2 size={15} className="fas-gira" /> : <Sparkles size={15} />} {recomendando === 'todas' ? 'Recomendando las fases…' : 'Recomendar todas las fases'}
+                            </button>
+                            <span>{recomendando === 'fallo' ? 'No se pudo recomendar: inténtalo de nuevo.' : 'Una por objetivo específico y la de socialización, con actividades, técnicas y productos tomados de tu metodología.'}</span>
+                        </div>
+                    )}
 
                     <div className="fas-tabs" role="tablist" aria-label="Fases del proyecto">
                         {fases.map((x, i) => (
@@ -200,6 +325,12 @@ const Constructor = ({ intro, onNavigate }) => {
 
                     {fase ? (
                         <div className="input-group pla-part mar-grid" key={fase.id}>
+                            <div className="fas-recomendar mar-wide">
+                                <button type="button" className="ide-btn ide-btn--ghost" disabled={Boolean(recomendando) && recomendando !== 'fallo'} onClick={recomendarActiva}>
+                                    {recomendando === 'una' ? <Loader2 size={15} className="fas-gira" /> : <Sparkles size={15} />} {recomendando === 'una' ? 'Recomendando esta fase…' : 'Recomendar esta fase'}
+                                </button>
+                                <span>{fase.recomendada ? 'Recomendada por la IA con tu proyecto: revísala y ajústala.' : 'Llena esta fase según su objetivo y tu metodología. No cambia las demás.'}</span>
+                            </div>
                             <label className="mar-campo mar-wide">
                                 <span>Nombre de la fase</span>
                                 <input className="input-field" value={fase.nombre} onChange={(e) => setFase(ai, { nombre: e.target.value })} placeholder="Ej: Caracterización de la inasistencia" />
