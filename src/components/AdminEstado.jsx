@@ -57,7 +57,7 @@ const AdminEstado = ({ fijo = false }) => {
                 <div className="adm-estado-body">
                     <div>
                         <h3><DatabaseBackup size={16} aria-hidden="true" /> Copias de seguridad</h3>
-                        <p className="adm-muted">Se crea una copia completa cada día y se conservan las últimas 30 en el servidor.{estado.backupEmail ? ` Cada copia también se envía como adjunto a ${estado.backupEmail}, para tenerla fuera del servidor.` : ' El correo no está configurado: descarga una copia de vez en cuando para tenerla fuera del servidor.'}</p>
+                        <p className="adm-muted">Se crea una copia completa cada día y se conservan las últimas 30 en el servidor. No se envían por correo: descarga una de vez en cuando para tenerla también fuera del servidor., para tenerla fuera del servidor.` : ' El correo no está configurado: descarga una copia de vez en cuando para tenerla fuera del servidor.'}</p>
                         <div className="adm-estado-acciones">
                             <button type="button" className="pro-btn pro-btn--ghost" onClick={copiar} disabled={busy}><RefreshCw size={15} /> {busy ? 'Creando…' : 'Crear una copia ahora'}</button>
                         </div>

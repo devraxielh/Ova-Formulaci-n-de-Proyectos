@@ -40,9 +40,8 @@ const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
 const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
 const MAIL_FROM = process.env.MAIL_FROM || SMTP_USER;
-// A dónde llegan las alertas y la copia diaria (por defecto, el mismo buzón de la app). «off» desactiva el envío.
+// A dónde llegan las alertas (por defecto, el mismo buzón de la app). «off» desactiva el envío.
 const ALERT_EMAIL = process.env.ALERT_EMAIL || MAIL_FROM;
-const BACKUP_EMAIL = process.env.BACKUP_EMAIL || ALERT_EMAIL;
 const BACKUP_DIR = process.env.BACKUP_DIR || path.join(path.dirname(DB_PATH), 'backups');
 const BACKUP_KEEP = 30;
 const RESET_MINUTES = 60;
@@ -354,7 +353,7 @@ const listBackups = () => {
 
 // Copia consistente de toda la base (incluye lo que aún está en el WAL), comprimida. Se conservan las últimas 30.
 let backupRunning = false;
-const runBackup = async ({ email = true } = {}) => {
+const runBackup = async () => {
     if (backupRunning) return null;
     backupRunning = true;
     const tmp = path.join(BACKUP_DIR, 'en-curso.db');
@@ -367,23 +366,8 @@ const runBackup = async ({ email = true } = {}) => {
         fs.rmSync(tmp, { force: true });
         listBackups().slice(BACKUP_KEEP).forEach((old) => fs.rmSync(path.join(BACKUP_DIR, old.name), { force: true }));
         const size = fs.statSync(file).size;
-        // Copia fuera del servidor: llega como adjunto al buzón del administrador (si pesa menos de 15 MB).
-        let mailed = false;
-        if (email && mailer && BACKUP_EMAIL && BACKUP_EMAIL !== 'off' && size < 15 * 1024 * 1024) {
-            try {
-                await mailer.sendMail({
-                    from: MAIL_FROM,
-                    to: BACKUP_EMAIL,
-                    subject: `[PROJECTSIA] Copia de seguridad ${name.slice(11, 21)}`,
-                    text: 'Copia diaria de la base de datos de PROJECTSIA (usuarios, proyectos, versiones y figuras). Para restaurarla: descomprime el archivo y reemplaza server/data/projectsia.db con la API detenida.',
-                    attachments: [{ filename: name, path: file }],
-                });
-                mailed = true;
-            } catch (error) {
-                logError('backup', 'No se pudo enviar la copia por correo', error?.message);
-            }
-        }
-        return { name, size, mailed };
+        // La copia se queda en el servidor: no se envía por correo. Para tenerla fuera, el administrador la descarga.
+        return { name, size };
     } catch (error) {
         logError('backup', 'Falló la copia de seguridad', error?.message);
         alertar('backup', 'Falló la copia de seguridad', `No se pudo crear la copia diaria: ${error?.message}`);
@@ -1261,13 +1245,12 @@ app.get('/api/admin/estado', requireAdmin, (_req, res) => {
         mail: Boolean(mailer),
         ai: { configured: Boolean(GROQ_API_KEY), fails: aiState.fails, lastOk: aiState.lastOk, lastError: aiState.lastError },
         backups: listBackups(),
-        backupEmail: Boolean(mailer) && BACKUP_EMAIL !== 'off' ? BACKUP_EMAIL : '',
         errors: errors.map((e) => ({ id: e.id, kind: e.kind, message: e.message, detail: e.detail, createdAt: e.created_at, user: e.user || '' })),
     });
 });
 
 app.post('/api/admin/backups', requireAdmin, async (_req, res) => {
-    const result = await runBackup({ email: false });
+    const result = await runBackup();
     if (!result) return res.status(500).json({ error: 'No se pudo crear la copia. Revisa el registro de errores.' });
     return res.status(201).json({ backup: result, backups: listBackups() });
 });
