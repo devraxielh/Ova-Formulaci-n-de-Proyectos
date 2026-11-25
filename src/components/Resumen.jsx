@@ -95,7 +95,7 @@ const useResumenState = () => {
 
 /* ---------- Constructor ---------- */
 
-const Constructor = ({ intro }) => {
+const Constructor = ({ intro, onNavigate }) => {
     const { data, f, update, setResumen, setClaves } = useResumenState();
     const { project } = useProject();
     const [saved, setSaved] = useState(false);
@@ -193,8 +193,21 @@ const Constructor = ({ intro }) => {
                     {PARTES.map((p) => (
                         <div className="input-group pla-part" data-active={active === p.key} key={p.key}>
                             <label htmlFor={`res-${p.key}`}><mark data-part={p.color} data-active="true">{PARTES.indexOf(p) || '·'}</mark> {p.label} <small className="res-cuenta">{countWords(f[p.key])} palabras</small></label>
-                            <textarea id={`res-${p.key}`} className="textarea-field" rows={p.key === 'resultados' ? 4 : 3} value={f[p.key]} onFocus={() => setActive(p.key)} onChange={(e) => { touch(); update({ [p.key]: e.target.value }); }} placeholder={`Ej: ${ejemplos[p.key] || p.placeholder}`} />
-                            <small className="ide-field-hint">{p.hint}{ORIGEN[p.key] && !fuentes[p.key] ? ` Se redacta sola cuando completes «${ORIGEN[p.key].nombre}».` : ''}</small>
+                            {ORIGEN[p.key] && !fuentes[p.key] && vacia(p.key) ? (
+                                // Su sección todavía no está escrita: la parte queda desactivada hasta que lo esté.
+                                <div className="int-auto" data-lista="false" id={`res-${p.key}`} aria-disabled="true">
+                                    <p className="int-auto-texto">Se redactará sola cuando completes «{ORIGEN[p.key].nombre}».</p>
+                                    <small>
+                                        Esta parte sale de esa sección de tu proyecto: {p.hint.charAt(0).toLowerCase() + p.hint.slice(1)}
+                                        {onNavigate && <> <button type="button" className="ide-link" onClick={() => onNavigate(ORIGEN[p.key].seccion)}>Ir a {ORIGEN[p.key].nombre}</button></>}
+                                    </small>
+                                </div>
+                            ) : (
+                                <>
+                                    <textarea id={`res-${p.key}`} className="textarea-field" rows={p.key === 'resultados' ? 4 : 3} value={f[p.key]} onFocus={() => setActive(p.key)} onChange={(e) => { touch(); update({ [p.key]: e.target.value }); }} placeholder={`Ej: ${ejemplos[p.key] || p.placeholder}`} />
+                                    <small className="ide-field-hint">{p.hint}{ORIGEN[p.key] && !fuentes[p.key] ? ` Su sección («${ORIGEN[p.key].nombre}») aún no está escrita: este texto lo pusiste a mano.` : ''}</small>
+                                </>
+                            )}
                         </div>
                     ))}
 
@@ -454,7 +467,7 @@ const Resumen = ({ onNavigate }) => {
             </>
         ),
         construye: (
-            <Constructor intro={(
+            <Constructor onNavigate={onNavigate} intro={(
                 <>
                     {heading}
                     <p>El resumen se redacta solo con lo que ya escribiste: objetivo, metodología, resultados y conclusiones, cada uno en una o dos oraciones. Las partes cuya sección aún no está escrita quedan pendientes; cuando la completes, toca «Redactar con mi proyecto». Ajusta hasta quedar entre {MIN_PALABRAS} y {MAX_PALABRAS} palabras y agrega tus palabras clave.</p>
