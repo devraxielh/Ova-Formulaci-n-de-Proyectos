@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { useProject, useProjectField } from '../context/ProjectContext';
 import { groq } from '../services/api';
@@ -38,6 +38,8 @@ const Operacionalizacion = () => {
     const [guardadas, setGuardadas] = useProjectField('operacionalizacion', []);
     const filas = Array.isArray(guardadas) ? guardadas : [];
     const [estado, setEstado] = useState('');
+    // Si la tabla ya se llenó sola una vez, no se vuelve a llenar aunque el estudiante la deje vacía a propósito.
+    const [yaSugerida, setYaSugerida] = useProjectField('operacionalizacionAuto', false);
     const { general, especificos } = partesObjetivos(data.objetivos);
     const cualitativo = /cualitativ/i.test(String(data.enfoque || ''));
     const nombre = cualitativo ? 'categoría' : 'variable';
@@ -46,31 +48,44 @@ const Operacionalizacion = () => {
     const agregar = (base = {}) => setGuardadas((prev) => [...(Array.isArray(prev) ? prev : []), { id: uid(), variable: '', tipoVar: '', definicion: '', dimension: '', indicador: '', item: '', escala: cualitativo ? 'abierta' : 'likert', opciones: [], objetivo: 0, ...base }]);
     const quitar = (id) => setGuardadas((prev) => (Array.isArray(prev) ? prev : []).filter((f) => f.id !== id));
 
-    const conIA = async () => {
-        if (!especificos.length) { avisar('Primero escribe tus objetivos específicos: la operacionalización sale de ellos.', 'error'); return; }
-        if (filasValidas(filas).length && !(await confirmar({ texto: '¿Reemplazar la tabla actual?', detalle: 'Se cambia por la que salga de tus objetivos. Puedes recuperar la anterior desde el historial de versiones.', aceptar: 'Reemplazar', peligro: true }))) return;
+    const conIA = async (sola = false) => {
+        if (!especificos.length) { if (!sola) avisar('Primero escribe tus objetivos específicos: la operacionalización sale de ellos.', 'error'); return; }
+        if (!sola && filasValidas(filas).length && !(await confirmar({ texto: '¿Reemplazar la tabla actual?', detalle: 'Se cambia por la que salga de tus objetivos. Puedes recuperar la anterior desde el historial de versiones.', aceptar: 'Reemplazar', peligro: true }))) return;
         setEstado('pensando');
         try {
-            setGuardadas(await generar({ data, especificos, general: general || t(data.objetivoGeneral), cualitativo }));
-            avisar('Tabla lista. Revísala: cada ítem pasará a ser una pregunta de tu instrumento.');
+            const nuevas = await generar({ data, especificos, general: general || t(data.objetivoGeneral), cualitativo });
+            // Llenado automático: solo si la tabla sigue vacía (nunca se pisa lo que el estudiante haya escrito mientras tanto).
+            let puesta = true;
+            setGuardadas((prev) => { if (sola && filasValidas(prev).length) { puesta = false; return prev; } return nuevas; });
+            setYaSugerida(true);
+            if (puesta) avisar(sola ? 'Llenamos la tabla con las variables de tus objetivos. Revísala y ajústala: cada ítem pasará a ser una pregunta de tu instrumento.' : 'Tabla lista. Revísala: cada ítem pasará a ser una pregunta de tu instrumento.');
         } catch {
-            avisar('No se pudo generar la tabla. Inténtalo de nuevo.', 'error');
+            if (!sola) avisar('No se pudo generar la tabla. Inténtalo de nuevo.', 'error');
         } finally {
             setEstado('');
         }
     };
+
+    // Al abrir la pestaña por primera vez con la tabla vacía y los objetivos ya escritos, se llena sola.
+    const intento = useRef(false);
+    useEffect(() => {
+        if (intento.current || yaSugerida || filasValidas(filas).length || !especificos.length) return;
+        intento.current = true;
+        conIA(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [yaSugerida, especificos.length]);
 
     const sinCubrir = especificos.map((_, i) => i + 1).filter((n) => !filasValidas(filas).some((f) => f.objetivo === n));
 
     return (
         <div className="ope">
             <div className="met-razon">
-                <button type="button" className="ide-btn ide-btn--ghost" disabled={estado === 'pensando'} onClick={conIA}>
-                    {estado === 'pensando' ? <Loader2 size={15} className="met-gira" /> : <Sparkles size={15} />} {estado === 'pensando' ? 'Leyendo tus objetivos…' : `Generar desde mis objetivos`}
+                <button type="button" className="ide-btn ide-btn--ghost" disabled={estado === 'pensando'} onClick={() => conIA(false)}>
+                    {estado === 'pensando' ? <Loader2 size={15} className="met-gira" /> : <Sparkles size={15} />} {estado === 'pensando' ? 'Leyendo tus objetivos…' : filasValidas(filas).length ? 'Volver a generar desde mis objetivos' : 'Generar desde mis objetivos'}
                 </button>
                 <span>De cada objetivo salen sus {cualitativo ? 'categorías, subcategorías' : 'variables, dimensiones'}, indicadores e ítems. Con esta tabla se arma el instrumento.</span>
             </div>
-            {filas.length === 0 && <p className="ope-vacio">Todavía no hay filas. Genera la tabla desde tus objetivos o agrega la primera {nombre} a mano.</p>}
+            {filas.length === 0 && <p className="ope-vacio">{estado === 'pensando' ? 'Estamos sacando las variables de tus objetivos…' : !especificos.length ? 'Escribe primero tus objetivos específicos: de ellos salen las variables.' : `Todavía no hay filas. Genera la tabla desde tus objetivos o agrega la primera ${nombre} a mano.`}</p>}
             {sinCubrir.length > 0 && filasValidas(filas).length > 0 && <p className="ope-aviso">{sinCubrir.length === 1 ? `El objetivo específico ${sinCubrir[0]} no tiene` : `Los objetivos específicos ${sinCubrir.join(', ')} no tienen`} ninguna {nombre} en la tabla.</p>}
             {filas.length > 0 && (
                 <div className="ope-tabla-wrap">

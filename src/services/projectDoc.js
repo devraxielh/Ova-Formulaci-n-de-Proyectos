@@ -329,7 +329,7 @@ export const CAMPOS_SECCION = {
     justificacion: ['justificacion', 'justificacionForm'],
     alcances: ['alcances', 'alcancesForm', 'limitaciones'],
     marco: ['marcoAntecedentes', 'marcoTeorico', 'marcoConceptual', 'marcoContextual', 'marcoLegal', 'marcoForm'],
-    metodologia: ['operacionalizacion', 'metodologia', 'metodologiaForm', 'metEnfoque', 'metTipo', 'metDiseno', 'metPlanAnalisis', 'poblacionSugerida', 'poblacionTamano', 'poblacionTipo', 'muestraConfianza', 'muestraError', 'instrumentos', 'presupuesto', 'cronogramaItems', 'ganttPeriodos', 'ganttUnidad', 'enfoque', 'tipoInvestigacion', 'diseno', 'instrumentosGen'],
+    metodologia: ['operacionalizacion', 'operacionalizacionAuto', 'metodologia', 'metodologiaForm', 'metEnfoque', 'metTipo', 'metDiseno', 'metPlanAnalisis', 'poblacionSugerida', 'poblacionTamano', 'poblacionTipo', 'muestraConfianza', 'muestraError', 'instrumentos', 'presupuesto', 'cronogramaItems', 'ganttPeriodos', 'ganttUnidad', 'enfoque', 'tipoInvestigacion', 'diseno', 'instrumentosGen'],
     fases: ['fases', 'fasesForm'],
     resultados: ['resultados', 'discusion', 'resultadosForm', 'elementos', 'cualitativo'],
     conclusiones: ['conclusiones', 'conclusionesForm', 'recomendaciones'],
