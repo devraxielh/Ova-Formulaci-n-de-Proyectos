@@ -207,7 +207,7 @@ const Constructor = ({ intro, onNavigate }) => {
                             {pregunta && <div className="tit-from-idea mar-wide"><span>Tu pregunta de investigación</span><p>{pregunta}</p></div>}
                             <label className="mar-campo mar-wide" htmlFor="conc-gen">
                                 <span>Conclusión general (responde la pregunta y el objetivo general)</span>
-                                <EditorRico id="conc-gen" className="textarea-field" rows={5} value={f.general} onChange={(e) => { touch(); update({ general: e.target.value }); }} placeholder="Ej: En respuesta a la pregunta de investigación, los factores asociados a la inasistencia son principalmente el olvido de la cita y el costo del transporte, lo que permitió proponer una estrategia de recordatorios" />
+                                <EditorRico id="conc-gen" className="textarea-field" rows={5} value={f.general} onChange={(e) => { touch(); update({ general: e.target.value }); }} placeholder="Ej: En respuesta a la pregunta de investigación, los factores asociados a la inasistencia son principalmente el olvido de la cita y el costo del transporte, y la inasistencia es mayor en los pacientes jóvenes y de la zona rural" />
                             </label>
                             {!clean(f.general) && pregunta && (
                                 <button type="button" className="ide-link mar-wide" onClick={() => { touch(); update({ general: 'En respuesta a la pregunta de investigación, ' }); }}><Wand2 size={13} /> Empezar con «En respuesta a la pregunta de investigación…»</button>

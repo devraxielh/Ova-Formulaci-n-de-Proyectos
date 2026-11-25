@@ -48,8 +48,8 @@ export const SLIDES = construccionPrimero([
         panel: {
             type: 'chain', title: 'De los objetivos a las conclusiones', items: [
                 { label: 'Objetivo específico 1', text: 'Caracterizar la inasistencia → Conclusión 1: cómo es la inasistencia.' },
-                { label: 'Objetivo específico 2', text: 'Establecer la relación → Conclusión 2: si hay relación y de qué tipo.' },
-                { label: 'Objetivo específico 3', text: 'Proponer estrategias → Conclusión 3: qué propuesta se obtuvo.' },
+                { label: 'Objetivo específico 2', text: 'Comparar la inasistencia → Conclusión 2: en qué grupos es mayor.' },
+                { label: 'Objetivo específico 3', text: 'Establecer la relación → Conclusión 3: si hay relación y de qué tipo.' },
                 { label: 'Conclusión general', text: 'Responde el objetivo general y la pregunta de investigación.' },
             ],
         },
@@ -67,9 +67,9 @@ export const SLIDES = construccionPrimero([
         panel: {
             type: 'table', title: 'Verbo del objetivo → inicio de la conclusión', head: ['Objetivo', 'Conclusión'], rows: [
                 ['Caracterizar…', 'Se caracterizó… / La inasistencia se caracteriza por…'],
+                ['Comparar…', 'Se encontró que la inasistencia es mayor en…'],
                 ['Establecer la relación…', 'Se estableció que existe una relación…'],
-                ['Determinar los factores…', 'Se determinó que los factores…'],
-                ['Proponer una estrategia…', 'Se propuso una estrategia que…'],
+                ['Analizar los factores…', 'Los factores asociados a… son…'],
             ],
         },
     },
@@ -78,7 +78,7 @@ export const SLIDES = construccionPrimero([
         lead: ['Integra las conclusiones específicas en una respuesta a tu pregunta de investigación. Si planteaste una hipótesis, di si los resultados la respaldan o no.'],
         panel: {
             type: 'example', title: 'Ejemplo', paragraphs: [
-                'En respuesta a la pregunta de investigación, los factores asociados a la inasistencia a citas médicas de los pacientes de consulta externa del hospital son principalmente el olvido de la cita y el costo del transporte, y su efecto es mayor en los pacientes jóvenes y de la zona rural. Estos hallazgos permitieron proponer una estrategia de recordatorios y flexibilización de horarios para reducir la inasistencia.',
+                'En respuesta a la pregunta de investigación, los factores asociados a la inasistencia a citas médicas de los pacientes de consulta externa del hospital son principalmente el olvido de la cita y el costo del transporte; la inasistencia es mayor en los pacientes menores de 30 años, en los de la zona rural y en quienes no recibieron recordatorio. El olvido se relaciona de forma positiva y moderada con la inasistencia, lo que indica asociación y no causalidad.',
             ],
         },
     },
@@ -87,9 +87,9 @@ export const SLIDES = construccionPrimero([
         lead: ['Mira cómo cada conclusión responde su objetivo, sin citas ni datos nuevos. Ejemplo ilustrativo.'],
         panel: {
             type: 'example', title: 'Ejemplo (salud)', paragraphs: [
-                '**1.** La inasistencia a citas médicas en la consulta externa del hospital es frecuente y se concentra en los pacientes menores de 30 años y en quienes viven en la zona rural.',
-                '**2.** Se estableció que el olvido de la cita está asociado a la inasistencia: los pacientes que no reciben recordatorio faltan con mayor frecuencia.',
-                '**3.** Se propuso una estrategia de recordatorios por mensaje de texto y de flexibilización de horarios, validada por expertos como pertinente y viable.',
+                '**1.** La inasistencia a citas médicas en la consulta externa del hospital es frecuente: se pierde cerca de una de cada cinco citas, y el olvido es la causa que más reportan los pacientes.',
+                '**2.** La inasistencia es mayor en los pacientes menores de 30 años, en quienes viven en la zona rural y en quienes no recibieron recordatorio de la cita.',
+                '**3.** Se estableció que el olvido de la cita se relaciona de forma positiva y moderada con la inasistencia: a mayor olvido, más citas perdidas.',
             ],
         },
     },
@@ -150,7 +150,7 @@ export const SLIDES = construccionPrimero([
             type: 'table', title: 'Antes y después', head: ['Débil', 'Fuerte'], rows: [
                 ['Se hizo la encuesta y se vieron muchas cosas.', 'La inasistencia se concentra en los pacientes jóvenes y de la zona rural.'],
                 ['El olvido es malo según varios autores.', 'Se estableció que el olvido de la cita está asociado a la inasistencia en esta población.'],
-                ['La estrategia solucionará el problema del país.', 'Se propuso una estrategia de recordatorios validada por expertos como viable para el hospital.'],
+                ['Los recordatorios solucionarán la inasistencia en todo el país.', 'En esta población, la inasistencia es mayor en quienes no recibieron recordatorio de la cita.'],
             ],
         },
     },

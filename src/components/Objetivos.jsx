@@ -118,9 +118,9 @@ const QUEES_QUIZ = [
     {
         text: '¿Cuál es el objetivo general y no un específico?',
         options: [
-            'Caracterizar la inasistencia a citas de los pacientes de consulta externa.',
-            'Determinar los factores asociados a la inasistencia a citas médicas en los pacientes de consulta externa de un hospital de Sincelejo.',
-            'Identificar las causas que los pacientes reportan para no asistir.',
+            'Caracterizar la inasistencia a citas médicas en los pacientes de consulta externa.',
+            'Analizar los factores asociados a la inasistencia a citas médicas en los pacientes de consulta externa de un hospital de Sincelejo.',
+            'Establecer la relación entre el olvido de la cita y la inasistencia.',
         ],
         answer: 1,
         why: 'Abarca toda la investigación y responde la pregunta. Los otros dos son pasos para llegar a él.',
@@ -134,7 +134,7 @@ const ORIGEN = [
 ];
 
 const PARTES = [
-    { key: 'verbo', color: 'que', label: 'Verbo en infinitivo', text: 'Determinar', what: 'Qué acción cognitiva harás. Uno solo, verificable.' },
+    { key: 'verbo', color: 'que', label: 'Verbo en infinitivo', text: 'Analizar', what: 'Qué acción cognitiva harás. Uno solo, verificable.' },
     { key: 'objeto', color: 'paraque', label: 'Qué', text: 'los factores asociados a la inasistencia a citas médicas', what: 'El objeto de estudio: tus variables.' },
     { key: 'quien', color: 'quien', label: 'En quiénes', text: 'en los pacientes de consulta externa', what: 'La población o unidad de análisis.' },
     { key: 'donde', color: 'donde', label: 'Dónde y cuándo', text: 'de un hospital de Sincelejo, en 2026', what: 'El lugar y, si aplica, el tiempo.' },
@@ -152,10 +152,9 @@ const VERBOS = [
 ];
 
 const ESCALERA = [
-    { label: 'Peldaño 1 · Nivel 2 · Describir', text: 'Caracterizar la inasistencia a citas en los pacientes de consulta externa.', note: '¿Cómo es? Muestra la situación actual.' },
-    { label: 'Peldaño 2 · Nivel 3 · Analizar', text: 'Establecer la relación entre el olvido de la cita y la inasistencia.', note: '¿Con qué se relaciona? Usa la descripción anterior.' },
-    { label: 'Peldaño 3 · Nivel 4 · Explicar', text: 'Determinar los factores que más inciden en la inasistencia.', note: '¿Por qué ocurre? Usa las relaciones encontradas.' },
-    { label: 'Peldaño 4 · Nivel 6 · Proponer', text: 'Proponer estrategias para reducir la inasistencia a partir de los factores encontrados.', note: '¿Qué se propone? Usa todo lo anterior.' },
+    { label: 'Peldaño 1 · Nivel 2 · Describir', text: 'Caracterizar la inasistencia a citas médicas en los pacientes de consulta externa.', note: '¿Cómo es? Muestra la situación actual.' },
+    { label: 'Peldaño 2 · Nivel 3 · Analizar', text: 'Comparar la inasistencia según la edad, la zona de residencia y el recordatorio de la cita.', note: '¿En quiénes es mayor? Usa la descripción anterior.' },
+    { label: 'Peldaño 3 · Nivel 3 · Analizar', text: 'Establecer la relación entre el olvido de la cita y la inasistencia.', note: '¿Con qué se relaciona? Mismo nivel que el anterior: no baja.' },
 ];
 
 const ERRORES = [
@@ -190,7 +189,7 @@ const JUZGA_QUIZ = [
 ];
 
 const ANTES_DESPUES = [
-    { antes: 'Mejorar la atención en el hospital.', despues: 'Proponer estrategias para reducir el tiempo de espera de los pacientes de urgencias de un hospital de Sincelejo.', porque: 'Pasa de una promesa vaga a un producto concreto, con población y lugar.' },
+    { antes: 'Mejorar la atención en la clínica.', despues: 'Proponer estrategias para reducir el tiempo de espera de los pacientes de urgencias de una clínica de Montería.', porque: 'Pasa de una promesa vaga a un producto concreto, con población y lugar.' },
     { antes: 'Investigar y analizar el consumo de agua.', despues: 'Caracterizar el consumo de agua en los hogares rurales de Lorica, Córdoba.', porque: 'Un solo verbo verificable y un objeto delimitado.' },
     { antes: 'Hacer una encuesta para saber qué piensan los clientes.', despues: 'Describir la percepción de los clientes sobre la calidad del servicio de una tienda en línea.', porque: 'Convierte la actividad (encuesta) en el resultado que se busca.' },
 ];
@@ -464,7 +463,7 @@ const Constructor = ({ intro, onNavigate }) => {
                             value={f.general}
                             onChange={(event) => { touch(); update({ general: event.target.value }); }}
                             onFocus={() => setActive('general')}
-                            placeholder={`Ej: ${desdeTitulo || 'Determinar los factores asociados a la inasistencia a citas médicas en los pacientes de consulta externa de un hospital de Sincelejo'}`}
+                            placeholder={`Ej: ${desdeTitulo || 'Analizar los factores asociados a la inasistencia a citas médicas en los pacientes de consulta externa de un hospital de Sincelejo'}`}
                         />
                         <Warnings value={f.general} />
                         {desdeTitulo && f.general.trim() !== desdeTitulo && (
@@ -738,7 +737,7 @@ const Objetivos = ({ onNavigate }) => {
                     </ol>
                     <p className="ide-hint">Regla: cada específico está en el mismo nivel o más arriba que el anterior; nunca baja.</p>
                 </div>
-                <Cadena title="Ejemplo: cuatro peldaños" items={ESCALERA} />
+                <Cadena title="Ejemplo: tres peldaños" items={ESCALERA} />
             </>
         ),
         alineacion: (

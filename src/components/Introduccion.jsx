@@ -74,7 +74,7 @@ const PARTES = [
         key: 'importancia', label: 'Importancia y vacío', color: 'quien',
         what: 'Dice por qué vale la pena estudiarlo y qué falta por saber.',
         hint: 'Una síntesis de la justificación: a quién beneficia y qué no se conoce todavía.',
-        placeholder: 'Ej: Aunque el problema es conocido, no se han estudiado sus causas en esta institución, lo que impide diseñar acciones…',
+        placeholder: 'Ej: Aunque el problema es conocido, no se han estudiado sus factores en esta institución, lo que impide diseñar acciones…',
         conectores: ['Por esta razón,', 'Aunque', 'No obstante,', 'De ahí la importancia de'],
     },
     {
@@ -210,7 +210,7 @@ const QUEES_QUIZ = [
         options: [
             'Según Ajzen (1991), la intención de una conducta depende de la actitud, la norma subjetiva y el control percibido.',
             'Este documento presenta una propuesta para analizar los factores asociados a la inasistencia a citas médicas en un hospital de Sincelejo.',
-            'Se aplicó la encuesta a 230 pacientes entre marzo y mayo.',
+            'Se aplicó la encuesta a 278 pacientes entre marzo y mayo.',
         ],
         answer: 1,
         why: 'Presenta el proyecto completo. El primero es marco teórico; el tercero, metodología o resultados.',
@@ -268,7 +268,7 @@ const JUZGA_QUIZ = [
         why: 'Anticipa el método en una oración: es justo lo que pide la introducción.',
     },
     {
-        text: '«Los resultados muestran que el 62 % de los pacientes olvidó su cita.»',
+        text: '«Los resultados muestran que el 41 % de los pacientes olvidó su cita.»',
         options: ['Sí va', 'No va'],
         answer: 1,
         why: 'Es un resultado: en una propuesta todavía no existe.',

@@ -67,9 +67,9 @@ export const SLIDES = construccionPrimero([
         ],
         panel: {
             type: 'table', title: 'De causa a medio, y de medio a objetivo específico', head: ['Causa', 'Medio', 'Objetivo específico'], rows: [
-                ['Los pacientes olvidan la fecha', 'Los pacientes recuerdan su cita', '**Diseñar** un sistema de recordatorios de cita por mensaje de texto.'],
-                ['Es difícil reprogramar por teléfono', 'Reprogramar la cita es sencillo', '**Diseñar** un canal de reprogramación en línea.'],
-                ['El transporte rural es costoso', 'Las citas se ajustan al transporte disponible', '**Proponer** horarios acordes con las rutas rurales.'],
+                ['Los pacientes olvidan la fecha', 'Los pacientes recuerdan su cita', '**Establecer** la relación entre el olvido de la cita y la inasistencia.'],
+                ['Es difícil reprogramar por teléfono', 'Reprogramar la cita es sencillo', '**Describir** las dificultades de los pacientes para reprogramar su cita.'],
+                ['El transporte rural es costoso', 'Las citas se ajustan al transporte disponible', '**Comparar** la inasistencia según la zona de residencia.'],
             ],
         },
     },

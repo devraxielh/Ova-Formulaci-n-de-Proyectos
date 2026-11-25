@@ -363,7 +363,7 @@ export default {
             ['Dependencias entre actividades', 'Algunas actividades no pueden empezar hasta que termina otra: no se recoge sin aval ni instrumento validado, no se analiza sin datos. Identificar ese orden muestra qué retrasos atrasan todo el proyecto.'],
             ['Unidad de tiempo', 'En un proyecto de un semestre se planea por semanas; en uno de un año, por meses. Usa «semana 1» o «mes 1» en vez de fechas exactas, porque la fecha de inicio puede cambiar.'],
         ],
-        ejemplo: 'El objetivo «Identificar las causas de inasistencia reportadas por los pacientes» se convierte en: diseñar el cuestionario, validarlo con expertos, hacer la prueba piloto, aplicarlo a los 278 pacientes, digitar los datos y calcular las frecuencias.',
+        ejemplo: 'El objetivo «Establecer la relación entre el olvido de la cita y la inasistencia» se convierte en: diseñar el cuestionario, validarlo con expertos, hacer la prueba piloto, aplicarlo a los 278 pacientes, digitar los datos y calcular la correlación.',
         ojo: 'El cronograma empieza cuando te aprueban el anteproyecto, no antes. No incluyas como actividades lo que ya hiciste para escribirlo.',
     },
     gantt: {

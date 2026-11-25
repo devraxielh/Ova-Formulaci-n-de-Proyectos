@@ -24,7 +24,7 @@ export default {
             ['No partas de la solución', 'Si empiezas por «falta una app», ya decidiste la respuesta sin estudiar el problema. Descartas otras salidas y no podrás demostrar después que la tuya sirvió, porque nunca mediste la situación inicial.'],
             ['Tres datos lo vuelven concreto', 'Un problema bien enunciado dice **a quién** le ocurre, **qué** le ocurre y cómo se nota: una cifra, una frecuencia o un hecho que cualquiera puede verificar.'],
         ],
-        ejemplo: 'Solución disfrazada: «No hay un sistema de recordatorios en el hospital». Problema: «Tres de cada diez pacientes de consulta externa de un hospital de Sincelejo no asisten a su cita, y esos cupos se pierden».',
+        ejemplo: 'Solución disfrazada: «No hay un sistema de recordatorios en el hospital». Problema: «Una de cada cinco citas de consulta externa de un hospital de Sincelejo no se cumple, y esos cupos se pierden».',
         ojo: 'Redacta el problema sin mencionar ninguna solución. Si al leerlo se te ocurren dos o tres formas distintas de atenderlo, está bien planteado.',
     },
     porques: {
@@ -51,7 +51,7 @@ export default {
             ['Unidad de análisis', 'No siempre son personas. Puedes estudiar hogares, empresas, historias clínicas, fincas o documentos. Decide qué es «un caso» en tu estudio: de ahí sale qué vas a contar y a quién le pedirás información.'],
             ['Criterios de inclusión y exclusión', 'Son las condiciones que debe cumplir un caso para entrar al estudio y las que lo dejan por fuera. Convierten una población vaga en una lista que se puede verificar caso por caso.'],
         ],
-        ejemplo: 'Población: citas de consulta externa programadas a mayores de 18 años en un hospital de Sincelejo durante 2026. Se excluyen las canceladas por el hospital. Unidad de análisis: cada cita; por eso se cuentan citas perdidas, no pacientes.',
+        ejemplo: 'Población: pacientes mayores de 18 años con cita programada en consulta externa de un hospital de Sincelejo durante 2026. Se excluyen los pacientes de urgencias. Unidad de análisis: el paciente; por eso la información se le pide a cada paciente y no a cada cita.',
         ojo: 'Pregúntate si existe una lista o un registro de esa población. Si nadie puede decirte cuántos son ni dónde están, todavía no está delimitada.',
     },
     delimita: {

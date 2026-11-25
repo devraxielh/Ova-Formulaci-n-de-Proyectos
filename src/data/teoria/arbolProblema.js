@@ -60,7 +60,7 @@ export default {
             ['Coherencia entre secciones', 'Si cambias una causa en el árbol, cambian también el párrafo de causas y un objetivo específico. Por eso conviene dejar el árbol firme antes de redactar.'],
             ['También delimita', 'Las causas que decides **no** trabajar no desaparecen: se mencionan en el planteamiento y luego se declaran fuera del alcance del estudio, con la razón por la que quedaron fuera.'],
         ],
-        ejemplo: 'De la causa «los pacientes olvidan la fecha» salen una oración del planteamiento («Entre las causas se encuentra el olvido de la cita…») y un objetivo específico («Identificar las razones que los pacientes reportan para no asistir»).',
+        ejemplo: 'De la causa «los pacientes olvidan la fecha» salen una oración del planteamiento («Entre las causas se encuentra el olvido de la cita…») y un objetivo específico («Establecer la relación entre el olvido de la cita y la inasistencia»).',
         ojo: 'La figura acompaña al texto, no lo reemplaza. En el planteamiento debes explicar con palabras lo que el árbol muestra y mencionar la figura.',
     },
     errores: {

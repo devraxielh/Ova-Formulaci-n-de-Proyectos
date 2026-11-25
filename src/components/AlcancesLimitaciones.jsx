@@ -155,11 +155,11 @@ const FRONTERAS = [
     { icon: Users, label: 'Poblacional', text: 'Con quiénes.', example: 'Pacientes adultos de consulta externa.' },
     { icon: MapPin, label: 'Espacial', text: 'Dónde.', example: 'Un hospital de Sincelejo, Sucre.' },
     { icon: CalendarDays, label: 'Temporal', text: 'Cuándo o en qué periodo.', example: 'Primer semestre de 2026.' },
-    { icon: Package, label: 'Resultados', text: 'Qué se obtendrá o entregará.', example: 'Los factores que más inciden en la inasistencia.' },
+    { icon: Package, label: 'Resultados', text: 'Qué se obtendrá o entregará.', example: 'Los factores asociados a la inasistencia y la fuerza de su relación.' },
 ];
 
 const LOQUESI = [
-    { si: 'Identificar los factores asociados a la inasistencia.', no: 'Aplicar la estrategia de recordatorios ni medir su efecto.' },
+    { si: 'Analizar los factores asociados a la inasistencia.', no: 'Diseñar ni aplicar una estrategia de recordatorios, ni medir su efecto.' },
     { si: 'Pacientes adultos de consulta externa.', no: 'Pacientes de urgencias, hospitalización ni menores de edad.' },
     { si: 'Un hospital de Sincelejo.', no: 'Otros hospitales del departamento.' },
     { si: 'Citas del primer semestre de 2026.', no: 'Datos de años anteriores.' },
@@ -291,7 +291,7 @@ const CAMPOS = [
     { key: 'poblacion', label: 'Con quiénes', color: 'quien', hint: 'Tu población, lo más precisa posible.', fallback: 'pacientes adultos de consulta externa' },
     { key: 'lugar', label: 'Dónde', color: 'donde', hint: 'La institución, el municipio o la región.', fallback: 'un hospital de Sincelejo, Sucre' },
     { key: 'tiempo', label: 'Cuándo', color: 'cuando', hint: 'El periodo en que se recogen los datos.', fallback: 'el primer semestre de 2026' },
-    { key: 'resultados', label: 'Qué se obtendrá', color: 'paraque', hint: 'El producto o conocimiento que dejará el estudio.', fallback: 'la identificación de los factores que más inciden en la inasistencia' },
+    { key: 'resultados', label: 'Qué se obtendrá', color: 'paraque', hint: 'El producto o conocimiento que dejará el estudio.', fallback: 'el análisis de los factores asociados a la inasistencia y de la fuerza de su relación' },
     { key: 'exclusiones', label: 'Qué no abarca', color: 'extra2', hint: 'Lo que queda por fuera: otras poblaciones, sedes, la aplicación de soluciones…', fallback: 'pacientes de urgencias ni la aplicación de soluciones' },
 ];
 

@@ -15,7 +15,7 @@ export default {
             ['Si se cumplió a medias', 'Dilo. Una conclusión honesta señala hasta dónde se llegó y por qué: «se caracterizó la inasistencia en consulta externa; no fue posible hacerlo por especialidad porque la agenda no registra ese dato».'],
             ['Hallazgos fuera de los objetivos', 'Si encontraste algo relevante que ningún objetivo pedía, no lo fuerces como conclusión. Preséntalo en la discusión y conviértelo en una recomendación para futuros estudios.'],
         ],
-        ejemplo: 'Objetivo 2: «Establecer la relación entre el olvido de la cita y la inasistencia». Conclusión 2: «Se estableció que existe una relación positiva entre el olvido y la inasistencia: quienes no reciben recordatorio faltan con mayor frecuencia».',
+        ejemplo: 'Objetivo 3: «Establecer la relación entre el olvido de la cita y la inasistencia». Conclusión 3: «Se estableció que existe una relación positiva y moderada entre el olvido y la inasistencia: a mayor olvido, más citas perdidas».',
         ojo: 'Cuenta: si tienes tres objetivos específicos y cinco conclusiones, o solo dos, algo no corresponde. Revisa cuál sobra o cuál falta.',
     },
     reglas: {
@@ -39,7 +39,7 @@ export default {
     ejemplo: {
         claves: [
             ['Qué tienen en común', 'Las tres empiezan por el hallazgo, nombran la población o el lugar y caben en una o dos oraciones. Ninguna explica cómo se recogieron los datos ni cita a otro autor.'],
-            ['Cada una con su alcance', 'La primera describe («es frecuente y se concentra en…»), la segunda relaciona («está asociado a…») y la tercera presenta un producto («se propuso…»). El verbo corresponde al objetivo que responde.'],
+            ['Cada una con su alcance', 'La primera describe («es frecuente y se concentra en…»), la segunda compara («es mayor en…») y la tercera relaciona («se relaciona de forma positiva…»). El verbo corresponde al objetivo que responde.'],
             ['La propuesta también se concluye', 'Cuando un objetivo pide diseñar algo, la conclusión dice qué se obtuvo y **cómo se validó**: por expertos, por usuarios o con una prueba piloto. Sin validación, solo se afirma que existe.'],
         ],
         ejemplo: 'En educación: «1. La reprobación en primer semestre se concentra en cálculo y en los estudiantes que trabajan. 2. Se estableció que la asistencia a tutorías está asociada a una menor reprobación. 3. Se propuso un plan de tutorías tempranas, valorado como viable por la coordinación académica».',
@@ -75,7 +75,7 @@ export default {
     antes: {
         claves: [
             ['Tres defectos típicos', 'La primera frase débil cuenta el procedimiento, la segunda se apoya en otros autores y la tercera promete más de lo que el estudio hizo. Cada versión fuerte corrige uno de ellos.'],
-            ['Sujeto: el hallazgo', 'En la versión fuerte el sujeto de la oración es la variable o el resultado («la inasistencia», «el olvido de la cita», «una estrategia»), no el investigador ni el instrumento.'],
+            ['Sujeto: el hallazgo', 'En la versión fuerte el sujeto de la oración es la variable o el resultado («la inasistencia», «el olvido de la cita», «la relación»), no el investigador ni el instrumento.'],
             ['Sin verbos en futuro', 'Las conclusiones hablan de lo que se encontró o **se logró**, en pasado o en presente: «se estableció», «se concentra». Un verbo en futuro («solucionará») suele ser una promesa o una recomendación disfrazada.'],
         ],
         ejemplo: 'Débil: «Con las encuestas se pudo ver que los estudiantes tienen problemas». Fuerte: «La reprobación en primer semestre se concentra en cálculo y en los estudiantes que trabajan más de 20 horas semanales».',

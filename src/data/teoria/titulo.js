@@ -24,7 +24,7 @@ export default {
             ['El objeto de estudio', 'Es el fenómeno o las variables que vas a observar: «los factores asociados a la deserción», no «los estudiantes». Los estudiantes son la población; el objeto es lo que estudias **en** ellos.'],
             ['Cuándo incluir el para qué', 'Inclúyelo si el estudio entrega un insumo para algo concreto, como un diseño o una propuesta. Si solo repite un fin genérico («para mejorar la calidad»), alarga el título sin informar.'],
         ],
-        ejemplo: '«Caracterización (verbo) de la inasistencia a citas médicas (objeto) en pacientes de consulta externa (en quiénes) de un hospital público de Sincelejo (dónde) durante 2026 (cuándo)»: 20 palabras y cuatro de las cinco partes.',
+        ejemplo: '«Análisis (verbo) de los factores asociados a la inasistencia a citas médicas (objeto) en pacientes de consulta externa (en quiénes) de un hospital de Sincelejo (dónde)»: 21 palabras y tres de las cinco partes.',
         ojo: 'Un título no es mejor por tener las cinco partes. Si pasa de 30 palabras, quita primero el para qué y luego el periodo.',
     },
     verbo: {
@@ -69,7 +69,7 @@ export default {
             ['Qué se puede quitar', 'Sobran las fórmulas de entrada («Estudio sobre», «Investigación acerca de»), el método («mediante encuestas»), los adjetivos de valor («importante», «novedoso») y lo que ya está implícito en la población o el lugar.'],
             ['Léelo en voz alta', 'Si te quedas sin aire o tienes que releer para entenderlo, hay demasiadas preposiciones encadenadas. Reordena las partes o elimina un complemento hasta que se lea de corrido.'],
         ],
-        ejemplo: 'Antes: «Investigación sobre los problemas de las citas médicas en Sincelejo». Después: «Determinación de los factores asociados a la inasistencia a citas médicas en pacientes de consulta externa de un hospital público de Sincelejo».',
+        ejemplo: 'Antes: «Investigación sobre los problemas de las citas médicas en Sincelejo». Después: «Análisis de los factores asociados a la inasistencia a citas médicas en pacientes de consulta externa de un hospital de Sincelejo».',
         ojo: 'Si la versión corregida te obliga a cambiar la población o el verbo, revisa también tu idea y tu objetivo: el título solo refleja lo que ya decidiste.',
     },
 };

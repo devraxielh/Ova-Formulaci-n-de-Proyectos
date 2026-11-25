@@ -81,7 +81,7 @@ export const SLIDES = construccionPrimero([
         bullets: ['Datos: números (encuestas cerradas, pruebas, registros).', 'Muestras grandes y, si es posible, aleatorias.', 'Análisis: estadística descriptiva e inferencial.', 'Hipótesis que se ponen a prueba.'],
         panel: {
             type: 'example', title: 'Ejemplos cuantitativos', paragraphs: [
-                '**Salud.** Determinar la relación entre la edad y la inasistencia a citas en 278 pacientes de consulta externa.',
+                '**Salud.** Establecer la relación entre el olvido de la cita y la inasistencia en 278 pacientes de consulta externa.',
                 '**Educación.** Comparar el rendimiento en matemáticas de dos grupos que usan estrategias distintas.',
                 '**Negocios.** Medir el efecto de los pagos digitales en las ventas de 150 tiendas de barrio.',
             ],
@@ -362,7 +362,7 @@ export const SLIDES = construccionPrimero([
         panel: {
             type: 'table', title: 'Ejemplos', head: ['Técnica', 'Ejemplo de instrumento'], rows: [
                 ['Observación', 'Lista de chequeo con 15 conductas de los estudiantes en clase (sí/no).'],
-                ['Revisión documental', 'Ficha con fecha de cita, edad, régimen y asistencia, tomada del sistema de citas.'],
+                ['Revisión documental', 'Ficha con fecha de cita, edad, zona de residencia, recordatorio y asistencia, tomada del sistema de citas.'],
             ],
         },
     },
@@ -460,8 +460,8 @@ export const SLIDES = construccionPrimero([
         panel: {
             type: 'table', title: 'Ejemplo de matriz', head: ['Objetivo específico', 'Técnica e instrumento', 'Análisis'], rows: [
                 ['Caracterizar la inasistencia', 'Revisión documental · ficha de registro', 'Frecuencias y porcentajes'],
-                ['Identificar las causas reportadas', 'Encuesta · cuestionario', 'Estadística descriptiva'],
-                ['Establecer la relación entre olvido e inasistencia', 'Encuesta · cuestionario', 'Chi cuadrado o Spearman'],
+                ['Comparar la inasistencia según edad, zona y recordatorio', 'Revisión documental · ficha de registro', 'Chi cuadrado (proporciones entre grupos)'],
+                ['Establecer la relación entre olvido e inasistencia', 'Encuesta · cuestionario', 'Spearman o chi cuadrado'],
             ],
         },
     },

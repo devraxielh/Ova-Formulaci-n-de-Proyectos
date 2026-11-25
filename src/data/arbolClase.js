@@ -112,7 +112,7 @@ export const SLIDES = construccionPrimero([
             ],
         },
         quiz: [
-            q('Si el proyecto va a crear recordatorios por mensaje de texto, ¿sobre qué parte del árbol actúa?', ['Sobre un efecto', 'Sobre una causa', 'Sobre el problema central directamente'], 1, 'Ataca la causa «los pacientes olvidan la fecha»; al reducirla, baja la inasistencia.'),
+            q('Si el hospital decide enviar recordatorios por mensaje de texto, ¿sobre qué parte del árbol actúa?', ['Sobre un efecto', 'Sobre una causa', 'Sobre el problema central directamente'], 1, 'Ataca la causa «los pacientes olvidan la fecha»; al reducirla, baja la inasistencia.'),
         ],
     },
     {

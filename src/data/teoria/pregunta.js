@@ -6,7 +6,7 @@ export default {
             ['Qué comparten las tres', 'Las tres formas llevan las mismas variables, población y lugar. Además, el verbo sustantivado del título, el tipo de pregunta y el infinitivo del objetivo apuntan a la misma acción: análisis, «¿qué relación…?», analizar.'],
             ['En qué orden se escriben', 'En esta ruta formulas primero el título y luego la pregunta y el objetivo. En la práctica se ajustan juntos: al precisar la pregunta es normal volver al título y corregirlo.'],
         ],
-        ejemplo: 'Título: «Determinación de los factores asociados a la inasistencia a citas médicas…». Pregunta: «¿Qué factores determinan la inasistencia a citas médicas…?». Objetivo: «Determinar los factores asociados a la inasistencia a citas médicas…». Cambia la forma, no el estudio.',
+        ejemplo: 'Título: «Análisis de los factores asociados a la inasistencia a citas médicas…». Pregunta: «¿Qué factores están asociados a la inasistencia a citas médicas…?». Objetivo: «Analizar los factores asociados a la inasistencia a citas médicas…». Cambia la forma, no el estudio.',
         ojo: 'El objetivo no es la pregunta sin signos. La pregunta dice qué quieres saber; el objetivo, qué harás para saberlo, y debe poder cumplirse y verificarse.',
     },
     camino: {
@@ -15,7 +15,7 @@ export default {
             ['De la duda al tipo', 'Mira qué clase de respuesta esperas: una descripción, una diferencia, una relación, una causa, un pronóstico, una valoración o una propuesta. Esa respuesta esperada es la que define el tipo de pregunta.'],
             ['Qué se conserva del título', 'Pasan a la pregunta, sin cambiar, las variables, la población y el lugar. Solo cambia el arranque: el verbo sustantivado se reemplaza por la expresión interrogativa que corresponde a ese tipo.'],
         ],
-        ejemplo: 'Título: «Determinación de los factores asociados a la inasistencia a citas médicas en pacientes de consulta externa de un hospital de Sincelejo». Quiero saber por qué faltan. Tipo: explicativa. Pregunta: «¿Qué factores determinan la inasistencia a citas médicas en pacientes…?».',
+        ejemplo: 'Título: «Análisis de los factores asociados a la inasistencia a citas médicas en pacientes de consulta externa de un hospital de Sincelejo». Quiero saber con qué se relaciona que falten. Tipo: correlacional. Pregunta: «¿Qué factores están asociados a la inasistencia a citas médicas en los pacientes…?».',
         ojo: 'Si al formular la pregunta te descubres preguntando por otra cosa que la del título, no la fuerces. Decide cuál refleja lo que quieres saber y ajusta el otro.',
     },
     tipos: {
@@ -51,7 +51,7 @@ export default {
             ['Los mismos límites del título', 'No inventes una delimitación nueva: copia la población, el lugar y el periodo del título. Si ahora te parecen muy amplios o muy estrechos, corrige los dos textos a la vez.'],
             ['Hasta dónde vale la respuesta', 'Lo que encuentres en un hospital de Sincelejo describe a ese hospital. Extenderlo a otros exige una muestra representativa de ellos o nuevos estudios, y así debe decirse en las conclusiones.'],
         ],
-        ejemplo: 'Amplia: «¿Por qué los pacientes no van a las citas?». Delimitada: «¿Qué factores determinan la inasistencia a citas médicas en pacientes de consulta externa de un hospital público de Sincelejo durante 2026?».',
+        ejemplo: 'Amplia: «¿Por qué los pacientes no van a las citas?». Delimitada: «¿Qué factores están asociados a la inasistencia a citas médicas en los pacientes de consulta externa de un hospital de Sincelejo?».',
         ojo: 'Delimitar no es llenar la pregunta de detalles. Si pasa de 40 palabras, deja el periodo o los criterios finos para la metodología.',
     },
     errores: {
@@ -60,7 +60,7 @@ export default {
             ['Hechos, no valores', 'La investigación no decide si algo «es bueno» o «debería gustar»: eso es un juicio. Sí puede establecer qué efecto tiene, quiénes lo usan o qué opinan de ello, que son hechos observables.'],
             ['Pregunta general y específicas', 'Si tienes varias preguntas, una es la **general** y las demás, **específicas**: cada una resuelve una parte y juntas responden la general. Más adelante se corresponderán con tus objetivos específicos.'],
         ],
-        ejemplo: 'Dos en una: «¿Por qué faltan los pacientes a las citas y cómo solucionarlo?». General: «¿Qué factores determinan la inasistencia a citas médicas en pacientes de consulta externa de un hospital de Sincelejo?». La solución queda para un estudio posterior.',
+        ejemplo: 'Dos en una: «¿Por qué faltan los pacientes a las citas y cómo solucionarlo?». General: «¿Qué factores están asociados a la inasistencia a citas médicas en los pacientes de consulta externa de un hospital de Sincelejo?». La solución queda para un estudio posterior.',
         ojo: 'Antes de aceptar tu pregunta, imagina la respuesta escrita. Si cabe en una palabra o ya la conoces, no hay investigación que hacer.',
     },
     reescribe: {
@@ -78,7 +78,7 @@ export default {
             ['La cadena sigue', 'La misma coherencia se exigirá con el objetivo general, la hipótesis si la hay, el diseño y las conclusiones. Muchos programas la revisan con una **matriz de consistencia**, que pone todo en una tabla.'],
             ['Cuál de los dos se ajusta', 'Cuando no coinciden, manda lo que de verdad quieres saber y puedes responder. Con eso claro se corrige el texto que quedó atrás, sea el título o la pregunta.'],
         ],
-        ejemplo: 'Incoherente: título «Diseño de un sistema de recordatorios…» con la pregunta «¿Qué factores determinan la inasistencia…?». Coherente: «¿Cómo debería diseñarse un sistema de recordatorios para reducir la inasistencia a citas en un hospital de Sincelejo?».',
+        ejemplo: 'Incoherente: título «Diseño de un sistema de recordatorios…» con la pregunta «¿Qué factores están asociados a la inasistencia…?». Coherente: «¿Cómo debería diseñarse un sistema de recordatorios para reducir la inasistencia a citas en un hospital de Sincelejo?».',
         ojo: 'Usar palabras parecidas no basta. «Inasistencia» en el título y «cancelación» en la pregunta son variables distintas: usa siempre el mismo término.',
     },
 };

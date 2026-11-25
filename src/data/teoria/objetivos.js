@@ -6,7 +6,7 @@ export default {
             ['Suma sin sobrantes', 'Prueba doble: si cumples todos los específicos, ¿queda cumplido el general? Y al revés: ¿hay algún específico que no haga falta para el general? Si lo hay, quítalo.'],
             ['De conocimiento, no de gestión', 'Un objetivo de investigación produce **conocimiento** (una descripción, una relación, una explicación) o una propuesta fundamentada. Cambiar la realidad es tarea de quien use esos resultados.'],
         ],
-        ejemplo: 'General: «Determinar los factores asociados a la inasistencia a citas en un hospital de Sincelejo». Específicos: caracterizar la inasistencia, identificar las razones que reportan los pacientes y establecer cuáles pesan más. Juntos responden el general.',
+        ejemplo: 'General: «Analizar los factores asociados a la inasistencia a citas médicas en un hospital de Sincelejo». Específicos: caracterizar la inasistencia, compararla según la edad, la zona de residencia y el recordatorio, y establecer su relación con el olvido de la cita. Juntos responden el general.',
         ojo: 'Los objetivos pueden ajustarse durante el estudio, pero cada cambio obliga a revisar título, pregunta y metodología. No los cambies solos.',
     },
     origen: {
@@ -33,7 +33,7 @@ export default {
             ['El verbo anuncia el alcance', 'En los términos de Hernández Sampieri: «explorar» corresponde a un estudio exploratorio; «describir» o «caracterizar», a uno descriptivo; «establecer la relación», a uno correlacional; «determinar» o «explicar», a uno explicativo.'],
             ['Cada verbo deja un producto', 'Pregúntate qué entregarás: una lista (identificar), un perfil (caracterizar), una tabla comparativa (comparar), una relación medida (establecer), un diseño (proponer). Si no puedes nombrar el producto, cambia el verbo.'],
         ],
-        ejemplo: 'Con el mismo tema: «Describir la inasistencia a citas» entrega cuántos pacientes faltan y quiénes son; «Determinar los factores asociados a la inasistencia» entrega por qué faltan. El segundo exige más datos y más análisis.',
+        ejemplo: 'Con el mismo tema: «Describir la inasistencia a citas» entrega cuántos pacientes faltan y quiénes son; «Analizar los factores asociados a la inasistencia» entrega con qué se relaciona que falten. El segundo exige más datos y más análisis.',
         ojo: 'No escojas el verbo más alto para que suene importante. «Evaluar» o «explicar» te obligan a un diseño que quizá no puedas cumplir en un semestre.',
     },
     secuencia: {
@@ -51,7 +51,7 @@ export default {
             ['Las mismas palabras clave', 'Variables, población y lugar se escriben **igual** en título, pregunta y objetivo. Los sinónimos, que en otros textos mejoran el estilo, aquí parecen un cambio de tema.'],
             ['Lo que sigue depende de ellos', 'De cada específico saldrán una técnica, un instrumento y un apartado de resultados y de conclusiones. Un específico mal planteado arrastra el error hasta el final del informe.'],
         ],
-        ejemplo: 'Título: «Factores asociados a la inasistencia a citas…». Pregunta: «¿Qué factores están asociados a la inasistencia a citas…?». Objetivo: «Determinar los factores asociados a la inasistencia a citas…». Las mismas palabras; solo cambia la forma.',
+        ejemplo: 'Título: «Análisis de los factores asociados a la inasistencia a citas…». Pregunta: «¿Qué factores están asociados a la inasistencia a citas…?». Objetivo: «Analizar los factores asociados a la inasistencia a citas…». Las mismas palabras; solo cambia la forma.',
         ojo: 'Cuando cambies una de las tres piezas, revisa las otras dos en ese mismo momento. La desalineación casi siempre nace de editar una sola.',
     },
     errores: {
@@ -69,7 +69,7 @@ export default {
             ['De la actividad al logro', 'Pregunta «¿para qué lo hago?» sobre la actividad. La respuesta es el objetivo: se entrevista para describir, se mide para comparar, se revisa bibliografía para identificar.'],
             ['Delimitar el objeto', '«La atención», «el consumo» o «la educación» son temas, no objetos. Precisa qué aspecto estudiarás: el tiempo de espera, el consumo por hogar, la reprobación en una asignatura.'],
         ],
-        ejemplo: 'Antes: «Estudiar el problema de las citas en el hospital». Después: «Identificar las razones de inasistencia que reportan los pacientes de consulta externa de un hospital de Sincelejo». Verbo verificable, objeto preciso, población y lugar.',
+        ejemplo: 'Antes: «Estudiar el problema de las citas en el hospital». Después: «Caracterizar la inasistencia a citas médicas en los pacientes de consulta externa de un hospital de Sincelejo». Verbo verificable, objeto preciso, población y lugar.',
         ojo: 'No reescribas cada objetivo por separado. Al terminar, léelos en orden junto al general y comprueba que sigan formando una escalera.',
     },
 };

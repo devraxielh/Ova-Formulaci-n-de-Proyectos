@@ -357,7 +357,7 @@ const JUZGA_QUIZ = [
     { text: '«¿Es importante la tecnología en la educación?»', options: ['Investigable', 'Mejorable'], answer: 1, why: 'Se responde con sí, la respuesta es obvia y no está delimitada.' },
     { text: '«¿Qué relación existe entre las horas de sueño y el rendimiento académico de estudiantes de primer semestre de una universidad de Sincelejo?»', options: ['Investigable', 'Mejorable'], answer: 0, why: 'Dos variables medibles, población y lugar.' },
     { text: '«¿Cómo podemos acabar con la pobreza?»', options: ['Investigable', 'Mejorable'], answer: 1, why: 'Demasiado amplia y sin variables ni población.' },
-    { text: '«¿Qué factores determinan la inasistencia a citas médicas en pacientes de consulta externa de un hospital de Sincelejo?»', options: ['Investigable', 'Mejorable'], answer: 0, why: 'Pregunta explicativa delimitada y abierta.' },
+    { text: '«¿Qué factores están asociados a la inasistencia a citas médicas en los pacientes de consulta externa de un hospital de Sincelejo?»', options: ['Investigable', 'Mejorable'], answer: 0, why: 'Pregunta correlacional delimitada y abierta.' },
     { text: '«¿Funciona la nueva plataforma del colegio?»', options: ['Investigable', 'Mejorable'], answer: 1, why: 'Se responde con sí o no y no dice qué se entiende por «funcionar».' },
 ];
 

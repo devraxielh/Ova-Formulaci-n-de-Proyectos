@@ -15,7 +15,7 @@ export default {
             ['Qué se planea en la propuesta', 'Antes de tener datos puedes dejar definido el **plan de análisis**: qué tabla o figura responderá cada objetivo, qué prueba aplicarás y con qué antecedentes compararás lo que encuentres.'],
             ['Método y resultados se corresponden', 'Todo lo que anunciaste en el método debe tener su resultado, y ningún resultado debe salir de un procedimiento que no describiste. El evaluador revisa esa correspondencia.'],
         ],
-        ejemplo: 'En la propuesta: «Para el objetivo 2 se presentará una tabla de inasistencia según recordatorio y se calculará la correlación de Spearman». En el informe final, esa tabla y esa prueba aparecen con los datos reales.',
+        ejemplo: 'En la propuesta: «Para el objetivo 2 se presentará una tabla de inasistencia según recordatorio y se calculará la prueba chi cuadrado». En el informe final, esa tabla y esa prueba aparecen con los datos reales.',
         ojo: 'Preparar las tablas vacías desde la propuesta, solo con títulos y columnas, te muestra si tu instrumento recoge todo lo que necesitas reportar.',
     },
     'res-organizar': {
@@ -24,7 +24,7 @@ export default {
             ['Primero la muestra', 'Antes del primer objetivo suele ir un párrafo breve que describe a los participantes: cuántos fueron, edad, sexo, procedencia. Ese párrafo da contexto a todos los resultados que siguen.'],
             ['Subtítulos que informan', 'Titula cada apartado con su contenido, no con el número del objetivo: «Caracterización de la inasistencia» orienta más al lector que «Resultados del objetivo 1».'],
         ],
-        ejemplo: 'Participantes (278 pacientes, descripción general) → Caracterización de la inasistencia (tablas 1 y 2) → Relación entre el olvido y la inasistencia (tabla 3 y prueba estadística) → Estrategia propuesta y su validación.',
+        ejemplo: 'Participantes (278 pacientes, descripción general) → Caracterización de la inasistencia (tabla 1) → Comparación según edad, zona y recordatorio (tablas 2 y 3) → Relación entre el olvido y la inasistencia (prueba de correlación).',
         ojo: 'Un resultado que no responde a ningún objetivo, por interesante que sea, distrae. Déjalo fuera o repórtalo brevemente como hallazgo adicional.',
     },
     'res-que': {

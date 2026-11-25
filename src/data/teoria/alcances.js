@@ -42,7 +42,7 @@ export default {
             ['Cada exclusión tiene razón', 'Se excluye por coherencia con el objetivo, por falta de acceso o por tiempo. Dar la razón en media oración evita que la exclusión parezca arbitraria o un descuido.'],
             ['Diagnosticar no es intervenir', 'Es la exclusión más frecuente en un trabajo de grado: el estudio identifica factores o diseña una propuesta, pero **no la implementa** ni mide su efecto. Dilo de forma explícita.'],
         ],
-        ejemplo: '«El estudio no abarca a los pacientes de urgencias, porque no tienen cita programada, ni incluye la aplicación de la estrategia de recordatorios ni la medición de su efecto, que podrán abordarse en un trabajo posterior».',
+        ejemplo: '«El estudio no abarca a los pacientes de urgencias, porque no tienen cita programada, ni incluye el diseño ni la aplicación de una estrategia de recordatorios, que podrán abordarse en un trabajo posterior».',
         ojo: 'Revisa que las exclusiones no contradigan tus objetivos: si un objetivo dice «proponer una estrategia», no puedes excluir el diseño de la propuesta.',
     },
     tiposlim: {

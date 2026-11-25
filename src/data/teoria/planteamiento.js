@@ -78,7 +78,7 @@ export default {
             ['Los mismos términos siempre', 'Si escribes «inasistencia», no alternes después con «ausentismo» o «incumplimiento» para no repetir. En un texto académico, cambiar la palabra hace pensar al lector que cambiaste de variable.'],
             ['En ambos sentidos', 'El planteamiento tampoco debe abrir temas que la pregunta no recoge. Si dedicas un párrafo al transporte rural y la pregunta no lo incluye, sobra el párrafo o falta ajustar la pregunta.'],
         ],
-        ejemplo: 'Pregunta: «¿Qué factores están asociados a la inasistencia a citas en los pacientes de consulta externa de un hospital de Sincelejo?». El planteamiento debe mostrar la inasistencia con un dato y al menos dos posibles factores con su respaldo.',
+        ejemplo: 'Pregunta: «¿Qué factores están asociados a la inasistencia a citas médicas en los pacientes de consulta externa de un hospital de Sincelejo?». El planteamiento debe mostrar la inasistencia con un dato y al menos dos posibles factores con su respaldo.',
         ojo: 'Si al terminar el planteamiento la pregunta ya no encaja, es válido ajustar la pregunta. Lo que no se puede es dejarlos distintos.',
     },
 };

@@ -39,8 +39,8 @@ export const SLIDES = construccionPrimero([
         panel: {
             type: 'chain', title: 'Del objetivo a la fase', items: [
                 { label: 'Objetivo específico 1', text: 'Caracterizar la inasistencia a citas médicas.', note: '→ Fase 1. Caracterización' },
-                { label: 'Objetivo específico 2', text: 'Establecer la relación entre el olvido y la inasistencia.', note: '→ Fase 2. Análisis de la relación' },
-                { label: 'Objetivo específico 3', text: 'Proponer estrategias para reducir la inasistencia.', note: '→ Fase 3. Diseño de la propuesta' },
+                { label: 'Objetivo específico 2', text: 'Comparar la inasistencia según la edad, la zona de residencia y el recordatorio.', note: '→ Fase 2. Comparación' },
+                { label: 'Objetivo específico 3', text: 'Establecer la relación entre el olvido y la inasistencia.', note: '→ Fase 3. Análisis de la relación' },
             ],
         },
     },
@@ -98,8 +98,8 @@ export const SLIDES = construccionPrimero([
         panel: {
             type: 'table', title: 'Ejemplos', head: ['Fase', 'Hito', 'Indicador'], rows: [
                 ['Caracterización', 'Base de datos depurada', '100 % de los registros del semestre revisados'],
-                ['Análisis', 'Informe de resultados aprobado por el asesor', 'Una prueba estadística por objetivo'],
-                ['Propuesta', 'Estrategia validada', 'Concepto favorable de 3 expertos'],
+                ['Comparación', 'Tablas comparativas revisadas por el asesor', 'Una prueba chi cuadrado por variable: edad, zona y recordatorio'],
+                ['Análisis de la relación', 'Informe de resultados aprobado por el asesor', 'Correlación reportada con su valor p'],
             ],
         },
     },
@@ -184,7 +184,7 @@ export const SLIDES = construccionPrimero([
         id: 'ej-salud', section: 'ejemplos', min: 4, title: 'Ejemplo: salud',
         lead: ['Una fase completa en un proyecto de salud.'],
         panel: {
-            type: 'example', title: 'Fase 2. Análisis de la relación entre el olvido y la inasistencia', paragraphs: [
+            type: 'example', title: 'Fase 3. Análisis de la relación entre el olvido y la inasistencia', paragraphs: [
                 '**Objetivo:** establecer la relación entre el olvido de la cita y la inasistencia en los pacientes de consulta externa.',
                 '**Actividades:** aplicar el cuestionario a los 278 pacientes de la muestra; digitar y depurar la base de datos; calcular la correlación de Spearman; interpretar los resultados frente a los antecedentes.',
                 '**Técnicas y herramientas:** encuesta, cuestionario validado por expertos, Jamovi.',
@@ -224,7 +224,7 @@ export const SLIDES = construccionPrimero([
         lead: ['Compara y fíjate en lo que falta en la débil.'],
         panel: {
             type: 'table', title: 'Antes y después', head: ['Elemento', 'Débil', 'Fuerte'], rows: [
-                ['Nombre', 'Fase 2', 'Fase 2. Análisis de la relación'],
+                ['Nombre', 'Fase 3', 'Fase 3. Análisis de la relación'],
                 ['Actividades', 'Hacer encuestas y analizar.', 'Aplicar el cuestionario; depurar la base; calcular Spearman; interpretar.'],
                 ['Producto', '—', 'Informe de resultados con tablas y prueba estadística.'],
                 ['Duración', '—', '8 semanas.'],
@@ -240,8 +240,8 @@ export const SLIDES = construccionPrimero([
         panel: {
             type: 'table', title: 'Ejemplo de secuencia', head: ['Fase', 'Depende de', 'Duración'], rows: [
                 ['1. Caracterización', '—', '6 semanas'],
-                ['2. Análisis', 'Fase 1', '8 semanas'],
-                ['3. Propuesta', 'Fase 2', '6 semanas'],
+                ['2. Comparación', 'Fase 1', '6 semanas'],
+                ['3. Análisis de la relación', 'Fase 2', '8 semanas'],
                 ['Total', '', '20 semanas (5 meses)'],
             ],
         },

@@ -78,7 +78,7 @@ const PARTES = [
         key: 'cierre', label: 'Párrafo de cierre', color: 'cuando',
         what: 'Sintetiza el problema y muestra por qué es necesario investigarlo: conduce a tu pregunta.',
         hint: 'Dos o tres oraciones: resume lo esencial (quiénes, qué problema, por qué importa) y anuncia lo que hace falta conocer. Tu pregunta va a continuación, en su propia sección.',
-        placeholder: 'Ej: Por lo anterior, resulta necesario identificar los factores que explican la inasistencia de estos pacientes, como base para mejorar la atención…',
+        placeholder: 'Ej: Por lo anterior, resulta necesario analizar los factores asociados a la inasistencia de estos pacientes, como base para mejorar la atención…',
         conectores: ['Por lo anterior,', 'En síntesis,', 'En este sentido,', 'De ahí la necesidad de'],
     },
 ];

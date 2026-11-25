@@ -15,7 +15,7 @@ export default {
             ['Cómo nombrar la fase', 'Convierte el verbo del objetivo en sustantivo: caracterizar → caracterización, diseñar → diseño, evaluar → evaluación. El nombre queda corto y deja ver de inmediato qué objetivo cumple esa fase.'],
             ['Dónde van los preparativos', 'Los permisos y la validación del instrumento no son un objetivo. Inclúyelos como primeras actividades de la fase 1 o en una fase preparatoria breve con su producto; las demás responden cada una a un objetivo.'],
         ],
-        ejemplo: 'Objetivo: «Proponer estrategias para reducir la inasistencia». Fase 3. Diseño de la propuesta. Al terminar queda el documento de la estrategia; si ese documento existe y fue validado, el objetivo está cumplido.',
+        ejemplo: 'Objetivo: «Comparar la inasistencia según la edad, la zona de residencia y el recordatorio de la cita». Fase 2. Comparación. Al terminar quedan las tablas comparativas con su prueba; si ese producto existe y fue revisado, el objetivo está cumplido.',
         ojo: 'Haz la prueba inversa: tapa los objetivos y lee solo los nombres de las fases. Deberías poder reconstruir qué quería lograr cada objetivo.',
     },
     partes: {
@@ -51,7 +51,7 @@ export default {
             ['Indicador que se mide', 'Un buen indicador tiene una cantidad y una meta: «278 cuestionarios aplicados», «100 % de los registros revisados», «tres conceptos favorables». Así el cumplimiento no depende de apreciaciones personales.'],
             ['Sirven para decidir', 'Al llegar a un hito se revisa si se puede pasar a la fase siguiente. Si el indicador no se cumplió, se ajusta el plan en ese momento, no al final del proyecto.'],
         ],
-        ejemplo: 'Fase 2. Hito: base de datos completa. Indicador: 278 cuestionarios digitados y menos del 5 % de datos faltantes. Si solo hay 240, se amplía una semana la recolección antes de iniciar el análisis.',
+        ejemplo: 'Fase 3. Hito: base de datos completa. Indicador: 278 cuestionarios digitados y menos del 5 % de datos faltantes. Si solo hay 240, se amplía una semana la recolección antes de iniciar el análisis.',
         ojo: '«Avanzar en la recolección» no es un hito: no tiene fecha ni forma de comprobarse. Un hito siempre describe algo terminado.',
     },
     'mod-cuanti': {
@@ -159,7 +159,7 @@ export default {
             ['Un solo responsable', 'El responsable **responde** por que la fase se cumpla y coordina a los demás. Encuestadores, expertos y asesor participan, pero solo una persona rinde cuentas por el producto.'],
             ['Lo que no pagas', 'Tu tiempo, el computador propio o el software libre son recursos aunque no impliquen desembolso. Se registran como aporte en especie para mostrar el costo real del proyecto.'],
         ],
-        ejemplo: 'Fase 2. Quién: investigador principal y dos encuestadores. Con qué: 278 copias del cuestionario, un computador y Jamovi, que es gratuito. Dónde: sala de espera de consulta externa del hospital.',
+        ejemplo: 'Fase 3. Quién: investigador principal y dos encuestadores. Con qué: 278 copias del cuestionario, un computador y Jamovi, que es gratuito. Dónde: sala de espera de consulta externa del hospital.',
         ojo: 'Si necesitas encuestadores, incluye una actividad para capacitarlos. Que cada uno aplique el instrumento a su manera daña la calidad de los datos.',
     },
     riesgos: {
@@ -177,7 +177,7 @@ export default {
             ['Revisión en dos pasadas', 'Primera pasada, fase por fase: cada una tiene sus seis elementos. Segunda, de conjunto: cada objetivo tiene fase, cada fase deja producto y los tiempos suman lo que dice el cronograma.'],
             ['Acciones, no razones', 'La metodología argumenta **por qué** se eligió un diseño o una técnica; las fases solo dicen qué se hará con ellos. Si en una fase aparece un «porque», probablemente sobra.'],
         ],
-        ejemplo: 'Tres objetivos y fases llamadas «Revisión bibliográfica», «Trabajo de campo» y «Conclusiones»: ninguna nombra un objetivo ni deja producto. Corregido: «Caracterización», «Análisis de la relación» y «Diseño de la propuesta», cada una con su entregable.',
+        ejemplo: 'Tres objetivos y fases llamadas «Revisión bibliográfica», «Trabajo de campo» y «Conclusiones»: ninguna nombra un objetivo ni deja producto. Corregido: «Caracterización», «Comparación» y «Análisis de la relación», cada una con su entregable.',
         ojo: 'Pide a un compañero que lea solo tus fases y te diga qué vas a hacer y qué entregarás. Lo que no pueda responder es lo que falta.',
     },
     coherencia: {
@@ -186,7 +186,7 @@ export default {
             ['Los cambios se propagan', 'Si amplías la muestra o agregas una actividad, cambian la duración, el cronograma y el presupuesto. Cada ajuste en las fases obliga a revisar las otras secciones antes de entregar.'],
             ['Las mismas palabras', 'Usa los mismos nombres en todo el documento: si la fase dice «cuestionario», el presupuesto no debe decir «encuesta impresa» ni el cronograma «test». Los sinónimos hacen dudar al evaluador.'],
         ],
-        ejemplo: 'Objetivo 2 → Fase 2. Análisis de la relación → encuesta y correlación de Spearman, como en la metodología → semanas 7 a 14 del cronograma → rubros del presupuesto: copias, encuestadores y computador.',
+        ejemplo: 'Objetivo 3 → Fase 3. Análisis de la relación → encuesta y correlación de Spearman, como en la metodología → semanas 13 a 20 del cronograma → rubros del presupuesto: copias, encuestadores y computador.',
         ojo: 'Haz esta revisión al final, cuando el cronograma y el presupuesto ya estén escritos. Es el momento en que aparecen las incoherencias.',
     },
 };

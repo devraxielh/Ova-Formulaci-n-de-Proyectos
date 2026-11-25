@@ -58,8 +58,8 @@ export const SLIDES = construccionPrimero([
         panel: {
             type: 'chain', title: 'Un apartado por objetivo', items: [
                 { label: 'Objetivo 1', text: 'Caracterización de la inasistencia → perfil de los pacientes y frecuencia.' },
-                { label: 'Objetivo 2', text: 'Relación entre el olvido y la inasistencia → prueba estadística.' },
-                { label: 'Objetivo 3', text: 'Propuesta → estrategia diseñada y su validación.' },
+                { label: 'Objetivo 2', text: 'Comparación de la inasistencia según edad, zona y recordatorio → tablas cruzadas y chi cuadrado.' },
+                { label: 'Objetivo 3', text: 'Relación entre el olvido y la inasistencia → prueba de correlación.' },
             ],
         },
     },
@@ -126,11 +126,11 @@ export const SLIDES = construccionPrimero([
     },
     {
         id: 'res-cuanti', section: 'resultados', min: 5, title: 'Ejemplo de resultados cuantitativos',
-        lead: ['Así se ve un apartado de resultados con su objetivo, su tabla y su prueba. Datos ilustrativos.'],
+        lead: ['Así se ven los resultados de dos objetivos, cada uno con su tabla o su prueba. Datos ilustrativos.'],
         panel: {
-            type: 'example', title: 'Objetivo 2: relación entre el olvido y la inasistencia', paragraphs: [
-                'Se encontró una relación positiva moderada entre la frecuencia con que los pacientes olvidan sus citas y el número de citas perdidas en el semestre (rho = 0,41; p < 0,001).',
-                'Como se observa en la tabla 3, los pacientes que no recibieron recordatorio presentaron una inasistencia mayor (28,4 %) que quienes sí lo recibieron (12,1 %).',
+            type: 'example', title: 'Objetivos 2 y 3: comparación y relación', paragraphs: [
+                '**Objetivo 2.** Como se observa en la tabla 3, los pacientes que no recibieron recordatorio presentaron una inasistencia mayor (28,4 %) que quienes sí lo recibieron (12,1 %).',
+                '**Objetivo 3.** Se encontró una relación positiva moderada entre la frecuencia con que los pacientes olvidan sus citas y el número de citas perdidas en el semestre (rho = 0,41; p < 0,001).',
             ],
         },
     },
@@ -231,7 +231,7 @@ export const SLIDES = construccionPrimero([
         panel: {
             type: 'table', title: 'Evita y prefiere', head: ['Evita', 'Prefiere'], rows: [
                 ['Se demostró que el olvido causa la inasistencia.', 'Los resultados sugieren que el olvido está asociado a la inasistencia.'],
-                ['Esto prueba que la estrategia funciona siempre.', 'La estrategia mostró un efecto favorable en esta población.'],
+                ['Esto prueba que los recordatorios acaban con la inasistencia.', 'La inasistencia fue menor en quienes recibieron recordatorio.'],
                 ['Todos los pacientes…', 'La mayoría de los pacientes encuestados…'],
             ],
         },

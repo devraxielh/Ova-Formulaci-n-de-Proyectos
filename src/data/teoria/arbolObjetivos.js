@@ -15,7 +15,7 @@ export default {
             ['Resultado frente a actividad', 'Un resultado se comprueba midiendo lo mismo que medía el problema: ¿bajó la inasistencia? Una actividad se comprueba con un «se hizo». El tronco siempre es un resultado.'],
             ['Del árbol a tu investigación', 'El objetivo central dice qué situación se busca. Tu objetivo general dirá qué **conocimiento o propuesta** aporta tu estudio para acercarse a ella; por eso su verbo puede ser «determinar», «analizar» o «proponer».'],
         ],
-        ejemplo: 'Objetivo central del árbol: «Reducir la inasistencia a las citas de consulta externa». Objetivo general de un estudio: «Determinar los factores asociados a la inasistencia a las citas de consulta externa de un hospital de Sincelejo, como base para reducirla».',
+        ejemplo: 'Objetivo central del árbol: «Reducir la inasistencia a las citas de consulta externa». Objetivo general de un estudio: «Analizar los factores asociados a la inasistencia a citas médicas en los pacientes de consulta externa de un hospital de Sincelejo».',
         ojo: 'No prometas el extremo contrario. «Eliminar la inasistencia» o «lograr asistencia total» no es alcanzable; «reducir» sí.',
     },
     raices: {
