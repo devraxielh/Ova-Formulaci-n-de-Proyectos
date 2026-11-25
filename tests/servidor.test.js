@@ -524,6 +524,81 @@ test('muchas cuentas: grupos, cambios masivos en una llamada y registro de lo qu
     assert.equal((await profe.api('/admin/log')).status, 403);
 });
 
+test('papelera: una cuenta eliminada se restaura con su contraseña, proyectos, versiones, figuras e invitaciones', async () => {
+    const admin = await entrarAdmin();
+    const profe = await cuenta('profe14', 'teacher');
+    const otro = await cuenta('otro14');
+    const creado = await profe.api('/teacher/students', 'POST', { name: 'Estudiante Catorce', email: `est14.${Date.now()}@example.test`, permitir: true });
+    const est = await estrenar(creado.body.student.email, creado.body.clave);
+    const idEst = creado.body.student.id;
+    const p = (await est.api('/projects', 'POST', { name: 'Tesis', data: { titulo: 'Versión 1' } })).body.project;
+    await est.api(`/projects/${p.id}`, 'PUT', { patch: { titulo: 'Versión 2' } });
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+    const figura = (await est.api(`/projects/${p.id}/files`, 'POST', { mime: 'image/png', data: png.toString('base64') })).body.file;
+    const ajeno = (await otro.api('/projects', 'POST', { name: 'Compartido', data: {} })).body.project;
+    await otro.api(`/projects/${ajeno.id}/members`, 'POST', { email: est.email });
+
+    // Eliminar la manda a la papelera; solo el administrador la ve.
+    assert.equal((await admin(`/admin/users/${idEst}`, 'DELETE')).status, 200);
+    assert.equal((await profe.api('/admin/trash')).status, 403);
+    const enPapelera = (await admin('/admin/trash')).body.trash.find((c) => c.email === est.email);
+    assert.equal(enPapelera.projects, 1);
+    assert.equal(enPapelera.deletedBy, 'Administrador');
+    assert.ok(enPapelera.venceEn >= 29);
+    assert.equal(enPapelera.data, undefined); // la lista no arrastra el contenido
+    assert.equal((await cliente()('/auth/login', 'POST', { email: est.email, password: est.password })).status, 401);
+
+    // Si alguien ocupa ese correo, no se restaura hasta liberarlo.
+    const intruso = await admin('/admin/users', 'POST', { name: 'Intruso', email: est.email, role: 'researcher' });
+    assert.equal((await admin(`/admin/trash/${enPapelera.id}/restore`, 'POST')).status, 400);
+    assert.equal((await admin(`/admin/users/${intruso.body.user.id}`, 'PUT', { email: `libre14.${Date.now()}@example.test` })).status, 200);
+
+    // Restaurar: mismo id, misma contraseña, vuelve con su profesor, su proyecto, su versión, su figura y su invitación.
+    assert.equal((await profe.api(`/admin/trash/${enPapelera.id}/restore`, 'POST')).status, 403);
+    const vuelto = await admin(`/admin/trash/${enPapelera.id}/restore`, 'POST');
+    assert.equal(vuelto.status, 200);
+    assert.equal(vuelto.body.user.id, idEst);
+    assert.equal(vuelto.body.user.teacherId, profe.id);
+    assert.equal((await admin(`/admin/trash/${enPapelera.id}/restore`, 'POST')).status, 404);
+    const denuevo = cliente();
+    assert.equal((await denuevo('/auth/login', 'POST', { email: est.email, password: est.password })).status, 200);
+    assert.equal((await denuevo(`/projects/${p.id}`)).body.project.data.titulo, 'Versión 2');
+    const versiones = (await denuevo(`/projects/${p.id}/versions`)).body.versions;
+    assert.equal((await denuevo(`/projects/${p.id}/versions/${versiones[0].id}`)).body.version.data.titulo, 'Versión 1');
+    const imagen = await denuevo(`/projects/${p.id}/files/${figura.id}`);
+    assert.equal(imagen.status, 200);
+    assert.deepEqual([...new Uint8Array(imagen.body)], [...png]);
+    assert.equal((await denuevo(`/projects/${ajeno.id}`)).status, 200);
+    assert.equal((await profe.api('/teacher/students')).body.students.length, 1);
+
+    // Un profesor eliminado y restaurado recupera a los estudiantes que seguían sin profesor.
+    assert.equal((await admin(`/admin/users/${profe.id}`, 'DELETE')).status, 200);
+    assert.equal((await admin('/admin/users')).body.users.find((u) => u.id === idEst).teacherId, null);
+    const profeEnPapelera = (await admin('/admin/trash')).body.trash.find((c) => c.email === profe.email);
+    assert.equal((await admin(`/admin/trash/${profeEnPapelera.id}/restore`, 'POST')).status, 200);
+    assert.equal((await admin('/admin/users')).body.users.find((u) => u.id === idEst).teacherId, profe.id);
+
+    // Borrar definitivamente: una, y vaciar todo.
+    assert.equal((await admin(`/admin/users/${otro.id}`, 'DELETE')).status, 200);
+    const deOtro = (await admin('/admin/trash')).body.trash.find((c) => c.email === otro.email);
+    assert.equal((await profe.api('/auth/me')).body.user, null); // al restaurar no vuelven las sesiones: el profesor entra de nuevo
+    assert.equal((await denuevo(`/admin/trash/${deOtro.id}`, 'DELETE')).status, 403);
+    assert.equal((await admin(`/admin/trash/${deOtro.id}`, 'DELETE')).status, 200);
+    assert.equal((await admin(`/admin/trash/${deOtro.id}`, 'DELETE')).status, 404);
+    assert.equal((await admin('/admin/trash', 'DELETE')).status, 200);
+    assert.equal((await admin('/admin/trash')).body.trash.length, 0);
+
+    // El registro se puede buscar por correo (el historial de una cuenta) y deja constancia de la restauración.
+    const suyo = (await admin('/admin/log', 'POST', { q: est.email })).body.log;
+    assert.ok(suyo.length >= 2 && suyo.every((l) => l.detail.toLowerCase().includes(est.email)));
+    assert.ok(suyo.some((l) => l.action === 'Restauró una cuenta'));
+    assert.equal((await admin('/admin/log', 'POST', { q: '%' })).body.log.length, 0); // los comodines no se interpretan
+    // Los proyectos traen el grupo y el profesor de su dueño.
+    const fila = (await admin('/admin/projects')).body.projects.find((x) => x.id === p.id);
+    assert.equal(fila.ownerTeacherId, profe.id);
+    assert.equal(fila.ownerGrupo, '');
+});
+
 test('carga por lotes: crea las filas buenas, explica las malas y enlaza cada estudiante con su profesor', async () => {
     const admin = await entrarAdmin();
     const t = Date.now();

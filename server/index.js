@@ -326,6 +326,56 @@ const sendReset = async (user) => {
 
 /* ---------- Registro de errores y alertas ---------- */
 
+// Papelera: al eliminar una cuenta se guarda aquí todo lo suyo (cuenta, proyectos, versiones, figuras, encuestas
+// e invitaciones) durante 30 días, para poder restaurarla tal como estaba.
+db.exec(`CREATE TABLE IF NOT EXISTS deleted_users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    deleted_at INTEGER NOT NULL,
+    deleted_by TEXT NOT NULL DEFAULT '',
+    user_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    role TEXT NOT NULL,
+    grupo TEXT NOT NULL DEFAULT '',
+    projects INTEGER NOT NULL DEFAULT 0,
+    data TEXT NOT NULL
+)`);
+const PAPELERA_DIAS = 30;
+const vaciarPapeleraVieja = () => { try { db.prepare('DELETE FROM deleted_users WHERE deleted_at < ?').run(Date.now() - PAPELERA_DIAS * 86400000); } catch { /* se reintenta en la próxima hora */ } };
+vaciarPapeleraVieja();
+setInterval(vaciarPapeleraVieja, 60 * 60 * 1000).unref();
+
+// Filas ↔ JSON (los binarios, como las figuras, van en base64).
+const aTexto = (filas) => filas.map((f) => Object.fromEntries(Object.entries(f).map(([k, v]) => [k, Buffer.isBuffer(v) ? { __b64: v.toString('base64') } : v])));
+const columnasDe = (tabla) => db.prepare(`PRAGMA table_info(${tabla})`).all().map((c) => c.name);
+const reinsertar = (tabla, filas) => {
+    const cols = columnasDe(tabla);
+    (filas || []).forEach((f) => {
+        const usar = cols.filter((c) => f[c] !== undefined);
+        db.prepare(`INSERT INTO ${tabla} (${usar.join(', ')}) VALUES (${usar.map(() => '?').join(', ')})`)
+            .run(...usar.map((c) => (f[c] && typeof f[c] === 'object' && f[c].__b64 !== undefined ? Buffer.from(f[c].__b64, 'base64') : f[c])));
+    });
+};
+const archivarCuenta = (target, actor) => {
+    const proyectos = db.prepare('SELECT * FROM projects WHERE user_id = ?').all(target.id);
+    const ids = proyectos.map((p) => p.id);
+    const en = (tabla, col, lista) => (lista.length ? db.prepare(`SELECT * FROM ${tabla} WHERE ${col} IN (${lista.map(() => '?').join(',')})`).all(...lista) : []);
+    const encuestas = en('surveys', 'project_id', ids);
+    const copia = {
+        user: aTexto([target])[0],
+        projects: aTexto(proyectos),
+        project_versions: aTexto(en('project_versions', 'project_id', ids)),
+        project_files: aTexto(en('project_files', 'project_id', ids)),
+        surveys: aTexto(encuestas),
+        survey_responses: aTexto(en('survey_responses', 'survey_id', encuestas.map((e) => e.id))),
+        project_members: aTexto(en('project_members', 'project_id', ids)),
+        invitaciones: aTexto(db.prepare('SELECT * FROM project_members WHERE email = ?').all(target.email)),
+        estudiantes: db.prepare('SELECT id FROM users WHERE teacher_id = ?').all(target.id).map((u) => u.id),
+    };
+    db.prepare('INSERT INTO deleted_users (deleted_at, deleted_by, user_id, name, email, role, grupo, projects, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(Date.now(), String(actor || '').slice(0, 80), target.id, target.name, target.email, target.role, target.grupo || '', proyectos.length, JSON.stringify(copia));
+};
+
 const bitacora = (req, action, detail = '') => {
     try {
         db.prepare('INSERT INTO admin_log (created_at, actor_id, actor, action, detail) VALUES (?, ?, ?, ?, ?)')
@@ -1009,13 +1059,13 @@ app.get('/api/admin/users/:id', requireAdmin, (req, res) => {
 // Todos los proyectos de la plataforma, con su dueño, avance y coherencia (para la pestaña «Proyectos»).
 app.get('/api/admin/projects', requireAdmin, (_req, res) => {
     const rows = db.prepare(`
-        SELECT p.id, p.name, p.data, p.created_at, p.updated_at, u.id AS owner_id, u.name AS owner, u.email AS owner_email, u.role AS owner_role,
+        SELECT p.id, p.name, p.data, p.created_at, p.updated_at, u.id AS owner_id, u.name AS owner, u.email AS owner_email, u.role AS owner_role, u.grupo AS owner_grupo, u.teacher_id AS owner_teacher,
                (SELECT COUNT(*) FROM project_members m WHERE m.project_id = p.id) AS miembros
         FROM projects p JOIN users u ON u.id = p.user_id ORDER BY p.updated_at DESC, p.id DESC LIMIT 2000`).all();
     res.json({
         projects: rows.map((r) => ({
             id: r.id, name: r.name, createdAt: r.created_at, updatedAt: r.updated_at,
-            ownerId: r.owner_id, owner: r.owner, ownerEmail: r.owner_email, ownerRole: r.owner_role, miembros: r.miembros,
+            ownerId: r.owner_id, owner: r.owner, ownerEmail: r.owner_email, ownerRole: r.owner_role, ownerGrupo: r.owner_grupo || '', ownerTeacherId: r.owner_teacher || null, miembros: r.miembros,
             ...resumenProyecto(r.data), coherencia: coherenciaDe(r.data),
         })),
     });
@@ -1056,7 +1106,8 @@ app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
 
 // Borra la cuenta y lo que cuelga de ella: sus estudiantes quedan sin profesor, salen sus invitaciones,
 // y sesiones, enlaces y proyectos caen en cascada.
-const borrarCuenta = (target) => db.transaction(() => {
+const borrarCuenta = (target, actor = '') => db.transaction(() => {
+    archivarCuenta(target, actor);
     db.prepare('UPDATE users SET teacher_id = NULL WHERE teacher_id = ?').run(target.id);
     db.prepare('DELETE FROM project_members WHERE email = ?').run(target.email);
     db.prepare('DELETE FROM users WHERE id = ?').run(target.id);
@@ -1070,7 +1121,7 @@ app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
     if (target.role === 'admin') return res.status(400).json({ error: 'No se puede eliminar a un administrador.' });
     const proyectos = db.prepare('SELECT COUNT(*) AS n FROM projects WHERE user_id = ?').get(target.id).n;
     if (proyectos > 0 && !(await runBackup())) return res.status(500).json({ error: 'No se pudo crear la copia de seguridad previa, así que la cuenta no se eliminó. Inténtalo de nuevo.' });
-    borrarCuenta(target);
+    borrarCuenta(target, req.user.name);
     bitacora(req, 'Eliminó una cuenta', `${target.name} (${target.email}), ${ROL_NOMBRE[target.role] || target.role}, ${proyectos} ${proyectos === 1 ? 'proyecto' : 'proyectos'}`);
     return res.json({ ok: true, proyectos });
 });
@@ -1139,7 +1190,7 @@ app.post('/api/admin/users/bulk', requireAdmin, async (req, res) => {
     } else if (action === 'delete') {
         const conProyectos = db.prepare(`SELECT COUNT(*) AS n FROM projects WHERE user_id IN (${cuentas.map(() => '?').join(',') || 'NULL'})`).get(...cuentas.map((u) => u.id)).n;
         if (conProyectos > 0 && !(await runBackup())) return res.status(500).json({ error: 'No se pudo crear la copia de seguridad previa, así que no se eliminó nada. Inténtalo de nuevo.' });
-        hacer = (u) => borrarCuenta(u);
+        hacer = (u) => borrarCuenta(u, req.user.name);
         texto = `Eliminó (con ${conProyectos} ${conProyectos === 1 ? 'proyecto' : 'proyectos'})`;
     } else {
         return res.status(400).json({ error: 'Acción no válida.' });
@@ -1164,11 +1215,75 @@ app.post('/api/admin/groups/rename', requireAdmin, (req, res) => {
     return res.json({ cuentas: n, unido, grupo: to });
 });
 
-// Últimos cambios hechos a las cuentas (para la pestaña «Sistema»).
-app.get('/api/admin/log', requireAdmin, (_req, res) => {
-    const rows = db.prepare('SELECT id, created_at, actor, action, detail FROM admin_log ORDER BY id DESC LIMIT 300').all();
-    res.json({ log: rows.map((r) => ({ id: r.id, createdAt: r.created_at, actor: r.actor, action: r.action, detail: r.detail })) });
+// Papelera: cuentas eliminadas en los últimos 30 días.
+const filaPapelera = (r) => ({ id: r.id, deletedAt: r.deleted_at, deletedBy: r.deleted_by, name: r.name, email: r.email, role: r.role, grupo: r.grupo, projects: r.projects, venceEn: Math.max(0, Math.ceil((r.deleted_at + PAPELERA_DIAS * 86400000 - Date.now()) / 86400000)) });
+app.get('/api/admin/trash', requireAdmin, (_req, res) => {
+    vaciarPapeleraVieja();
+    const rows = db.prepare('SELECT id, deleted_at, deleted_by, name, email, role, grupo, projects FROM deleted_users ORDER BY id DESC').all();
+    res.json({ trash: rows.map(filaPapelera), dias: PAPELERA_DIAS });
 });
+
+// Restaurar: vuelve la cuenta con el mismo usuario y contraseña, y sus proyectos como estaban.
+app.post('/api/admin/trash/:id/restore', requireAdmin, (req, res) => {
+    const row = db.prepare('SELECT * FROM deleted_users WHERE id = ?').get(Number(req.params.id));
+    if (!row) return res.status(404).json({ error: 'Esa cuenta ya no está en la papelera.' });
+    if (db.prepare('SELECT 1 FROM users WHERE email = ?').get(row.email)) return res.status(400).json({ error: `Ya existe otra cuenta con el correo ${row.email}. Cámbiale el correo a esa cuenta o elimínala antes de restaurar.` });
+    let copia;
+    try { copia = JSON.parse(row.data); } catch { return res.status(500).json({ error: 'La copia de esta cuenta está dañada y no se puede restaurar.' }); }
+    try {
+        db.transaction(() => {
+            const user = { ...copia.user };
+            if (user.teacher_id && !db.prepare("SELECT 1 FROM users WHERE id = ? AND role = 'teacher'").get(user.teacher_id)) user.teacher_id = null;
+            reinsertar('users', [user]);
+            reinsertar('projects', copia.projects);
+            reinsertar('project_versions', copia.project_versions);
+            reinsertar('project_files', copia.project_files);
+            reinsertar('surveys', copia.surveys);
+            reinsertar('survey_responses', copia.survey_responses);
+            reinsertar('project_members', copia.project_members);
+            // Invitaciones a proyectos de otros: solo las de proyectos que siguen existiendo.
+            const hay = db.prepare('SELECT 1 FROM projects WHERE id = ?');
+            const invitar = db.prepare('INSERT OR IGNORE INTO project_members (project_id, email, added_at) VALUES (?, ?, ?)');
+            (copia.invitaciones || []).forEach((m) => { if (hay.get(m.project_id)) invitar.run(m.project_id, m.email, m.added_at); });
+            // Si era profesor, vuelven a su cargo los estudiantes que siguen sin profesor.
+            const volver = db.prepare("UPDATE users SET teacher_id = ? WHERE id = ? AND role = 'student' AND teacher_id IS NULL");
+            if (user.role === 'teacher') (copia.estudiantes || []).forEach((id) => volver.run(user.id, id));
+            db.prepare('DELETE FROM deleted_users WHERE id = ?').run(row.id);
+        })();
+    } catch (error) {
+        logError('servidor', 'No se pudo restaurar una cuenta de la papelera', error?.message);
+        return res.status(500).json({ error: 'No se pudo restaurar la cuenta; quedó en la papelera sin cambios.' });
+    }
+    bitacora(req, 'Restauró una cuenta', `${row.name} (${row.email}), ${row.projects} ${row.projects === 1 ? 'proyecto' : 'proyectos'}`);
+    const fila = db.prepare(`${ADMIN_USERS_SQL} WHERE users.id = ? GROUP BY users.id`).get(row.user_id);
+    return res.json({ user: adminUserRow(fila) });
+});
+
+// Borrar definitivamente de la papelera (una, o todas con /api/admin/trash).
+app.delete('/api/admin/trash/:id', requireAdmin, (req, res) => {
+    const row = db.prepare('SELECT name, email FROM deleted_users WHERE id = ?').get(Number(req.params.id));
+    if (!row) return res.status(404).json({ error: 'Esa cuenta ya no está en la papelera.' });
+    db.prepare('DELETE FROM deleted_users WHERE id = ?').run(Number(req.params.id));
+    bitacora(req, 'Borró definitivamente de la papelera', `${row.name} (${row.email})`);
+    return res.json({ ok: true });
+});
+app.delete('/api/admin/trash', requireAdmin, (req, res) => {
+    const n = db.prepare('DELETE FROM deleted_users').run().changes;
+    if (n) bitacora(req, 'Vació la papelera', `${n} ${n === 1 ? 'cuenta' : 'cuentas'}`);
+    return res.json({ ok: true, borradas: n });
+});
+
+// Últimos cambios hechos a las cuentas (para la pestaña «Sistema»).
+// La búsqueda va en el cuerpo (POST) para que un correo no quede escrito en la dirección ni en los registros del servidor web.
+const verRegistro = (req, res) => {
+    const q = String(req.body?.q || '').trim().toLowerCase().slice(0, 160).replace(/[%_\\]/g, (c) => `\\${c}`);
+    const rows = q
+        ? db.prepare("SELECT id, created_at, actor, action, detail FROM admin_log WHERE lower(detail) LIKE ? ESCAPE '\\' OR lower(action) LIKE ? ESCAPE '\\' OR lower(actor) LIKE ? ESCAPE '\\' ORDER BY id DESC LIMIT 300").all(`%${q}%`, `%${q}%`, `%${q}%`)
+        : db.prepare('SELECT id, created_at, actor, action, detail FROM admin_log ORDER BY id DESC LIMIT 300').all();
+    res.json({ log: rows.map((r) => ({ id: r.id, createdAt: r.created_at, actor: r.actor, action: r.action, detail: r.detail })) });
+};
+app.get('/api/admin/log', requireAdmin, verRegistro);
+app.post('/api/admin/log', requireAdmin, verRegistro);
 
 app.post('/api/admin/users/:id/status', requireAdmin, async (req, res) => {
     const status = String(req.body?.status || '');

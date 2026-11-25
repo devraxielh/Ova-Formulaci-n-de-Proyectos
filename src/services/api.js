@@ -86,7 +86,11 @@ export const api = {
         deleteUser: (id) => request(`/admin/users/${id}`, { method: 'DELETE' }),
         // El mismo cambio a muchas cuentas en una sola llamada, y el registro de lo que se ha hecho.
         bulk: (ids, action, value) => request('/admin/users/bulk', { method: 'POST', body: { ids, action, value } }),
-        log: () => request('/admin/log'),
+        log: (q = '') => (q ? request('/admin/log', { method: 'POST', body: { q } }) : request('/admin/log')),
+        // Papelera: cuentas eliminadas que todavía se pueden restaurar.
+        trash: () => request('/admin/trash'),
+        restore: (id) => request(`/admin/trash/${id}/restore`, { method: 'POST' }),
+        purge: (id) => request(id ? `/admin/trash/${id}` : '/admin/trash', { method: 'DELETE' }),
         renameGroup: (from, to) => request('/admin/groups/rename', { method: 'POST', body: { from, to } }),
     },
     // Profesor: los estudiantes a su cargo y sus proyectos (solo lectura).

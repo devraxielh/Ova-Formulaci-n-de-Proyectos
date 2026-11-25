@@ -235,3 +235,41 @@
 .adm-icono:disabled { opacity: 0.4; cursor: not-allowed; }
 .adm-table--grupos td:first-child { min-width: 13rem; }
 .adm-grupo-acciones { gap: 0.35rem; flex-wrap: nowrap; }
+
+/* Resumen: cada cifra filtra la lista */
+.adm-resumen dd button { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; border-radius: 0.3rem; text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 4px; transition: text-decoration-color 0.18s, color 0.18s; }
+.adm-resumen dd button:hover { text-decoration-color: #a5b4fc; }
+.adm-resumen dd button[aria-pressed='true'] { color: var(--pro-primary-strong); }
+
+/* Proyectos según su avance: cinco tramos que también filtran */
+.adm-reparto { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.5rem; margin-bottom: 0.9rem; }
+.adm-reparto button {
+  position: relative; overflow: hidden; display: grid; gap: 0.05rem; text-align: left;
+  padding: 0.55rem 0.75rem 0.7rem; border: 1px solid var(--pro-line); border-radius: 0.65rem; background: #fff;
+  font: inherit; color: var(--pro-body); cursor: pointer; transition: border-color 0.18s, background-color 0.18s;
+}
+.adm-reparto button:hover:not(:disabled) { border-color: #a5b4fc; background: #f8fafc; }
+.adm-reparto button[aria-pressed='true'] { border-color: var(--pro-primary); background: #eef2ff; }
+.adm-reparto button:disabled { cursor: default; opacity: 0.6; }
+.adm-reparto b { font-size: 1.1rem; font-weight: 700; color: var(--pro-ink); font-variant-numeric: tabular-nums; line-height: 1.2; }
+.adm-reparto span { font-size: 0.8rem; }
+.adm-reparto i { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--pro-primary); border-radius: 0 3px 3px 0; }
+.adm-reparto button[data-tramo='cero'] i { background: #94a3b8; }
+.adm-reparto button[data-tramo='listo'] i { background: var(--pro-ok); }
+
+.adm-papelera-cabeza { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.75rem; }
+.adm-papelera-cabeza > div { display: grid; gap: 0.2rem; }
+span.adm-user-link { cursor: default; }
+
+/* Historial de una cuenta */
+.adm-historial { list-style: none; margin: 0; padding: 0; display: grid; }
+.adm-historial li { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 0.1rem 1rem; padding: 0.55rem 0; font-size: 0.9rem; color: var(--pro-body); }
+.adm-historial li + li { border-top: 1px solid var(--pro-line); }
+.adm-historial time { grid-row: span 2; font-size: 0.84rem; color: #64748b; font-variant-numeric: tabular-nums; }
+.adm-historial b { color: var(--pro-ink); font-weight: 600; }
+.adm-historial small { font-size: 0.82rem; color: #64748b; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .adm-reparto { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .adm-historial li { grid-template-columns: minmax(0, 1fr); }
+  .adm-historial time { grid-row: auto; }
+}

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowLeft, ArrowUp, Ban, CheckCircle2, ChevronLeft, ChevronRight, Download, FileText, KeyRound, Mail, Pencil, RefreshCw, Search, UserCheck, Trash2, UserPlus, Users, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Ban, CheckCircle2, ChevronLeft, ChevronRight, Download, FileText, KeyRound, Mail, Pencil, RefreshCw, Search, UserCheck, RotateCcw, Trash2, UserPlus, Users, X } from 'lucide-react';
 import { api } from '../services/api';
 import { buildDocument } from '../services/projectDoc';
 import { DocumentPaper } from './ProjectDocument';
@@ -21,6 +21,26 @@ import './Admin.css';
 
 const TAMANOS = [25, 50, 100, 200];
 const SIN_GRUPO = '—'; // valor del filtro «Sin grupo»
+
+// Lo que el administrador dejó puesto (pestaña, filtros, filas por página) se recuerda mientras dure la sesión del
+// navegador: al volver a Administración encuentra la lista como la dejó.
+const RECUERDO = 'projectsia-admin';
+const recordado = (() => { try { return JSON.parse(sessionStorage.getItem(RECUERDO)) || {}; } catch { return {}; } })();
+const useRecordado = (clave, inicial) => {
+    const [valor, setValor] = useState(() => (recordado[clave] !== undefined ? recordado[clave] : inicial));
+    useEffect(() => {
+        recordado[clave] = valor;
+        try { sessionStorage.setItem(RECUERDO, JSON.stringify(recordado)); } catch { /* sin almacenamiento: no se recuerda */ }
+    }, [clave, valor]);
+    return [valor, setValor];
+};
+const TRAMOS = [
+    { id: 'cero', nombre: 'Sin empezar', sirve: (a) => a === 0 },
+    { id: 'inicio', nombre: 'Empezando (1–33 %)', sirve: (a) => a > 0 && a <= 33 },
+    { id: 'medio', nombre: 'En curso (34–66 %)', sirve: (a) => a > 33 && a <= 66 },
+    { id: 'alto', nombre: 'Avanzado (67–99 %)', sirve: (a) => a > 66 && a < 100 },
+    { id: 'listo', nombre: 'Completo', sirve: (a) => a >= 100 },
+];
 const STATUS = { active: 'Activo', pending: 'Pendiente', blocked: 'Bloqueado' };
 const ROLES_FILTRO = [{ id: 'admin', nombre: 'Administrador' }, ...ROLES];
 
@@ -141,7 +161,11 @@ const Esqueleto = ({ columnas }) => Array.from({ length: 6 }, (_, i) => (
 ));
 
 const Admin = () => {
-    const [vista, setVista] = useState('usuarios');
+    const [vista, setVista] = useRecordado('vista', 'usuarios');
+    const [fallo, setFallo] = useState(''); // no se pudo cargar la lista de usuarios
+    const [papelera, setPapelera] = useState([]); // cuentas eliminadas que aún se pueden restaurar
+    const [historial, setHistorial] = useState(null); // cambios hechos a la cuenta de la ficha abierta
+    const [bQuery, setBQuery] = useState(''); // búsqueda en el registro de cambios
     const [users, setUsers] = useState([]);
     const [projects, setProjects] = useState(null); // null = todavía no se han pedido
     const [mailReady, setMailReady] = useState(true);
@@ -152,24 +176,27 @@ const Admin = () => {
     const setNotice = (texto) => avisar(texto);
 
     // Lista de usuarios: filtros, orden, página y selección.
-    const [query, setQuery] = useState('');
-    const [fRol, setFRol] = useState('');
-    const [fEstado, setFEstado] = useState('');
-    const [fProfesor, setFProfesor] = useState(''); // id del profesor o 'ninguno'
+    const [query, setQuery] = useRecordado('query', '');
+    const [fRol, setFRol] = useRecordado('fRol', '');
+    const [fEstado, setFEstado] = useRecordado('fEstado', '');
+    const [fProfesor, setFProfesor] = useRecordado('fProfesor', ''); // id del profesor o 'ninguno'
     const [fAtencion, setFAtencion] = useState(''); // 'sinProfesor' | 'sinPermiso' | 'sinEstrenar'
     const [orden, setOrden] = useState({ por: 'registro', asc: false });
     const [pagina, setPagina] = useState(1);
     const [marcados, setMarcados] = useState(() => new Set());
     const [creando, setCreando] = useState(false);
-    const [fGrupo, setFGrupo] = useState(''); // nombre del grupo o SIN_GRUPO
-    const [fActividad, setFActividad] = useState(''); // 'semana' | 'mes' | 'nunca'
-    const [porPagina, setPorPagina] = useState(TAMANOS[0]);
+    const [fGrupo, setFGrupo] = useRecordado('fGrupo', ''); // nombre del grupo o SIN_GRUPO
+    const [fActividad, setFActividad] = useRecordado('fActividad', ''); // 'semana' | 'mes' | 'nunca'
+    const [porPagina, setPorPagina] = useRecordado('porPagina', TAMANOS[0]);
     const [grupoNuevo, setGrupoNuevo] = useState(null); // texto mientras se escribe un grupo nuevo para la selección
     const [bitacora, setBitacora] = useState(null); // registro de cambios (pestaña Sistema)
     const [grupoEditado, setGrupoEditado] = useState(null); // { de, a } mientras se cambia el nombre de un grupo
 
     // Lista de proyectos.
-    const [pQuery, setPQuery] = useState('');
+    const [pQuery, setPQuery] = useRecordado('pQuery', '');
+    const [pGrupo, setPGrupo] = useRecordado('pGrupo', '');
+    const [pProfesor, setPProfesor] = useRecordado('pProfesor', '');
+    const [pTramo, setPTramo] = useRecordado('pTramo', '');
     const [pOrden, setPOrden] = useState({ por: 'actualizado', asc: false });
     const [pPagina, setPPagina] = useState(1);
 
@@ -184,8 +211,10 @@ const Admin = () => {
             const result = await api.admin.users();
             setUsers(result.users);
             setMailReady(result.mail);
+            setFallo('');
+            api.admin.trash().then((r) => setPapelera(r.trash)).catch(() => { /* la papelera se reintenta al abrir su pestaña */ });
         } catch (err) {
-            setError(err.message);
+            setFallo(err.message || 'No se pudo cargar la lista.');
         } finally {
             setLoading(false);
         }
@@ -198,8 +227,17 @@ const Admin = () => {
     useEffect(() => { if (vista === 'proyectos' && projects === null) loadProjects(); }, [vista, projects, loadProjects]);
     useEffect(() => {
         if (vista !== 'sistema') return;
-        api.admin.log().then((r) => setBitacora(r.log)).catch((err) => avisar(err.message, 'error'));
-    }, [vista]);
+        const espera = setTimeout(() => { api.admin.log(bQuery.trim()).then((r) => setBitacora(r.log)).catch((err) => avisar(err.message, 'error')); }, bQuery ? 300 : 0);
+        return () => clearTimeout(espera);
+    }, [vista, bQuery]);
+    useEffect(() => { if (vista === 'papelera') api.admin.trash().then((r) => setPapelera(r.trash)).catch((err) => avisar(err.message, 'error')); }, [vista]);
+    // Ficha abierta: lo que se le ha hecho a esa cuenta, según el registro de cambios.
+    const correoFicha = selected?.user?.email || '';
+    useEffect(() => {
+        setHistorial(null);
+        if (!correoFicha) return;
+        api.admin.log(correoFicha).then((r) => setHistorial(r.log)).catch(() => setHistorial([]));
+    }, [correoFicha, selected?.user?.name, selected?.user?.status, selected?.user?.role, selected?.user?.projectLimit, selected?.user?.grupo]);
 
     const profesores = useMemo(() => users.filter((u) => u.role === 'teacher'), [users]);
     const opcionesProfesor = useMemo(() => [{ value: '', label: 'Sin profesor' }, ...profesores.map((p) => ({ value: p.id, label: p.name, nota: p.email }))], [profesores]);
@@ -259,7 +297,10 @@ const Admin = () => {
 
     const proyectosVisibles = useMemo(() => {
         const q = sinTildes(pQuery.trim());
-        const lista = (projects || []).filter((p) => !q || sinTildes(p.titulo).includes(q) || sinTildes(p.name).includes(q) || sinTildes(p.owner).includes(q) || p.ownerEmail.toLowerCase().includes(q));
+        const tramo = TRAMOS.find((t) => t.id === pTramo);
+        const lista = (projects || []).filter((p) => (!pGrupo || (pGrupo === SIN_GRUPO ? !p.ownerGrupo : p.ownerGrupo === pGrupo))
+            && (!pProfesor || String(p.ownerTeacherId) === String(pProfesor))
+            && (!tramo || tramo.sirve(p.avance || 0))).filter((p) => !q || sinTildes(p.titulo).includes(q) || sinTildes(p.name).includes(q) || sinTildes(p.owner).includes(q) || p.ownerEmail.toLowerCase().includes(q));
         const clave = {
             proyecto: (p) => sinTildes(p.titulo || p.name),
             dueno: (p) => sinTildes(p.owner),
@@ -269,8 +310,10 @@ const Admin = () => {
         }[pOrden.por];
         const sentido = pOrden.asc ? 1 : -1;
         return [...lista].sort((a, b) => { const x = clave(a); const y = clave(b); return (x < y ? -1 : x > y ? 1 : 0) * sentido || a.id - b.id; });
-    }, [projects, pQuery, pOrden]);
-    useEffect(() => { setPPagina(1); }, [pQuery, porPagina]);
+    }, [projects, pQuery, pOrden, pGrupo, pProfesor, pTramo]);
+    useEffect(() => { setPPagina(1); }, [pQuery, porPagina, pGrupo, pProfesor, pTramo]);
+    const hayFiltrosP = Boolean(pQuery || pGrupo || pProfesor || pTramo);
+    const reparto = TRAMOS.map((t) => ({ ...t, n: (projects || []).filter((p) => t.sirve(p.avance || 0)).length }));
     const ordenarP = (por) => setPOrden((prev) => (prev.por === por ? { por, asc: !prev.asc } : { por, asc: por === 'proyecto' || por === 'dueno' }));
 
     const replaceUser = (updated) => {
@@ -324,7 +367,7 @@ const Admin = () => {
         const detalle = [
             n ? `Se ${n === 1 ? 'borra su proyecto' : `borran sus ${n} proyectos`}, con versiones, figuras y encuestas. Antes se guarda una copia de seguridad.` : 'No tiene proyectos.',
             alumnos ? `Sus ${alumnos} estudiantes quedan sin profesor a cargo.` : '',
-            'No se puede deshacer desde aquí.',
+            'Queda 30 días en la papelera, desde donde se puede restaurar.',
         ].filter(Boolean).join(' ');
         if (!(await confirmar({ texto: `¿Eliminar la cuenta de ${user.name}?`, detalle, aceptar: 'Eliminar', peligro: true }))) return undefined;
         return accion(async () => {
@@ -334,7 +377,7 @@ const Admin = () => {
             setEdicion(null);
             setProjects(null);
             await load();
-            setNotice(`Se eliminó la cuenta de ${user.name}.`);
+            setNotice(`Se eliminó la cuenta de ${user.name}. Está en la papelera durante 30 días.`);
         });
     };
     // Grupos: cambiar el nombre (si ya existe otro con ese nombre, se unen) o quitar el grupo sin tocar las cuentas.
@@ -362,6 +405,23 @@ const Admin = () => {
             setNotice(`Se borró el grupo «${g.nombre}»; ${r.cuentas} ${r.cuentas === 1 ? 'cuenta quedó' : 'cuentas quedaron'} sin grupo.`);
         });
     };
+    // Papelera: restaurar o borrar del todo.
+    const restaurar = (c) => accion(async () => {
+        const { user: vuelto } = await api.admin.restore(c.id);
+        setPapelera((prev) => prev.filter((x) => x.id !== c.id));
+        setProjects(null);
+        await load();
+        setNotice(`Se restauró la cuenta de ${vuelto.name}${c.projects ? `, con ${c.projects === 1 ? 'su proyecto' : `sus ${c.projects} proyectos`}` : ''}. Entra con el mismo correo y contraseña.`);
+    });
+    const borrarDeltodo = async (c) => {
+        if (!(await confirmar({ texto: c ? `¿Borrar definitivamente a ${c.name}?` : `¿Vaciar la papelera (${papelera.length})?`, detalle: 'Ya no se podrá restaurar desde aquí. Solo quedaría la copia de seguridad del servidor.', aceptar: c ? 'Borrar definitivamente' : 'Vaciar papelera', peligro: true }))) return undefined;
+        return accion(async () => {
+            await api.admin.purge(c?.id);
+            setPapelera((prev) => (c ? prev.filter((x) => x.id !== c.id) : []));
+            setNotice(c ? `Se borró definitivamente la cuenta de ${c.name}.` : 'La papelera quedó vacía.');
+        });
+    };
+    const exportarRegistro = () => descargar('registro-projectsia.csv', csv([['Cuándo', 'Quién', 'Qué hizo', 'Detalle'], ...(bitacora || []).map((b) => [new Date(b.createdAt).toLocaleString('es-CO'), b.actor, b.action, b.detail])]));
     const resend = (user) => accion(async () => {
         await api.admin.resend(user.id);
         setNotice(`Se envió un enlace de activación nuevo a ${user.email}.`);
@@ -394,7 +454,7 @@ const Admin = () => {
         { value: 'claves', label: 'Dar contraseñas nuevas', nota: 'Se muestran una sola vez', run: () => enLote({ action: 'access', hecho: 'Con contraseña nueva', pregunta: { texto: `¿Dar una contraseña nueva a ${cuantas}?`, detalle: 'Las anteriores dejan de servir y se cierran sus sesiones. Verás la lista para descargarla.', aceptar: 'Dar contraseñas' } }) },
         { value: 'activar', label: 'Activar o desbloquear', run: () => enLote({ action: 'status', value: 'active', hecho: 'Activadas' }) },
         { value: 'bloquear', label: 'Bloquear', run: () => enLote({ action: 'status', value: 'blocked', hecho: 'Bloqueadas', pregunta: { texto: `¿Bloquear ${cuantas}?`, detalle: 'No podrán entrar hasta que las desbloquees.', aceptar: 'Bloquear', peligro: true } }) },
-        { value: 'eliminar', label: 'Eliminar', nota: 'Con sus proyectos', run: () => { const n = elegidos.reduce((t, u) => t + (u.projectCount || 0), 0); return enLote({ action: 'delete', hecho: 'Eliminadas', pregunta: { texto: `¿Eliminar ${cuantas}?`, detalle: `${n ? `Se borran también sus ${n} ${n === 1 ? 'proyecto' : 'proyectos'}; antes se guarda una copia de seguridad.` : 'Ninguna tiene proyectos.'} No se puede deshacer desde aquí.`, aceptar: 'Eliminar', peligro: true } }); } },
+        { value: 'eliminar', label: 'Eliminar', nota: 'Con sus proyectos', run: () => { const n = elegidos.reduce((t, u) => t + (u.projectCount || 0), 0); return enLote({ action: 'delete', hecho: 'Eliminadas', pregunta: { texto: `¿Eliminar ${cuantas}?`, detalle: `${n ? `Se borran también sus ${n} ${n === 1 ? 'proyecto' : 'proyectos'}; antes se guarda una copia de seguridad.` : 'Ninguna tiene proyectos.'} Quedan 30 días en la papelera, desde donde se pueden restaurar.`, aceptar: 'Eliminar', peligro: true } }); } },
     ];
     const marcar = (id) => setMarcados((prev) => { const s = new Set(prev); if (s.has(id)) s.delete(id); else s.add(id); return s; });
     const marcables = enPagina.filter((u) => u.role !== 'admin');
@@ -566,6 +626,19 @@ const Admin = () => {
                         </ul>
                     )}
                 </section>
+
+                <section className="pro-card">
+                    <h2>Historial de la cuenta</h2>
+                    {historial === null && <p className="adm-muted">Cargando…</p>}
+                    {historial?.length === 0 && <p className="adm-muted">No hay cambios registrados para esta cuenta. El registro empezó a llevarse hace poco: lo anterior no aparece.</p>}
+                    {historial?.length > 0 && (
+                        <ol className="adm-historial">
+                            {historial.slice(0, 30).map((b) => (
+                                <li key={b.id}><time title={new Date(b.createdAt).toLocaleString('es-CO')}>{new Date(b.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}</time><span><b>{b.action}</b> · {b.actor}</span><small>{b.detail}</small></li>
+                            ))}
+                        </ol>
+                    )}
+                </section>
             </div>
         );
     }
@@ -610,9 +683,10 @@ const Admin = () => {
                     <button type="button" role="tab" aria-selected={vista === 'usuarios'} onClick={() => setVista('usuarios')}>Usuarios <span className="adm-count">{resumen.total}</span></button>
                     <button type="button" role="tab" aria-selected={vista === 'proyectos'} onClick={() => setVista('proyectos')}>Proyectos <span className="adm-count">{projects ? projects.length : resumen.proyectos}</span></button>
                     <button type="button" role="tab" aria-selected={vista === 'grupos'} onClick={() => setVista('grupos')}>Grupos <span className="adm-count">{grupos.length}</span></button>
+                    <button type="button" role="tab" aria-selected={vista === 'papelera'} onClick={() => setVista('papelera')}>Papelera {papelera.length > 0 && <span className="adm-count">{papelera.length}</span>}</button>
                     <button type="button" role="tab" aria-selected={vista === 'sistema'} onClick={() => setVista('sistema')}>Sistema</button>
                 </div>
-                {vista !== 'sistema' && (
+                {vista !== 'sistema' && vista !== 'papelera' && (
                     <button type="button" className="pro-btn pro-btn--ghost adm-sm" onClick={() => (vista === 'proyectos' ? loadProjects() : load())} disabled={loading}><RefreshCw size={15} /> Actualizar</button>
                 )}
             </div>
@@ -620,11 +694,11 @@ const Admin = () => {
             {vista === 'usuarios' && (
                 <>
                     <dl className="adm-resumen">
-                        <div><dt>Usuarios</dt><dd>{resumen.total}</dd></div>
-                        <div><dt>Profesores</dt><dd>{resumen.teacher}</dd></div>
-                        <div><dt>Estudiantes</dt><dd>{resumen.student}</dd></div>
-                        <div><dt>Investigadores</dt><dd>{resumen.researcher}</dd></div>
-                        <div><dt>Proyectos</dt><dd>{resumen.proyectos}</dd></div>
+                        <div><dt>Usuarios</dt><dd><button type="button" aria-pressed={!hayFiltros} onClick={() => { limpiarFiltros();  }} title="Ver solo usuarios">{resumen.total}</button></dd></div>
+                        <div><dt>Profesores</dt><dd><button type="button" aria-pressed={fRol === 'teacher'} onClick={() => { limpiarFiltros(); setFRol('teacher'); }} title="Ver solo profesores">{resumen.teacher}</button></dd></div>
+                        <div><dt>Estudiantes</dt><dd><button type="button" aria-pressed={fRol === 'student'} onClick={() => { limpiarFiltros(); setFRol('student'); }} title="Ver solo estudiantes">{resumen.student}</button></dd></div>
+                        <div><dt>Investigadores</dt><dd><button type="button" aria-pressed={fRol === 'researcher'} onClick={() => { limpiarFiltros(); setFRol('researcher'); }} title="Ver solo investigadores">{resumen.researcher}</button></dd></div>
+                        <div><dt>Proyectos</dt><dd><button type="button" onClick={() => setVista('proyectos')} title="Ir a Proyectos">{resumen.proyectos}</button></dd></div>
                     </dl>
                     {pendientes.length > 0 && (
                         <p className="adm-pendientes">
@@ -695,7 +769,10 @@ const Admin = () => {
                                 </thead>
                                 <tbody>
                                     {loading && users.length === 0 && <Esqueleto columnas={7} />}
-                                    {!loading && visible.length === 0 && (
+                                    {!loading && fallo && users.length === 0 && (
+                                        <tr><td colSpan={7} className="adm-empty"><b>No se pudo cargar la lista</b><span>{fallo} Revisa tu conexión e inténtalo de nuevo; no se perdió nada.</span><button type="button" className="pro-btn pro-btn--primary" onClick={load}><RefreshCw size={15} /> Reintentar</button></td></tr>
+                                    )}
+                                    {!loading && !(fallo && users.length === 0) && visible.length === 0 && (
                                         <tr>
                                             <td colSpan={7} className="adm-empty">
                                                 {users.length <= 1 && !hayFiltros
@@ -742,10 +819,23 @@ const Admin = () => {
                             <Search size={16} aria-hidden="true" />
                             <input className="input-field" type="search" placeholder="Buscar por título, proyecto o dueño" aria-label="Buscar proyectos" value={pQuery} onChange={(event) => setPQuery(event.target.value)} />
                         </div>
+                        <Selector buscar etiqueta="Filtrar proyectos por grupo" value={pGrupo} onChange={setPGrupo} opciones={[{ value: '', label: 'Todos los grupos' }, { value: SIN_GRUPO, label: 'Sin grupo' }, ...grupos.map((g) => ({ value: g, label: g }))]} />
+                        <Selector buscar etiqueta="Filtrar proyectos por profesor" value={pProfesor} onChange={setPProfesor} opciones={[{ value: '', label: 'Todos los profesores' }, ...profesores.map((p) => ({ value: p.id, label: p.name, nota: p.email }))]} />
+                        {hayFiltrosP && <button type="button" className="pro-link" onClick={() => { setPQuery(''); setPGrupo(''); setPProfesor(''); setPTramo(''); }}>Quitar filtros</button>}
                         <span className="adm-toolbar-fin">
                             <button type="button" className="pro-btn pro-btn--ghost" onClick={exportarProyectos} disabled={proyectosVisibles.length === 0}><Download size={15} /> Exportar</button>
                         </span>
                     </div>
+                    {projects?.length > 0 && (
+                        <div className="adm-reparto" role="group" aria-label="Proyectos según su avance">
+                            {reparto.map((t) => (
+                                <button key={t.id} type="button" data-tramo={t.id} aria-pressed={pTramo === t.id} onClick={() => setPTramo(pTramo === t.id ? '' : t.id)} disabled={t.n === 0}>
+                                    <b>{t.n}</b><span>{t.nombre}</span>
+                                    <i style={{ width: `${Math.round((t.n / projects.length) * 100)}%` }} aria-hidden="true" />
+                                </button>
+                            ))}
+                        </div>
+                    )}
                     <div className="adm-table-wrap">
                         <table className="adm-table adm-table--proyectos">
                             <thead>
@@ -765,7 +855,7 @@ const Admin = () => {
                                         <td colSpan={6} className="adm-empty">
                                             {projects.length === 0
                                                 ? <><FileText size={22} aria-hidden="true" /><b>Todavía no hay proyectos</b><span>Aparecerán aquí cuando los profesores, investigadores y estudiantes con permiso empiecen a trabajar.</span></>
-                                                : <><b>Ningún proyecto coincide</b><span>Prueba con otra palabra del título o con el nombre del dueño.</span><button type="button" className="pro-btn pro-btn--ghost" onClick={() => setPQuery('')}>Quitar la búsqueda</button></>}
+                                                : <><b>Ningún proyecto coincide</b><span>Prueba con otra palabra o quita los filtros de grupo, profesor o avance.</span><button type="button" className="pro-btn pro-btn--ghost" onClick={() => { setPQuery(''); setPGrupo(''); setPProfesor(''); setPTramo(''); }}>Quitar filtros</button></>}
                                         </td>
                                     </tr>
                                 )}
@@ -792,7 +882,7 @@ const Admin = () => {
                             </tbody>
                         </table>
                     </div>
-                    <Paginas total={proyectosVisibles.length} pagina={pPagina} onPagina={setPPagina} que={pQuery ? `(de ${projects?.length || 0} proyectos)` : 'proyectos'} porPagina={porPagina} onPorPagina={setPorPagina} />
+                    <Paginas total={proyectosVisibles.length} pagina={pPagina} onPagina={setPPagina} que={hayFiltrosP ? `(de ${projects?.length || 0} proyectos)` : 'proyectos'} porPagina={porPagina} onPorPagina={setPorPagina} />
                 </section>
             )}
 
@@ -869,6 +959,41 @@ const Admin = () => {
                 </>
             )}
 
+            {vista === 'papelera' && (
+                <section className="pro-card adm-panel">
+                    <div className="adm-bitacora-cabeza adm-papelera-cabeza">
+                        <div>
+                            <h2>Papelera</h2>
+                            <p className="adm-muted">Las cuentas eliminadas se guardan aquí 30 días con todo lo suyo: proyectos, versiones, figuras y encuestas. Al restaurar, la persona entra con el mismo correo y contraseña.</p>
+                        </div>
+                        {papelera.length > 0 && <button type="button" className="pro-btn pro-btn--ghost adm-sm adm-danger" disabled={busy} onClick={() => borrarDeltodo(null)}><Trash2 size={15} /> Vaciar papelera</button>}
+                    </div>
+                    <div className="adm-table-wrap">
+                        <table className="adm-table adm-table--grupos">
+                            <thead><tr><th scope="col">Cuenta</th><th scope="col">Rol</th><th scope="col" className="adm-num">Proyectos</th><th scope="col">Eliminada</th><th scope="col">Se borra en</th><th scope="col"><span className="adm-sr">Acciones</span></th></tr></thead>
+                            <tbody>
+                                {papelera.length === 0 && <tr><td colSpan={6} className="adm-empty"><Trash2 size={22} aria-hidden="true" /><b>La papelera está vacía</b><span>Cuando elimines una cuenta quedará aquí 30 días, por si hay que recuperarla.</span></td></tr>}
+                                {papelera.map((c) => (
+                                    <tr key={c.id}>
+                                        <td><span className="adm-user-link adm-user-link--suave"><b>{c.name}</b><small>{c.email}</small>{c.grupo && <small className="adm-grupo">{c.grupo}</small>}</span></td>
+                                        <td><RolBadge role={c.role} /></td>
+                                        <td className="adm-num">{c.projects}</td>
+                                        <td title={new Date(c.deletedAt).toLocaleString('es-CO')}>{haceCuanto(new Date(c.deletedAt).toISOString().replace('T', ' ').slice(0, 19))}{c.deletedBy ? ` · ${c.deletedBy}` : ''}</td>
+                                        <td data-alerta={c.venceEn <= 5 || undefined}>{c.venceEn} {c.venceEn === 1 ? 'día' : 'días'}</td>
+                                        <td>
+                                            <span className="adm-grupo-acciones">
+                                                <button type="button" className="pro-btn pro-btn--primary adm-sm" disabled={busy} onClick={() => restaurar(c)}><RotateCcw size={14} /> Restaurar</button>
+                                                <button type="button" className="pro-btn pro-btn--ghost adm-sm adm-danger" disabled={busy} onClick={() => borrarDeltodo(c)} aria-label={`Borrar definitivamente a ${c.name}`}><Trash2 size={14} /> Borrar</button>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            )}
+
             {vista === 'sistema' && (
                 <>
                     {!mailReady && (
@@ -882,8 +1007,15 @@ const Admin = () => {
                             <h2>Registro de cambios</h2>
                             <p className="adm-muted">Lo que el administrador y los profesores hacen con las cuentas: quién, qué y cuándo. Se conservan los últimos 3000.</p>
                         </div>
+                        <div className="adm-toolbar">
+                            <div className="adm-search">
+                                <Search size={16} aria-hidden="true" />
+                                <input className="input-field" type="search" placeholder="Buscar por correo, nombre, persona o acción" aria-label="Buscar en el registro de cambios" value={bQuery} onChange={(e) => setBQuery(e.target.value)} />
+                            </div>
+                            <span className="adm-toolbar-fin"><button type="button" className="pro-btn pro-btn--ghost" onClick={exportarRegistro} disabled={!bitacora?.length}><Download size={15} /> Exportar</button></span>
+                        </div>
                         {bitacora === null && <p className="adm-muted">Cargando…</p>}
-                        {bitacora?.length === 0 && <p className="adm-muted">Todavía no hay cambios registrados. Aparecerán aquí al crear, modificar o eliminar cuentas.</p>}
+                        {bitacora?.length === 0 && <p className="adm-muted">{bQuery ? 'Ningún cambio coincide con esa búsqueda.' : 'Todavía no hay cambios registrados. Aparecerán aquí al crear, modificar o eliminar cuentas.'}</p>}
                         {bitacora?.length > 0 && (
                             <div className="adm-table-wrap adm-bitacora-lista">
                                 <table className="adm-table">
