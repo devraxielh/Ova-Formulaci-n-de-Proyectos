@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import EditorRico from './EditorRico';
-import { AlertTriangle, CheckCircle2, Flag, Lightbulb, Plus, Trash2, Wand2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Flag, Lightbulb, Loader2, Plus, Sparkles, Trash2, Wand2 } from 'lucide-react';
+import { recomendarConclusiones } from '../services/resultadosIA';
 import SlideDeck from './deck/SlideDeck';
 import { Generica } from './deck/Contenido';
 import { useProject, useProjectField } from '../context/ProjectContext';
@@ -74,14 +75,39 @@ const useConcState = () => {
     return {
         data, f, update, setConclusiones, setRecomendaciones,
         especificos: especificos.map((o) => o.replace(/\.$/, '')),
-        hallazgos, pregunta: clean(data.pregunta), futuras: clean(data.resultadosForm?.futuras),
+        hallazgos, resultadosForm: data.resultadosForm || {}, pregunta: clean(data.pregunta), futuras: clean(data.resultadosForm?.futuras),
     };
 };
 
 /* ---------- Constructor ---------- */
 
 const Constructor = ({ intro, onNavigate }) => {
-    const { f, update, setConclusiones, setRecomendaciones, especificos, hallazgos, pregunta, futuras } = useConcState();
+    const { data, f, update, setConclusiones, setRecomendaciones, especificos, hallazgos, resultadosForm, pregunta, futuras } = useConcState();
+    // Llenar todo a partir de Resultados y discusión: conclusiones específicas, general y recomendaciones.
+    const [llenando, setLlenando] = useState(''); // '' | 'pensando' | 'fallo'
+    const conResultados = especificos.filter((_, i) => clean(hallazgos[i]?.hallazgo)).length;
+    const hayTexto = Object.values(f.especificas || {}).some((v) => clean(v)) || clean(f.general) || f.recomendaciones.some((r) => clean(r.accion));
+    const llenarTodo = async (preguntar = true) => {
+        if (!conResultados) return;
+        if (preguntar && hayTexto && !window.confirm('Se reemplazarán tus conclusiones y recomendaciones por las redactadas con tus resultados. ¿Continuar?')) return;
+        setLlenando('pensando');
+        try {
+            const res = await recomendarConclusiones({ data, especificos, resultados: resultadosForm });
+            setSaved(false);
+            update({ ...res, sugeridas: true });
+            setLlenando('');
+        } catch {
+            setLlenando('fallo');
+        }
+    };
+    // Al abrir: si no hay nada escrito y ya hay resultados, se llena todo solo.
+    const yaLleno = useRef(false);
+    useEffect(() => {
+        if (yaLleno.current || hayTexto || f.sugeridas || !conResultados) return;
+        yaLleno.current = true;
+        llenarTodo(false);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [conResultados]);
     const [tab, setTab] = useState(0);
     const [saved, setSaved] = useState(false);
     const touch = () => setSaved(false);
@@ -131,6 +157,18 @@ const Constructor = ({ intro, onNavigate }) => {
 
             <div className="pla-builder">
                 <div className="obj-form">
+                    <div className="res-llenar">
+                        <button type="button" className="ide-btn ide-btn--primary" disabled={llenando === 'pensando' || !conResultados} onClick={() => llenarTodo(true)}>
+                            {llenando === 'pensando' ? <Loader2 size={16} className="fas-gira" /> : <Sparkles size={16} />} {llenando === 'pensando' ? 'Redactando con tus resultados…' : 'Llenar todo con mis resultados'}
+                        </button>
+                        <span>
+                            {llenando === 'fallo' && 'No se pudo redactar: inténtalo de nuevo.'}
+                            {llenando !== 'fallo' && !conResultados && 'Primero llena Resultados y discusión: las conclusiones salen de tus hallazgos.'}
+                            {llenando !== 'fallo' && conResultados > 0 && `Con los hallazgos de ${conResultados} de ${n} objetivos, tu discusión, tus limitaciones y tus futuras investigaciones. No agrega datos nuevos ni citas.`}
+                        </span>
+                        {!conResultados && onNavigate && <button type="button" className="ide-link" onClick={() => onNavigate('resultados')}>Ir a Resultados y discusión</button>}
+                    </div>
+                    {f.sugeridas && <p className="obj-warn"><AlertTriangle size={14} aria-hidden="true" /> Redactado por la IA con tus resultados: léelo y ajústalo; las conclusiones son tuyas.</p>}
                     <div className="fas-tabs" role="tablist" aria-label="Conclusiones">
                         {especificos.map((o, i) => (
                             <button key={o} type="button" role="tab" aria-selected={tab === i} onClick={() => setTab(i)}>
@@ -144,6 +182,7 @@ const Constructor = ({ intro, onNavigate }) => {
                     {actual === 'esp' && (
                         <div className="input-group pla-part mar-grid">
                             <p className="ide-field-hint mar-pregunta mar-wide">Objetivo específico {tab + 1}: {especificos[tab]}</p>
+                            {!clean(hallazgos[tab]?.hallazgo) && <p className="obj-warn mar-wide"><AlertTriangle size={14} aria-hidden="true" /> Este objetivo todavía no tiene resultados: su conclusión queda pendiente hasta que los tengas.</p>}
                             {clean(hallazgos[tab]?.hallazgo) && (
                                 <div className="tit-from-idea mar-wide"><span>Tu resultado de este objetivo</span><p>{capital(clean(hallazgos[tab].hallazgo))}.</p></div>
                             )}

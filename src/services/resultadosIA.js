@@ -110,3 +110,31 @@ export const recomendarResultados = async ({ data, especificos, datos, anteceden
     });
     return { porObjetivo, limitaciones: sinPunto(json.limitaciones), futuras: sinPunto(json.futuras) };
 };
+
+// Conclusiones y recomendaciones a partir de los resultados y la discusión ya escritos (sin datos nuevos ni citas).
+export const recomendarConclusiones = async ({ data, especificos, resultados }) => {
+    const porObjetivo = resultados?.porObjetivo || {};
+    const general = t(data.objetivoGeneral);
+    const bloques = especificos.map((o, i) => {
+        const r = porObjetivo[i] || {};
+        return `Objetivo ${i + 1}: ${o}\n  Hallazgo: ${t(r.hallazgo) || '(sin resultados todavía)'}${t(r.datos) ? `\n  Otros datos: ${t(r.datos)}` : ''}${t(r.interpretacion) ? `\n  Interpretación: ${t(r.interpretacion)}` : ''}${t(r.implicacion) ? `\n  Implicación: ${t(r.implicacion)}` : ''}`;
+    }).join('\n');
+    const r = await groq.chat.completions.create({
+        messages: [
+            { role: 'system', content: 'Eres asesor de investigación. Redactas las conclusiones y recomendaciones de un proyecto a partir de sus resultados y su discusión. Reglas: cada conclusión responde su objetivo con lo que se encontró; no agregas datos nuevos (solo puedes retomar una cifra clave que ya esté en los resultados, igual); no citas autores; no recomiendas dentro de las conclusiones; limitas lo dicho a la población estudiada y usas lenguaje prudente. Si un objetivo no tiene resultados, su conclusión queda vacía. Escribes en español, en forma impersonal. Respondes solo JSON válido.' },
+            { role: 'user', content: `PROYECTO\nTítulo: ${t(data.titulo)}\nPregunta: ${t(data.pregunta)}\nObjetivo general: ${general || '(sin definir)'}\nPoblación y lugar: ${t(data.tituloForm?.quien || data.idea?.quien)} ${t(data.tituloForm?.donde || data.idea?.donde)}\n\nRESULTADOS Y DISCUSIÓN POR OBJETIVO\n${bloques}\n\nLimitaciones: ${t(resultados?.limitaciones) || '(sin definir)'}\nFuturas investigaciones: ${t(resultados?.futuras) || '(sin definir)'}\n\nEscribe:\n- "especificas": una conclusión por objetivo, en orden (dos a cuatro oraciones cada una). Empieza retomando el verbo del objetivo en pasado impersonal (por ejemplo «Se identificó…», «Se caracterizó…») y di qué se concluye. Cadena vacía si ese objetivo no tiene resultados.\n- "general": la conclusión general (tres a cinco oraciones) que responde la pregunta de investigación y el objetivo general integrando las conclusiones específicas. Empieza con «En respuesta a la pregunta de investigación,».\n- "recomendaciones": de tres a cinco recomendaciones concretas que se desprendan de los resultados y las implicaciones. Cada una con "destinatario" (a quién va: la institución del estudio, su personal, la secretaría de salud o de educación, futuros investigadores…) y "accion" (qué hacer, empezando con un verbo en infinitivo). Incluye una para futuros investigadores a partir de las futuras investigaciones.\nSin punto final en ningún campo.\n\nResponde exactamente con este JSON: {"especificas": ["…"], "general": "…", "recomendaciones": [{"destinatario": "…", "accion": "…"}]}` },
+        ],
+        temperature: 0.2,
+        max_tokens: 3000,
+        response_format: { type: 'json_object' },
+    });
+    const content = r.choices?.[0]?.message?.content || '';
+    const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+    const lista = Array.isArray(json.especificas) ? json.especificas : [];
+    const especificas = {};
+    especificos.forEach((_, i) => { especificas[i] = t(porObjetivo[i]?.hallazgo) ? sinPunto(lista[i]) : ''; });
+    const recomendaciones = (Array.isArray(json.recomendaciones) ? json.recomendaciones : [])
+        .map((x) => ({ destinatario: sinPunto(x?.destinatario).replace(/^a\s+/i, '').slice(0, 80), accion: sinPunto(x?.accion).slice(0, 300) }))
+        .filter((x) => x.accion).slice(0, 6);
+    return { especificas, general: sinPunto(json.general), recomendaciones: recomendaciones.length ? recomendaciones : [{ destinatario: '', accion: '' }] };
+};
