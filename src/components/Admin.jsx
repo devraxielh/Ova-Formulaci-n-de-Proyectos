@@ -851,17 +851,17 @@ const Admin = () => {
                                                     {user.grupo && <small className="adm-grupo">{user.grupo}</small>}
                                                 </button>
                                             </td>
-                                            <td>
+                                            <td data-label="Rol">
                                                 <span className="adm-rol-celda">
                                                     <RolBadge role={user.role} />
                                                     {user.role === 'student' && <small data-falta={!user.teacherId || undefined}>{user.teacherName || 'Sin profesor'}</small>}
                                                     {user.role === 'teacher' && <small>{estudiantesDe.get(user.id) || 0} {estudiantesDe.get(user.id) === 1 ? 'estudiante' : 'estudiantes'}</small>}
                                                 </span>
                                             </td>
-                                            <td><StatusBadge status={user.status} />{user.mustChangePassword && user.role !== 'admin' && <small className="adm-sub" title="Todavía no ha entrado a cambiar su contraseña temporal">Sin estrenar</small>}</td>
-                                            <td className="adm-num">{user.projectCount}</td>
-                                            <td><Cupo user={user} onChange={changeLimit} busy={busy} /></td>
-                                            <td title={formatDate(user.lastActivity || user.lastLoginAt)}>{haceCuanto(user.lastActivity || user.lastLoginAt)}</td>
+                                            <td data-label="Estado"><StatusBadge status={user.status} />{user.mustChangePassword && user.role !== 'admin' && <small className="adm-sub" title="Todavía no ha entrado a cambiar su contraseña temporal">Sin estrenar</small>}</td>
+                                            <td className="adm-num" data-label="Proyectos">{user.projectCount}</td>
+                                            <td data-label="Puede crear"><Cupo user={user} onChange={changeLimit} busy={busy} /></td>
+                                            <td data-label="Actividad" title={formatDate(user.lastActivity || user.lastLoginAt)}>{haceCuanto(user.lastActivity || user.lastLoginAt)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -951,7 +951,7 @@ const Admin = () => {
                     <section className="pro-card adm-panel">
                         <div className="adm-bitacora-cabeza">
                             <h2>Por grupo</h2>
-                            <p className="adm-muted">Un grupo es un curso o cohorte. Se pone al crear las cuentas (también en la carga por lotes) o seleccionando varias en Usuarios. Presiona un grupo para ver sus cuentas; con «Renombrar» le cambias el nombre (si pones el de otro grupo, se unen) y con «Borrar» desaparece el grupo y sus cuentas quedan sin grupo.</p>
+                            <p className="adm-muted">Un grupo es un curso o cohorte. Se pone al crear las cuentas (también en la carga por lotes) o seleccionando varias en Usuarios. Presiona un grupo para ver sus cuentas; con el lápiz le cambias el nombre (si pones el de otro grupo, se unen) y con la papelera desaparece el grupo y sus cuentas quedan sin grupo.</p>
                         </div>
                         <div className="adm-table-wrap">
                             <table className="adm-table adm-table--grupos">
@@ -979,8 +979,8 @@ const Admin = () => {
                                             <td>
                                                 {g.clave !== SIN_GRUPO && grupoEditado?.de !== g.clave && (
                                                     <span className="adm-grupo-acciones">
-                                                        <button type="button" className="pro-btn pro-btn--ghost adm-sm" disabled={busy} onClick={() => setGrupoEditado({ de: g.clave, a: g.nombre })} aria-label={`Cambiar el nombre de ${g.nombre}`}><Pencil size={14} /> Renombrar</button>
-                                                        <button type="button" className="pro-btn pro-btn--ghost adm-sm adm-danger" disabled={busy} onClick={() => quitarGrupo(g)} aria-label={`Borrar el grupo ${g.nombre}`} title="Sus cuentas quedan sin grupo; no se borra ninguna"><Trash2 size={14} /> Borrar</button>
+                                                        <button type="button" className="adm-icono" disabled={busy} onClick={() => setGrupoEditado({ de: g.clave, a: g.nombre })} aria-label={`Cambiar el nombre de ${g.nombre}`} title="Renombrar (o unir con otro grupo)"><Pencil size={15} /></button>
+                                                        <button type="button" className="adm-icono adm-danger" disabled={busy} onClick={() => quitarGrupo(g)} aria-label={`Borrar el grupo ${g.nombre}`} title="Borrar el grupo: sus cuentas quedan sin grupo; no se borra ninguna"><Trash2 size={15} /></button>
                                                     </span>
                                                 )}
                                             </td>

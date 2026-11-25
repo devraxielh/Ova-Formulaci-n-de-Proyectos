@@ -128,7 +128,7 @@ export const CuotaIA = ({ onVerUsuario }) => {
             {q === null && <p className="adm-muted">Cargando…</p>}
             {q && (
                 <>
-                    <dl className="adm-cuota-resumen">
+                    <dl className="adm-resumen adm-resumen--uso adm-resumen--tres">
                         <div><dt>Solicitudes hoy</dt><dd>{q.solicitudesHoy}</dd></div>
                         <div data-alerta={q.agotaron > 0 || undefined}><dt>Agotaron la cuota</dt><dd>{q.agotaron}</dd></div>
                         <div><dt>Cerca del límite</dt><dd>{q.cerca}</dd></div>
@@ -212,10 +212,8 @@ export const ServiciosExternos = () => {
                         const { texto, Icono } = ESTADO[s.estado] || ESTADO.sin_datos;
                         return (
                             <li key={s.id} data-estado={s.estado}>
-                                <div className="adm-servicio-cabeza">
-                                    <b>{s.nombre}</b>
-                                    <span className="adm-servicio-estado"><Icono size={14} aria-hidden="true" /> {texto}{s.estado === 'falla' && s.fallos > 1 ? ` (${s.fallos} seguidas)` : ''}</span>
-                                </div>
+                                <span className="adm-servicio-estado"><Icono size={14} aria-hidden="true" /> {texto}{s.estado === 'falla' && s.fallos > 1 ? ` (${s.fallos} seguidas)` : ''}</span>
+                                <b className="adm-servicio-nombre">{s.nombre}</b>
                                 <small className="adm-muted">{s.proveedor}{s.detalle ? ` · ${s.detalle}` : ''}</small>
                                 <dl>
                                     <div><dt>Hoy</dt><dd>{plural(s.hoy, s.id === 'correo' ? 'correo' : 'consulta', s.id === 'correo' ? 'correos' : 'consultas')}</dd></div>
