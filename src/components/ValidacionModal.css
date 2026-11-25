@@ -89,3 +89,15 @@
 .val-modal .ide-link { background: none; border: 0; padding: 0; font: inherit; font-size: 0.85rem; color: #4338ca; text-decoration: underline; cursor: pointer; }
 .val-modal .obj-remove { display: grid; place-items: center; width: 2rem; height: 2rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; background: #fff; color: #94a3b8; cursor: pointer; }
 .val-modal .obj-warn { margin: 0; font-size: 0.85rem; color: #b45309; }
+
+/* De dónde salen los ítems de la calculadora: el instrumento armado */
+.calc-origen { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.6rem; margin: 0 0 0.6rem; padding: 0.5rem 0.7rem; border-radius: 0.5rem; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; font-size: 0.85rem; line-height: 1.45; }
+.calc-origen[data-falta] { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+.calc-origen p { margin: 0; }
+.calc-origen svg { flex: none; vertical-align: -2px; }
+.calc-columnas { margin: 0.2rem 0 0; padding-left: 1.2rem; display: grid; gap: 0.15rem; max-height: 9rem; overflow-y: auto; width: 100%; list-style: none; }
+.calc-items { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.4rem; }
+.calc-items .ide-chip { min-width: 2.2rem; justify-content: center; }
+.calc-name { min-width: 16rem; }
+
+.calc-items .ide-chip[aria-pressed='true'] { background: #4f46e5; border-color: #4f46e5; color: #fff; }

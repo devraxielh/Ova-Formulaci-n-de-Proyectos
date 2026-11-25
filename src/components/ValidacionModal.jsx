@@ -17,7 +17,7 @@ const contraer = (text) => text.replace(/\bde el\b/g, 'del').replace(/\ba el\b/g
  * - datos / onGuardar: si existen, la calculadora se guarda en el instrumento.
  * - seleccionados / onToggle: agregar o quitar el método del instrumento.
  */
-const ValidacionModal = ({ open, inicial, instrumento, seleccionados = [], onToggle, datos = {}, onGuardar, onClose, enCalculadora = false }) => {
+const ValidacionModal = ({ open, inicial, instrumento, seleccionados = [], onToggle, datos = {}, onGuardar, onClose, enCalculadora = false, preguntas = [] }) => {
     const ref = useRef(null);
     const [actual, setActual] = useState(inicial || VALIDACION_DETALLE[0].id);
     const [borrador, setBorrador] = useState(datos || {});
@@ -100,6 +100,7 @@ const ValidacionModal = ({ open, inicial, instrumento, seleccionados = [], onTog
                                     value={borrador[v.id]}
                                     onChange={(next) => { setBorrador((prev) => ({ ...prev, [v.id]: next })); setGuardado(''); }}
                                     alfaLocalSugerido={alfaCalculado(borrador)}
+                                    preguntas={preguntas}
                                 />
                             )}
                         </section>

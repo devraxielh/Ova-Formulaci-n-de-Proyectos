@@ -1,10 +1,16 @@
 import React from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { ClipboardList, Plus, Trash2 } from 'lucide-react';
 import { cronbach, nivelAlfa, num, resumenAiken, resumenTriangulacion } from '../data/validacion';
 
 /*
  * Calculadoras de validez y confiabilidad. Cada una recibe `value` (datos guardados) y `onChange`.
+ * `preguntas`: los ítems del instrumento armado en esa fila; la validación trabaja sobre esos mismos ítems.
  */
+
+// Nombre de un ítem para las tablas: su número en el instrumento y su texto (recortado).
+const nombreItem = (q, i) => { const t = String(q?.texto || '').replace(/\s+/g, ' ').trim(); return `${i + 1}. ${t.length > 90 ? `${t.slice(0, 87)}…` : t}`; };
+const hayNota = (it) => (it.notas || []).some((x) => x !== '' && x != null);
+const listaItems = (nums) => (nums.length === 0 ? '' : nums.length === 1 ? `el ítem ${nums[0]}` : `los ítems ${nums.slice(0, -1).join(', ')} y ${nums[nums.length - 1]}`);
 
 const Campo = ({ label, children, wide }) => (
     <label className={`calc-campo ${wide ? 'calc-wide' : ''}`}>
@@ -19,14 +25,31 @@ const EJEMPLO_AIKEN = { expertos: 3, escala: 4, items: [
     { nombre: 'Ítem 1', notas: [4, 4, 3] }, { nombre: 'Ítem 2', notas: [4, 3, 4] }, { nombre: 'Ítem 3', notas: [2, 3, 2] },
 ] };
 
-export const CalcAiken = ({ value, onChange }) => {
-    const d = { expertos: 3, escala: 4, items: [{ nombre: 'Ítem 1', notas: [] }], ...(value || {}) };
+export const CalcAiken = ({ value, onChange, preguntas = [] }) => {
+    const guardado = { expertos: 3, escala: 4, items: [{ nombre: 'Ítem 1', notas: [] }], ...(value || {}) };
+    // Los ítems que califican los expertos son los del instrumento. Mientras no haya ninguna calificación, la
+    // tabla es directamente la lista de ítems del instrumento; con la primera nota queda guardada así.
+    const delInstrumento = preguntas.map(nombreItem);
+    const d = delInstrumento.length && !guardado.items.some(hayNota) ? { ...guardado, items: delInstrumento.map((nombre) => ({ nombre, notas: [] })) } : guardado;
     const n = Math.max(1, Math.min(10, Number(d.expertos) || 3));
     const set = (patch) => onChange({ ...d, ...patch });
     const setNota = (i, j, v) => set({ items: d.items.map((it, k) => (k === i ? { ...it, notas: Array.from({ length: n }, (_, x) => (x === j ? v : it.notas?.[x] ?? '')) } : it)) });
     const r = resumenAiken({ ...d, expertos: n });
+    // Si el instrumento cambió después de calificar, se ofrece poner la tabla al día: se conservan las calificaciones
+    // de los ítems que siguen igual y los que ya no están en el instrumento salen de la tabla.
+    const iguales = delInstrumento.length === d.items.length && delInstrumento.every((x, i) => x === d.items[i]?.nombre);
+    const cargarItems = () => set({ items: delInstrumento.map((nombre) => d.items.find((it) => it.nombre === nombre) || { nombre, notas: [] }) });
     return (
         <div className="calc">
+            {delInstrumento.length === 0 && <p className="calc-origen" data-falta="true"><ClipboardList size={14} aria-hidden="true" /> Aún no has armado este instrumento. Ármalo primero (paso 1) y aquí aparecerán sus ítems para que los expertos los califiquen.</p>}
+            {delInstrumento.length > 0 && iguales && <p className="calc-origen"><ClipboardList size={14} aria-hidden="true" /> La tabla usa los {delInstrumento.length} ítems de tu instrumento, en su mismo orden.</p>}
+            {delInstrumento.length > 0 && !iguales && (
+                <p className="calc-origen" data-falta="true">
+                    <ClipboardList size={14} aria-hidden="true" /> Tu instrumento tiene {delInstrumento.length} ítems y esta tabla, {d.items.length}: no coinciden.
+                    <button type="button" className="ide-link" onClick={cargarItems}>Usar los ítems de mi instrumento</button>
+                    <span>Se conservan las calificaciones de los ítems que no cambiaron.</span>
+                </p>
+            )}
             <div className="calc-row">
                 <Campo label="Número de expertos">
                     <input className="input-field" type="number" min="1" max="10" value={d.expertos} onChange={(e) => set({ expertos: Number(e.target.value) })} />
@@ -54,7 +77,7 @@ export const CalcAiken = ({ value, onChange }) => {
                             const vi = (() => { const notas = (it.notas || []).slice(0, n).map(Number).filter((x) => x >= 1 && x <= d.escala); return notas.length ? notas.reduce((s, x) => s + x - 1, 0) / (notas.length * (d.escala - 1)) : null; })();
                             return (
                                 <tr key={i}>
-                                    <th scope="row"><input className="input-field calc-name" aria-label={`Nombre del ítem ${i + 1}`} value={it.nombre} onChange={(e) => set({ items: d.items.map((x, k) => (k === i ? { ...x, nombre: e.target.value } : x)) })} /></th>
+                                    <th scope="row"><input className="input-field calc-name" aria-label={`Nombre del ítem ${i + 1}`} title={it.nombre} value={it.nombre} onChange={(e) => set({ items: d.items.map((x, k) => (k === i ? { ...x, nombre: e.target.value } : x)) })} /></th>
                                     {Array.from({ length: n }, (_, j) => (
                                         <td key={j}>
                                             <input className="input-field calc-num" type="number" min="1" max={d.escala} aria-label={`Calificación del experto ${j + 1} al ítem ${i + 1}`} value={it.notas?.[j] ?? ''} onChange={(e) => setNota(i, j, e.target.value === '' ? '' : Number(e.target.value))} />
@@ -81,9 +104,12 @@ export const CalcAiken = ({ value, onChange }) => {
 
 /* ---------- Prueba piloto ---------- */
 
-export const CalcPiloto = ({ value, onChange }) => {
+export const CalcPiloto = ({ value, onChange, preguntas = [] }) => {
     const d = { participantes: '', tiempo: '', confusos: '', cambios: '', ...(value || {}) };
     const set = (patch) => onChange({ ...d, ...patch });
+    // Los ítems confusos se marcan sobre los del instrumento: el texto se arma con sus números.
+    const marcados = [...new Set((String(d.confusos).match(/\d+/g) || []).map(Number).filter((x) => x >= 1 && x <= preguntas.length))].sort((a, b) => a - b);
+    const alternar = (k) => set({ confusos: listaItems(marcados.includes(k) ? marcados.filter((x) => x !== k) : [...marcados, k].sort((a, b) => a - b)) });
     return (
         <div className="calc">
             <div className="calc-row">
@@ -95,7 +121,15 @@ export const CalcPiloto = ({ value, onChange }) => {
                 </Campo>
             </div>
             <Campo label="Ítems que resultaron confusos" wide>
+                {preguntas.length > 0 && (
+                    <div className="calc-items" role="group" aria-label="Ítems del instrumento">
+                        {preguntas.map((q, i) => <button key={q.id || i} type="button" className="ide-chip" aria-pressed={marcados.includes(i + 1)} title={q.texto} onClick={() => alternar(i + 1)}>{i + 1}</button>)}
+                    </div>
+                )}
                 <input className="input-field" value={d.confusos} onChange={(e) => set({ confusos: e.target.value })} placeholder="Ej: los ítems 7 y 12" />
+                {preguntas.length > 0
+                    ? <small className="ide-field-hint">Marca los números de tu instrumento ({preguntas.length} ítems); pasa el cursor por un número para ver su pregunta.</small>
+                    : <small className="ide-field-hint">Arma primero el instrumento (paso 1) para marcar aquí sus ítems.</small>}
             </Campo>
             <Campo label="Cambios realizados" wide>
                 <textarea className="textarea-field" rows={2} value={d.cambios} onChange={(e) => set({ cambios: e.target.value })} placeholder="Ej: se reescribió el ítem 7 y se eliminó el 12 porque repetía el 5" />
@@ -109,12 +143,22 @@ export const CalcPiloto = ({ value, onChange }) => {
 
 const EJEMPLO_ALFA = '4\t5\t4\t3\t4\n3\t4\t4\t3\t3\n5\t5\t4\t4\t5\n2\t3\t2\t2\t3\n4\t4\t5\t3\t4\n3\t3\t3\t2\t3\n5\t4\t5\t4\t4\n2\t2\t3\t2\t2';
 
-export const CalcAlfa = ({ value, onChange }) => {
+export const CalcAlfa = ({ value, onChange, preguntas = [] }) => {
     const d = { matriz: '', dimension: '', ...(value || {}) };
     const set = (patch) => onChange({ ...d, ...patch });
     const r = d.matriz.trim() ? cronbach(d.matriz) : null;
+    // El alfa se calcula con los ítems de escala del instrumento: una columna por cada uno, en su orden.
+    const deEscala = preguntas.map((q, i) => ({ q, numero: i + 1 })).filter((x) => x.q.tipo === 'likert');
     return (
         <div className="calc">
+            {preguntas.length === 0 && <p className="calc-origen" data-falta="true"><ClipboardList size={14} aria-hidden="true" /> Aún no has armado este instrumento. Ármalo primero (paso 1): el alfa se calcula con las respuestas a sus ítems de escala.</p>}
+            {preguntas.length > 0 && deEscala.length < 2 && <p className="calc-origen" data-falta="true"><ClipboardList size={14} aria-hidden="true" /> Tu instrumento tiene {deEscala.length === 1 ? 'un solo ítem' : 'cero ítems'} de escala (tipo Likert). El alfa de Cronbach necesita al menos dos: agrega ítems de escala o elige otro método.</p>}
+            {deEscala.length >= 2 && (
+                <div className="calc-origen">
+                    <p><ClipboardList size={14} aria-hidden="true" /> Tu instrumento tiene <b>{deEscala.length} ítems de escala</b>: la matriz lleva {deEscala.length} columnas, en este orden.</p>
+                    <ol className="calc-columnas">{deEscala.map((x, k) => <li key={x.q.id || k}><b>Columna {k + 1}:</b> ítem {x.numero}. {x.q.texto}</li>)}</ol>
+                </div>
+            )}
             <Campo label="Pega las respuestas desde Excel (una fila por persona, una columna por ítem)" wide>
                 <textarea className="textarea-field calc-matriz" rows={7} value={d.matriz} onChange={(e) => set({ matriz: e.target.value })} placeholder={'4\t5\t4\t3\n3\t4\t4\t3\n…'} spellCheck={false} />
             </Campo>
@@ -125,6 +169,7 @@ export const CalcAlfa = ({ value, onChange }) => {
                 <button type="button" className="ide-link" onClick={() => set({ matriz: EJEMPLO_ALFA })}>Cargar ejemplo</button>
             </div>
             {r?.error && <p className="obj-warn">{r.error}</p>}
+            {r && !r.error && deEscala.length >= 2 && r.k !== deEscala.length && <p className="obj-warn">La matriz tiene {r.k} columnas, pero tu instrumento tiene {deEscala.length} ítems de escala: revisa que haya una columna por cada ítem y ninguna de otras preguntas.</p>}
             {r && !r.error && (
                 <div className="calc-result">
                     <p className="calc-big">α = <b>{num(r.alfa)}</b> <span data-nivel={nivelAlfa(r.alfa)}>confiabilidad {nivelAlfa(r.alfa)}</span></p>
@@ -198,7 +243,7 @@ const EJEMPLO_TRI = { fuentes: ['Pacientes', 'Médicos', 'Registros'], categoria
     { nombre: 'Trato del personal', celdas: { Pacientes: 'si', Médicos: 'difiere', Registros: 'no' } },
 ] };
 
-export const CalcTriangulacion = ({ value, onChange }) => {
+export const CalcTriangulacion = ({ value, onChange, preguntas = [] }) => {
     const d = { fuentes: ['Fuente 1', 'Fuente 2'], categorias: [{ nombre: '', celdas: {} }], ...(value || {}) };
     const set = (patch) => onChange({ ...d, ...patch });
     const r = resumenTriangulacion(d);
@@ -209,6 +254,7 @@ export const CalcTriangulacion = ({ value, onChange }) => {
                     <input className="input-field" value={d.fuentes.join(', ')} onChange={(e) => set({ fuentes: e.target.value.split(',').map((x) => x.trim()) })} placeholder="Ej: Pacientes, Médicos, Registros" />
                 </Campo>
                 <button type="button" className="ide-link" onClick={() => onChange(EJEMPLO_TRI)}>Cargar ejemplo</button>
+                {preguntas.length > 0 && <button type="button" className="ide-link" onClick={() => set({ categorias: preguntas.map((q, i) => d.categorias.find((c) => c.nombre === nombreItem(q, i)) || { nombre: nombreItem(q, i), celdas: {} }) })}><ClipboardList size={13} aria-hidden="true" /> Usar las {preguntas.length} preguntas de mi instrumento como categorías</button>}
             </div>
             <div className="calc-table-wrap">
                 <table className="calc-table">

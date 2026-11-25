@@ -7,7 +7,7 @@ import {
 import SlideDeck, { Opciones, Pestanas } from './deck/SlideDeck';
 import { useProject, useProjectField } from '../context/ProjectContext';
 import { useAutoGuardar } from '../hooks/useAutoGuardar';
-import { groq } from '../services/api';
+import { api, groq } from '../services/api';
 import { partesObjetivos } from '../services/coherencia';
 import { TIPO_ALCANCE } from '../data/ejemplos';
 import {
@@ -229,6 +229,41 @@ const sugerirInstrumentos = async ({ data, especificos, enfoque, tipo, diseno, p
     return lista;
 };
 
+// Presupuesto completo del proyecto: rubros coherentes con la muestra, los instrumentos, el software y la duración.
+// Los valores son estimaciones que el estudiante debe ajustar con cotizaciones; cada rubro dice cómo se calculó.
+const sugerirPresupuesto = async ({ data, enfoque, diseno, poblacion, n, instrumentos, software, meses, integrantes }) => {
+    const t = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
+    const r = await groq.chat.completions.create({
+        messages: [
+            { role: 'system', content: 'Eres asesor de proyectos de investigación formativa en Colombia (trabajos de grado y de aula hechos por estudiantes). Armas el presupuesto que el proyecto necesita, con rubros concretos y valores estimados en pesos colombianos (COP), realistas para estudiantes: sin sueldos de mercado ni compras que la universidad ya presta. Cada valor sale de una cuenta explícita (cantidad × valor unitario) con las cantidades del proyecto. Las categorías y las fuentes las eliges solo de las listas que recibes. Respondes solo JSON válido en español.' },
+            { role: 'user', content: `PROYECTO\nTítulo: ${t(data.titulo) || '(sin título)'}\nEnfoque: ${enfoque || '(sin definir)'}\nDiseño: ${diseno || '(sin definir)'}\nPoblación: ${t(poblacion) || '(sin describir)'}\nParticipantes previstos: ${n || '(sin definir)'}\nInstrumentos de recolección: ${instrumentos || '(sin definir)'}\nSoftware de análisis: ${software || '(sin definir)'}\nDuración: ${meses}\nIntegrantes del equipo: ${integrantes}\n\nCATEGORÍAS (elige de aquí): ${CATEGORIAS.join(' | ')}\nFUENTES (elige de aquí): ${FUENTES.join(' | ')}. Regla: «Personal» es todo lo que paga o aporta el estudiante (su tiempo, su computador, impresiones, transporte, datos móviles, papelería); «Universidad/Institución» es lo que aporta la institución (las horas del asesor, bases de datos bibliográficas, salas, licencias institucionales); «Externa» solo si el proyecto nombra un patrocinador: si no, no la uses.\n\nPropón entre 7 y 10 rubros que cubran todo lo que el proyecto necesita para ejecutarse: el tiempo de los investigadores y del asesor (como aporte, valorado por horas), la aplicación de los instrumentos (impresiones, copias o datos móviles si es en línea), los desplazamientos al lugar del estudio, los equipos (computador propio como aporte), el software (si es gratuito, valor 0), el acceso a bibliografía y la socialización o entrega del informe. Usa exactamente las cantidades del proyecto (participantes, meses, integrantes): si los participantes previstos son 292, las impresiones son para 292, no para un número redondeado. Si una cantidad del proyecto está sin definir, no la supongas: usa 1 y dilo en el detalle. No incluyas rubros que el proyecto no usa. Reglas de cantidad: las horas de los investigadores y del asesor se valoran (no van en 0), aunque sean un aporte y no un pago; los desplazamientos se cuentan por jornadas de recolección (entre 20 y 30 participantes por jornada y por investigador), nunca un viaje por participante; las guías de entrevista o de observación se imprimen una por investigador, no una por participante; para aplicar el cuestionario elige impresión o datos móviles, no los dos, según diga el instrumento (si no lo dice, impresión).\n- "categoria": copia exacta de una categoría de la lista.\n- "descripcion": qué es, en pocas palabras, con mayúscula inicial y sin punto (por ejemplo «Impresión de cuestionarios»).\n- "detalle": de dónde sale la cantidad, corto (por ejemplo «292 cuestionarios de 2 hojas» o «2 investigadores, 5 horas semanales, 24 semanas»).\n- "cantidad": la cantidad total, número (por ejemplo 584 hojas o 240 horas).\n- "unidad": en qué se cuenta, en plural (hojas, horas, viajes, meses, unidades).\n- "valorUnitario": valor de una unidad en pesos, número entero sin puntos ni símbolos; 0 si es gratuito o ya lo presta la institución sin costo.\n- "fuente": copia exacta de una fuente de la lista.\nNo calcules el total: se multiplica aparte.\n\nResponde exactamente con este JSON: {"rubros": [{"categoria": "…", "descripcion": "…", "detalle": "…", "cantidad": 0, "unidad": "…", "valorUnitario": 0, "fuente": "…"}]}` },
+        ],
+        temperature: 0.2,
+        max_tokens: 2200,
+        response_format: { type: 'json_object' },
+    });
+    const content = r.choices?.[0]?.message?.content || '';
+    const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+    const de = (lista, v, porDefecto) => lista.find((x) => x.toLowerCase() === t(v).toLowerCase()) || lista.find((x) => t(v) && x.toLowerCase().startsWith(t(v).toLowerCase().slice(0, 8))) || porDefecto;
+    const numero = (v) => Math.max(0, Number(String(v ?? '').replace(/[^\d.,-]/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.')) || 0);
+    const pesos = (v) => `$${Math.round(v).toLocaleString('es-CO')}`;
+    // El total de cada rubro lo calcula el código (cantidad × valor unitario), no la IA.
+    const rubros = (Array.isArray(json.rubros) ? json.rubros : []).map((x) => {
+        const cantidad = numero(x?.cantidad) || 1;
+        const unitario = Math.round(numero(x?.valorUnitario));
+        const unidadTxt = t(x?.unidad).toLowerCase() || 'unidades';
+        return {
+            categoria: de(CATEGORIAS, x?.categoria, 'Otros'),
+            descripcion: t(x?.descripcion).replace(/[.\s]+$/, '').slice(0, 120),
+            justificacion: `${t(x?.detalle).replace(/[.\s]+$/, '').slice(0, 120)}: ${cantidad.toLocaleString('es-CO')} ${unidadTxt} × ${unitario ? pesos(unitario) : '$0 (sin costo)'}`,
+            fuente: de(FUENTES, x?.fuente, 'Personal'),
+            costo: Math.min(200000000, Math.round(cantidad * unitario)),
+        };
+    }).filter((x) => x.descripcion).slice(0, 12);
+    if (rubros.length < 3) throw new Error('vacio');
+    return rubros;
+};
+
 const clean = (text) => String(text || '').trim().replace(/[\s.,;:]+$/, '');
 const lower = (text) => (text ? text.charAt(0).toLowerCase() + text.slice(1) : '');
 const capital = (text) => (text ? text.charAt(0).toUpperCase() + text.slice(1) : '');
@@ -311,7 +346,7 @@ const Calculadora = ({ calc, onChange, compacta = false }) => {
 /* ---------- Estado del constructor ---------- */
 
 const useMetState = () => {
-    const { data } = useProject();
+    const { data, project } = useProject();
     const [form, setForm] = useProjectField('metodologiaForm', MET_FORM);
     const [enfoque, setEnfoque] = useProjectField('enfoque', '');
     const [tipo, setTipo] = useProjectField('tipoInvestigacion', '');
@@ -351,7 +386,7 @@ const useMetState = () => {
         if ('e' in patch) setErr(patch.e);
     };
     return {
-        data, f, update, setters,
+        data, project, f, update, setters,
         enfoque, setEnfoque, tipo, setTipo, diseno, setDiseno,
         calc, setCalc, unidad, setUnidad, periodos: Number(periodos) || 6, setPeriodos,
         presupuesto: Array.isArray(presupuesto) ? presupuesto : [], setPresupuesto,
@@ -637,6 +672,40 @@ const Constructor = ({ intro, onNavigate }) => {
     }, []);
 
     const partes = redactarTodo(s);
+    // Presupuesto sugerido: llena el presupuesto vacío o agrega los rubros que falten (los que ya están no se tocan).
+    const [sugPres, setSugPres] = useState('');
+    const sugerirPres = async () => {
+        setSugPres('pensando');
+        try {
+            const mue = MUESTREOS.find((m) => m.id === f.poblacion.muestreo);
+            const hayCalculo = !calc.finita || calc.definida;
+            // Sin muestreo elegido, vale la muestra de la calculadora si ya hay población escrita.
+            const n = mue?.id.startsWith('censo') && calc.definida ? `${calc.N} (censo)` : mue && !mue.probabilistico ? (clean(f.poblacion.muestraTexto) || 'sin definir') : hayCalculo ? `${tamanoMuestra(calc)} (muestra calculada)` : 'sin definir';
+            const equipo = await api.members(estado.project?.id).then((x) => (Array.isArray(x?.members) ? x.members.length : Array.isArray(x) ? x.length : 0)).catch(() => 0);
+            const rubros = await sugerirPresupuesto({
+                data: estado.data, enfoque, diseno, poblacion: f.poblacion.descripcion, n,
+                instrumentos: f.instrumentos.map((it) => { const armado = s.armados.find((a) => a && it.id && a.filaId === it.id); return [clean(it.tecnica), clean(it.instrumento), armado ? `${preguntasDe(armado).length} preguntas` : ''].filter(Boolean).join(', '); }).filter(Boolean).join('; '),
+                software: [...new Set(f.analisis.map((x) => clean(x.software)).filter(Boolean))].join(', '),
+                meses: `${periodos} ${unidad === 'semanal' ? 'semanas' : 'meses'}`,
+                integrantes: Math.max(1, equipo), // la lista del equipo ya incluye al dueño del proyecto
+            });
+            const ya = new Set(presupuesto.map((x) => clean(x.descripcion).toLowerCase()));
+            const nuevos = rubros.filter((x) => !ya.has(x.descripcion.toLowerCase())).map((x, i) => ({ id: Date.now() + i, ...x, sugerido: true }));
+            touch();
+            setPresupuesto([...presupuesto.filter((x) => clean(x.descripcion) || Number(x.costo) > 0), ...nuevos]);
+            setSugPres(nuevos.length ? 'listo' : 'nada');
+        } catch {
+            setSugPres('fallo');
+        }
+    };
+    const yaSugirioPres = useRef(false);
+    useEffect(() => {
+        if (tab !== 'presupuesto' || yaSugirioPres.current || presupuesto.length > 0) return;
+        if (!String(estado.data.titulo || estado.data.pregunta || '').trim()) return;
+        yaSugirioPres.current = true;
+        sugerirPres();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tab]);
     const totalPresupuesto = presupuesto.reduce((sum, item) => sum + (Number(item.costo) || 0), 0);
     const cuenta = {
         enfoque: enfoque ? 1 : 0,
@@ -1044,6 +1113,13 @@ const Constructor = ({ intro, onNavigate }) => {
 
                     {tab === 'presupuesto' && (
                         <div className="mar-fichas">
+                            <div className="met-razon">
+                                <button type="button" className="ide-btn ide-btn--ghost" disabled={sugPres === 'pensando'} onClick={sugerirPres}>
+                                    {sugPres === 'pensando' ? <Loader2 size={15} className="met-gira" /> : <Sparkles size={15} />} {sugPres === 'pensando' ? 'Armando el presupuesto…' : presupuesto.length ? 'Sugerir los rubros que faltan' : 'Sugerir el presupuesto completo'}
+                                </button>
+                                <span>{sugPres === 'fallo' ? 'No se pudo sugerir: inténtalo de nuevo.' : sugPres === 'nada' ? 'No se sugirieron rubros nuevos: tu presupuesto ya los tiene.' : 'Según tu muestra, tus instrumentos, tu software, la duración y tu equipo. No cambia los rubros que ya tienes.'}</span>
+                            </div>
+                            {presupuesto.some((x) => x.sugerido) && <p className="obj-warn"><AlertTriangle size={14} aria-hidden="true" /> Los valores sugeridos son estimaciones, no cotizaciones: revisa cada cuenta y ajústala con precios reales de tu ciudad antes de entregar.</p>}
                             {presupuesto.map((it, i) => (
                                 <div className="met-pres-row" key={it.id || i}>
                                     <select className="input-field" aria-label="Rubro" value={it.categoria} onChange={(e) => { touch(); setPresupuesto(presupuesto.map((x, k) => (k === i ? { ...x, categoria: e.target.value } : x))); }}>
@@ -1055,6 +1131,7 @@ const Constructor = ({ intro, onNavigate }) => {
                                     </select>
                                     <input className="input-field" aria-label="Costo en pesos" type="number" min="0" step="1000" value={it.costo} onChange={(e) => { touch(); setPresupuesto(presupuesto.map((x, k) => (k === i ? { ...x, costo: Number(e.target.value) } : x))); }} />
                                     <button type="button" className="obj-remove" onClick={() => { touch(); setPresupuesto(presupuesto.filter((_, k) => k !== i)); }} aria-label={`Quitar ${it.descripcion || 'rubro'}`}><Trash2 size={16} /></button>
+                                    {it.sugerido && it.justificacion && <p className="met-pres-cuenta"><Sparkles size={12} aria-hidden="true" /> Cuenta estimada: {it.justificacion} = {money(it.costo)}</p>}
                                 </div>
                             ))}
                             <button type="button" className="ide-btn ide-btn--ghost obj-add" onClick={() => { touch(); setPresupuesto([...presupuesto, { id: Date.now(), categoria: 'Recursos Humanos', descripcion: '', justificacion: '', fuente: 'Personal', costo: 0 }]); }}><Plus size={15} /> Agregar rubro</button>
@@ -1086,6 +1163,8 @@ const Constructor = ({ intro, onNavigate }) => {
                 inicial={modal?.metodo}
                 enCalculadora={Boolean(modal?.calculadora)}
                 instrumento={modal ? clean(f.instrumentos[modal.index]?.instrumento) : ''}
+                // Los ítems del instrumento armado en esa fila: la validación trabaja sobre ellos.
+                preguntas={modal ? preguntasDe(s.armados.find((a) => a && f.instrumentos[modal.index]?.id && a.filaId === f.instrumentos[modal.index].id)) : []}
                 seleccionados={modal ? validacionesDe(f.instrumentos[modal.index]) : []}
                 onToggle={(id) => modal && toggleValidacion(modal.index, id)}
                 datos={modal ? f.instrumentos[modal.index]?.validacionDatos || {} : {}}
