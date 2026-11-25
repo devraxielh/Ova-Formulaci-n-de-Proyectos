@@ -1,0 +1,124 @@
+/* Encuesta pública (/?encuesta=TOKEN): la responde gente sin cuenta, casi siempre desde el celular. */
+
+.encp {
+    --encp-primario: #4f46e5;
+    --encp-primario-osc: #4338ca;
+    --encp-suave: #eef2ff;
+    --encp-borde: #e2e8f0;
+    --encp-texto: #0f172a;
+    --encp-texto-2: #475569;
+    --encp-ok: #059669;
+    --encp-mal: #dc2626;
+    /* La app ocupa la pantalla con #root en flex y sin scroll del body: la encuesta hace su propio scroll. */
+    flex: 1 1 auto;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: auto;
+    background:
+        radial-gradient(60rem 26rem at 50% -8rem, #e0e7ff 0%, rgb(224 231 255 / 0) 70%),
+        #f6f7fb;
+    color: var(--encp-texto);
+    -webkit-font-smoothing: antialiased;
+}
+
+.encp-main { max-width: 44rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; display: grid; gap: 1rem; }
+.encp-form { display: grid; gap: 1rem; }
+.encp-card { background: #fff; border: 1px solid var(--encp-borde); border-radius: 1rem; box-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -12px rgb(15 23 42 / 0.12); }
+
+/* Barra de avance fija arriba */
+.encp-avance { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 0.8rem; padding: 0.6rem max(1rem, calc((100% - 42rem) / 2)); background: rgb(255 255 255 / 0.88); backdrop-filter: saturate(1.4) blur(10px); border-bottom: 1px solid var(--encp-borde); }
+.encp-avance p { margin: 0; flex: none; font-size: 0.8rem; font-weight: 600; color: var(--encp-texto-2); font-variant-numeric: tabular-nums; }
+.encp-avance-barra { flex: 1; height: 0.45rem; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+.encp-avance-barra span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--encp-primario), #7c3aed); transition: width 0.35s ease; }
+
+/* Cabecera */
+.encp-cabeza { position: relative; overflow: hidden; padding: 1.6rem clamp(1.1rem, 4vw, 2rem) 1.4rem; border-top: 0; }
+.encp-cabeza::before { content: ''; position: absolute; inset: 0 0 auto; height: 0.4rem; background: linear-gradient(90deg, var(--encp-primario), #7c3aed 60%, #0ea5e9); }
+.encp-kicker { margin: 0 0 0.35rem; font-size: 0.74rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--encp-primario); }
+.encp-cabeza h1 { margin: 0; font-size: clamp(1.35rem, 4.5vw, 1.75rem); line-height: 1.25; letter-spacing: -0.015em; text-wrap: balance; }
+.encp-intro { margin: 0.8rem 0 0; color: var(--encp-texto-2); line-height: 1.65; white-space: pre-wrap; }
+.encp-datos { list-style: none; margin: 1.1rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.encp-datos li { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.32rem 0.7rem; border-radius: 999px; background: #f1f5f9; color: var(--encp-texto-2); font-size: 0.82rem; font-weight: 600; }
+.encp-datos svg { color: var(--encp-primario); }
+.encp-nota { margin: 0.9rem 0 0; font-size: 0.8rem; color: #64748b; }
+.encp-nota span, .encp-obligatoria { color: var(--encp-mal); font-weight: 700; }
+
+/* Preguntas */
+.encp-pregunta { margin: 0; min-width: 0; padding: 1.2rem clamp(1rem, 4vw, 1.6rem) 1.3rem; display: grid; gap: 0.8rem; scroll-margin: 4.5rem; transition: border-color 0.2s, box-shadow 0.2s; }
+.encp-pregunta[data-falta] { border-color: #fca5a5; box-shadow: 0 0 0 3px rgb(254 202 202 / 0.6); }
+.encp-pregunta-cabeza { display: flex; gap: 0.75rem; align-items: flex-start; }
+.encp-pregunta-cabeza p { margin: 0.15rem 0 0; font-size: 1.04rem; font-weight: 600; line-height: 1.45; }
+.encp-obligatoria { margin-left: 0.2rem; }
+.encp-numero { flex: none; display: grid; place-items: center; width: 1.85rem; height: 1.85rem; border-radius: 999px; background: var(--encp-suave); color: var(--encp-primario-osc); font-size: 0.85rem; font-weight: 700; font-variant-numeric: tabular-nums; transition: background 0.2s, color 0.2s; }
+.encp-pregunta[data-lista] .encp-numero { background: var(--encp-ok); color: #fff; }
+.encp-ayuda { margin: -0.35rem 0 0 2.6rem; font-size: 0.82rem; color: #64748b; }
+
+/* Opciones: el input real queda oculto pero accesible; se dibuja una marca propia */
+.encp-opciones { display: grid; gap: 0.5rem; }
+.encp-opcion { position: relative; display: flex; align-items: center; gap: 0.75rem; min-height: 3rem; padding: 0.7rem 0.9rem; border: 1.5px solid var(--encp-borde); border-radius: 0.75rem; background: #fff; cursor: pointer; transition: border-color 0.15s, background 0.15s, box-shadow 0.15s; -webkit-tap-highlight-color: transparent; }
+.encp-opcion:hover { border-color: #c7d2fe; background: #fafbff; }
+.encp-opcion input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.encp-opcion:has(input:focus-visible) { outline: 3px solid #a5b4fc; outline-offset: 2px; }
+.encp-opcion:has(input:checked) { border-color: var(--encp-primario); background: var(--encp-suave); box-shadow: 0 0 0 1px var(--encp-primario) inset; }
+.encp-opcion-texto { font-size: 0.97rem; line-height: 1.4; color: var(--encp-texto); }
+.encp-opcion:has(input:checked) .encp-opcion-texto { font-weight: 600; color: #312e81; }
+
+.encp-marca { flex: none; display: grid; place-items: center; width: 1.25rem; height: 1.25rem; border: 2px solid #cbd5e1; border-radius: 999px; background: #fff; color: transparent; transition: border-color 0.15s, background 0.15s, box-shadow 0.15s; }
+.encp-opcion:has(input:checked) .encp-marca { border-color: var(--encp-primario); box-shadow: inset 0 0 0 0.25rem #fff; background: var(--encp-primario); }
+.encp-marca--caja { border-radius: 0.35rem; }
+.encp-opcion:has(input:checked) .encp-marca--caja { box-shadow: none; color: #fff; }
+
+/* Sí / No en dos columnas */
+.encp-opciones--dos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* Escala tipo Likert: en pantallas anchas, una fila con el número arriba */
+.encp-escala-num { flex: none; display: grid; place-items: center; width: 1.7rem; height: 1.7rem; border-radius: 0.5rem; background: #f1f5f9; color: var(--encp-texto-2); font-size: 0.85rem; font-weight: 700; transition: background 0.15s, color 0.15s; }
+.encp-opcion:has(input:checked) .encp-escala-num { background: var(--encp-primario); color: #fff; }
+@media (min-width: 640px) {
+    .encp-opciones--escala { grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr)); gap: 0.45rem; }
+    .encp-opciones--escala .encp-opcion { flex-direction: column; justify-content: flex-start; gap: 0.45rem; padding: 0.8rem 0.4rem; text-align: center; }
+    .encp-opciones--escala .encp-opcion-texto { font-size: 0.8rem; line-height: 1.3; }
+    .encp-opciones--escala .encp-escala-num { width: 2.1rem; height: 2.1rem; border-radius: 999px; font-size: 0.95rem; }
+}
+
+/* Campos de texto y número */
+.encp-campo { width: 100%; box-sizing: border-box; padding: 0.8rem 0.9rem; border: 1.5px solid var(--encp-borde); border-radius: 0.75rem; font: inherit; font-size: 1rem; line-height: 1.5; color: var(--encp-texto); background: #fff; resize: vertical; transition: border-color 0.15s, box-shadow 0.15s; }
+.encp-campo:focus { outline: none; border-color: var(--encp-primario); box-shadow: 0 0 0 3px rgb(165 180 252 / 0.55); }
+.encp-campo--numero { max-width: 14rem; }
+.encp-contador { justify-self: end; margin-top: -0.4rem; font-size: 0.75rem; color: #94a3b8; font-variant-numeric: tabular-nums; }
+
+.encp-falta { display: flex; align-items: center; gap: 0.4rem; margin: 0; font-size: 0.86rem; font-weight: 600; color: var(--encp-mal); }
+
+/* Envío */
+.encp-enviar { padding: 1.2rem clamp(1rem, 4vw, 1.6rem); display: grid; gap: 0.85rem; }
+.encp-boton { display: inline-flex; align-items: center; justify-content: center; gap: 0.55rem; width: 100%; min-height: 3.2rem; padding: 0.8rem 1.2rem; border: 0; border-radius: 0.8rem; background: linear-gradient(135deg, var(--encp-primario), #6d28d9); color: #fff; font: inherit; font-size: 1.02rem; font-weight: 700; cursor: pointer; box-shadow: 0 10px 22px -10px rgb(79 70 229 / 0.7); transition: transform 0.15s, box-shadow 0.15s, filter 0.15s; }
+.encp-boton:hover:not(:disabled) { filter: brightness(1.06); box-shadow: 0 14px 26px -10px rgb(79 70 229 / 0.75); }
+.encp-boton:active:not(:disabled) { transform: translateY(1px); }
+.encp-boton:focus-visible { outline: 3px solid #a5b4fc; outline-offset: 3px; }
+.encp-boton:disabled { opacity: 0.75; cursor: progress; }
+.encp-privacidad { display: flex; gap: 0.45rem; align-items: flex-start; margin: 0; font-size: 0.8rem; line-height: 1.5; color: #64748b; }
+.encp-privacidad svg { flex: none; margin-top: 0.15rem; }
+
+/* Estados: cargando, error, cerrada, gracias */
+.encp-estado { padding: 2.6rem 1.5rem; display: grid; justify-items: center; gap: 0.6rem; text-align: center; }
+.encp-estado h1, .encp-estado h2 { margin: 0.3rem 0 0; font-size: 1.35rem; }
+.encp-estado p { margin: 0; max-width: 28rem; color: var(--encp-texto-2); line-height: 1.6; }
+.encp-estado-icono { color: #94a3b8; }
+.encp-estado-icono--mal { color: var(--encp-mal); }
+.encp-gracias-icono { display: grid; place-items: center; width: 4.5rem; height: 4.5rem; border-radius: 999px; background: var(--encp-ok); color: #fff; box-shadow: 0 0 0 0.6rem #d1fae5; animation: encp-aparece 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3); }
+.encp-gracias h1 { font-size: 1.6rem; margin-top: 0.8rem; }
+
+.encp-gira { width: 1.6rem; height: 1.6rem; border-radius: 999px; border: 3px solid #c7d2fe; border-top-color: var(--encp-primario); animation: encp-gira 0.8s linear infinite; }
+.encp-gira--blanco { width: 1.1rem; height: 1.1rem; border-width: 2.5px; border-color: rgb(255 255 255 / 0.4); border-top-color: #fff; }
+
+.encp-marca-sitio { display: flex; align-items: center; justify-content: center; gap: 0.35rem; margin: 0.4rem 0 0; font-size: 0.78rem; color: #94a3b8; }
+
+@keyframes encp-gira { to { transform: rotate(360deg); } }
+@keyframes encp-aparece { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+    .encp *, .encp *::before { animation: none !important; transition: none !important; }
+}
+.encp .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.encp .encp-pregunta-cabeza p { color: var(--encp-texto); }
+.encp .encp-intro, .encp .encp-estado p { color: var(--encp-texto-2); }
