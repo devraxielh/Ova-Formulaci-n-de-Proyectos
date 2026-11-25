@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import EditorRico from './EditorRico';
-import { AlertTriangle, ArrowDown, ArrowUp, CalendarDays, CheckCircle2, Loader2, Plus, Sparkles, Target, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, CalendarDays, CheckCircle2, Download, Image as ImageIcon, Loader2, Plus, Sparkles, Target, Trash2, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ESTILOS_FASES, datosFases, fasesDataUrl, fasesPng } from '../services/fasesGrafico';
 import SlideDeck from './deck/SlideDeck';
 import { Generica } from './deck/Contenido';
 import { useProject, useProjectField } from '../context/ProjectContext';
@@ -220,6 +222,69 @@ const useFasesState = () => {
     return { data, f, update, setFasesTexto, metForm, setMetForm, setCronoItems, setUnidadGantt, setPeriodos, especificos: especificos.map((o) => o.replace(/\.$/, '')) };
 };
 
+/* ---------- Ventana del gráfico ---------- */
+
+// Muestra la figura de las fases tal como saldrá en el documento y deja elegir su diseño. El estilo elegido se
+// guarda con el proyecto (`fasesForm.estiloGrafico`) y es el que usa «Desarrollo de las fases del proyecto».
+const GraficoModal = ({ open, datos, estilo, onEstilo, onClose }) => {
+    const ref = useRef(null);
+    const [guardado, setGuardado] = useState(false);
+    useEffect(() => {
+        const dialog = ref.current;
+        if (!dialog) return;
+        if (open && !dialog.open) { dialog.showModal(); setGuardado(false); }
+        if (!open && dialog.open) dialog.close();
+    }, [open]);
+    const descargar = async () => {
+        try {
+            const { dataUrl } = await fasesPng({ ...datos, estilo });
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = 'ruta-de-fases.png';
+            a.click();
+        } catch { /* si no se puede dibujar, no se descarga */ }
+    };
+    const actual = ESTILOS_FASES.find((e) => e.id === estilo) || ESTILOS_FASES[0];
+    return createPortal(
+        <dialog ref={ref} className="fas-modal" aria-labelledby="fas-modal-titulo" onClose={onClose} onClick={(e) => { if (e.target === ref.current) onClose(); }}>
+            <div className="fas-modal-caja">
+                <header>
+                    <div>
+                        <p className="fas-modal-kicker">Gráfico de las fases</p>
+                        <h2 id="fas-modal-titulo">Ruta de las fases del proyecto</h2>
+                        <p>Así sale en «Desarrollo de las fases del proyecto» de tu documento. Elige el diseño que prefieras.</p>
+                    </div>
+                    <button type="button" className="fas-modal-cerrar" onClick={onClose} aria-label="Cerrar"><X size={18} /></button>
+                </header>
+                <div className="fas-modal-cuerpo">
+                    {open && datos.fases.length >= 2 ? (
+                        <>
+                            <div className="fas-estilos" role="radiogroup" aria-label="Diseño del gráfico">
+                                {ESTILOS_FASES.map((e) => (
+                                    <button key={e.id} type="button" role="radio" aria-checked={e.id === actual.id} className="fas-estilo" onClick={() => { onEstilo(e.id); setGuardado(true); }}>
+                                        <img src={fasesDataUrl({ ...datos, estilo: e.id })} alt="" />
+                                        <b>{e.id === actual.id && <CheckCircle2 size={15} aria-hidden="true" />} {e.nombre}</b>
+                                        <small>{e.descripcion}</small>
+                                    </button>
+                                ))}
+                            </div>
+                            <figure className="fas-grafico">
+                                <img src={fasesDataUrl({ ...datos, estilo: actual.id })} alt={`Ruta del proyecto, diseño ${actual.nombre}: ${datos.fases.map((x, i) => `fase ${i + 1}, ${x.nombre}`).join('; ')}`} />
+                            </figure>
+                        </>
+                    ) : <p className="obj-warn"><AlertTriangle size={15} aria-hidden="true" /> El gráfico necesita al menos dos fases con nombre.</p>}
+                </div>
+                <footer>
+                    <span className="fas-modal-estado">{guardado ? <><CheckCircle2 size={15} aria-hidden="true" /> Diseño «{actual.nombre}» guardado: así saldrá en tu documento.</> : `Diseño actual: ${actual.nombre}.`}</span>
+                    <button type="button" className="ide-btn ide-btn--ghost" onClick={descargar} disabled={datos.fases.length < 2}><Download size={15} /> Descargar imagen</button>
+                    <button type="button" className="ide-btn ide-btn--primary" onClick={onClose}>Listo</button>
+                </footer>
+            </div>
+        </dialog>,
+        document.body,
+    );
+};
+
 /* ---------- Constructor ---------- */
 
 const Constructor = ({ intro, onNavigate }) => {
@@ -289,6 +354,8 @@ const Constructor = ({ intro, onNavigate }) => {
     }, [especificos.length]);
 
     const declarados = instrumentosDeclarados(data, especificos);
+    const [verGrafico, setVerGrafico] = useState(false);
+    const datosGrafico = datosFases(f, especificos);
     const total = fases.reduce((sum, x) => sum + (Number(x.duracion) || 0), 0);
     const texto = redactarFases(fases, f.unidad);
     const fase = fases[Math.min(active, fases.length - 1)];
@@ -336,6 +403,9 @@ const Constructor = ({ intro, onNavigate }) => {
                     </button>
                     <button type="button" className="ide-btn ide-btn--ghost" disabled={!texto} onClick={alCronograma}>
                         <CalendarDays size={16} /> Guardar y llevar al cronograma
+                    </button>
+                    <button type="button" className="ide-btn ide-btn--ghost" disabled={datosGrafico.fases.length < 2} onClick={() => setVerGrafico(true)}>
+                        <ImageIcon size={16} /> Ver el gráfico de las fases
                     </button>
                     {saved === 'fases' && <p className="ide-feedback ide-feedback--ok" role="status"><CheckCircle2 size={16} /><span>Guardadas. Ya aparecen en Mi proyecto.</span></p>}
                     {saved === 'crono' && (
@@ -484,6 +554,7 @@ const Constructor = ({ intro, onNavigate }) => {
                     </div>
                 </aside>
             </div>
+            <GraficoModal open={verGrafico} datos={datosGrafico} estilo={datosGrafico.estilo} onEstilo={(id) => { touch(); update({ estiloGrafico: id }); }} onClose={() => setVerGrafico(false)} />
         </div>
     );
 };
