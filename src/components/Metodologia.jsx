@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import EditorRico from './EditorRico';
 import {
     AlertTriangle, BarChart3, BookOpenCheck, Calculator, CalendarDays, CheckCircle2, ClipboardList, Compass, DollarSign, Layers, Microscope,
-    Loader2, Plus, ShieldCheck, Sparkles, Target, Trash2, Users, X, XCircle,
+    Loader2, Plus, ShieldCheck, Sparkles, Table2, Target, Trash2, Users, X, XCircle,
 } from 'lucide-react';
 import SlideDeck, { Opciones, Pestanas } from './deck/SlideDeck';
 import { useProject, useProjectField } from '../context/ProjectContext';
@@ -16,6 +16,8 @@ import {
 } from '../data/metodologia';
 import { SECTIONS, SLIDES } from '../data/metodologiaClase';
 import Instrumentos from './Instrumentos';
+import Operacionalizacion from './Operacionalizacion';
+import { filasValidas } from '../services/operacionalizacion';
 import { preguntasDe } from '../services/instrumentos';
 import { Generica } from './deck/Contenido';
 import ValidacionModal from './ValidacionModal';
@@ -278,6 +280,7 @@ const SUBTITULOS = [
     { key: 'diseno', label: 'Diseños de investigación', icon: Microscope },
     { key: 'poblacion', label: 'Población y muestra', icon: Users },
     { key: 'analisis', label: 'Plan de análisis de la información', icon: BarChart3 },
+    { key: 'variables', label: 'Operacionalización de variables', icon: Table2 },
     { key: 'instrumentos', label: 'Instrumentos de recolección de información', icon: ClipboardList },
     { key: 'cronograma', label: 'Cronograma', icon: CalendarDays },
     { key: 'presupuesto', label: 'Presupuesto', icon: DollarSign },
@@ -709,12 +712,14 @@ const Constructor = ({ intro, onNavigate }) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tab]);
     const totalPresupuesto = presupuesto.reduce((sum, item) => sum + (Number(item.costo) || 0), 0);
+    const [operacional] = useProjectField('operacionalizacion', []); // la edita su propia pestaña; aquí solo se cuenta
     const cuenta = {
         enfoque: enfoque ? 1 : 0,
         tipo: tipo ? 1 : 0,
         diseno: diseno && (DISENOS[enfoque] || []).some((d) => d.id === diseno) ? 1 : 0,
         poblacion: clean(partes.poblacionSugerida) ? 1 : 0,
         analisis: f.analisis.filter((x) => clean(x.tecnica)).length,
+        variables: filasValidas(operacional).length,
         instrumentos: f.instrumentos.filter((x) => clean(x.instrumento)).length,
         cronograma: f.cronograma.filter((x) => clean(x.actividad)).length,
         presupuesto: presupuesto.length,
@@ -804,7 +809,7 @@ const Constructor = ({ intro, onNavigate }) => {
             <header className="pla-builder-head">
                 <div>{intro}</div>
                 <div className="pla-status">
-                    <p className="obj-count"><b>{SUBTITULOS.filter((x) => cuenta[x.key] > 0).length} de 8 subtítulos</b> · muestra de {tamanoMuestra(calc)} · {money(totalPresupuesto)}</p>
+                    <p className="obj-count"><b>{SUBTITULOS.filter((x) => cuenta[x.key] > 0).length} de {SUBTITULOS.length} subtítulos</b> · muestra de {tamanoMuestra(calc)} · {money(totalPresupuesto)}</p>
                     <button type="button" className="ide-btn ide-btn--primary" onClick={save}>
                         <CheckCircle2 size={17} /> Guardar mi metodología
                     </button>
@@ -1012,6 +1017,8 @@ const Constructor = ({ intro, onNavigate }) => {
                             <button type="button" className="ide-btn ide-btn--ghost obj-add" onClick={() => { touch(); update({ analisis: [...f.analisis, { id: uid(), objetivo: '', tecnica: '', software: '' }] }); }}><Plus size={15} /> Agregar fila</button>
                         </div>
                     )}
+
+                    {tab === 'variables' && <Operacionalizacion />}
 
                     {tab === 'instrumentos' && (
                         <div className="mar-fichas">

@@ -86,3 +86,6 @@
 .met-val-estado li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; padding: 0.45rem 0.65rem; border-radius: 8px; background: #fef3c7; color: #78350f; font-size: 0.86rem; }
 .met-val-estado li[data-hecho='true'] { background: #dcfce7; color: #14532d; }
 .met-val-estado li span { flex: 1 1 240px; }
+
+.ins-faltan { margin: 0; padding: 0.55rem 0.75rem; border-radius: 0.5rem; background: #fffbeb; color: #92400e; font-size: 0.86rem; line-height: 1.5; }
+.ins-faltan svg { vertical-align: -2px; }

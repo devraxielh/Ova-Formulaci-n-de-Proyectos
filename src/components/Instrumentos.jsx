@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, ArrowDown, ArrowUp, BarChart3, CheckCircle2, ClipboardList, Copy, Globe, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, BarChart3, CheckCircle2, ClipboardList, Copy, Globe, Loader2, Plus, Sparkles, Table2, Trash2 } from 'lucide-react';
 import { useProject, useProjectField } from '../context/ProjectContext';
 import { api, groq } from '../services/api';
 import { partesObjetivos } from '../services/coherencia';
@@ -7,6 +7,7 @@ import { FRECUENCIA, TIPOS_PREGUNTA, UBICACIONES, definicionEncuesta, opcionesDe
 import './Proyecto.css';
 import './Instrumentos.css';
 import { Aviso } from './Avisos';
+import { filasValidas, indicadoresSinPregunta, matrizEnTexto, preguntasDesdeMatriz } from '../services/operacionalizacion';
 
 /*
  * Generador de instrumentos: arma la encuesta o la guía de entrevista a partir de los objetivos,
@@ -18,10 +19,11 @@ const TIPOS_INS = { encuesta: 'Encuesta (cuestionario)', entrevista: 'Guía de e
 
 const generar = async ({ tipo, aplicaA, cantidad, data }) => {
     const { general, especificos } = partesObjetivos(data.objetivos);
+    const matriz = matrizEnTexto(data.operacionalizacion);
     const r = await groq.chat.completions.create({
         messages: [
             { role: 'system', content: 'Eres metodólogo de investigación. Diseñas instrumentos de recolección de datos claros, neutrales y medibles para estudiantes universitarios. Cada pregunta mide una sola cosa, sin inducir la respuesta, sin dobles negaciones y con lenguaje sencillo. Respondes solo JSON válido en español.' },
-            { role: 'user', content: `Diseña ${tipo === 'entrevista' ? 'una guía de entrevista semiestructurada' : 'un cuestionario de encuesta'} para este proyecto.\n\nTÍTULO: ${String(data.titulo || '').trim()}\nPREGUNTA: ${String(data.pregunta || '').split('\n')[0]}\nOBJETIVO GENERAL: ${general || data.objetivoGeneral || ''}\nOBJETIVOS ESPECÍFICOS:\n${especificos.map((o, i) => `${i + 1}. ${o}`).join('\n') || '(sin definir)'}\nSE APLICA A: ${aplicaA || 'los participantes del estudio'}\n\nReglas:\n- ${cantidad} preguntas en total, repartidas entre los objetivos específicos que se pueden medir con este instrumento.\n- Empieza con 2 o 3 preguntas de caracterización (edad, sexo u otra pertinente).\n- ${tipo === 'entrevista' ? 'Todas las preguntas son de tipo "abierta", invitan a narrar y no se responden con sí o no.' : 'Usa sobre todo tipo "likert" (afirmaciones para valorar de acuerdo/desacuerdo) y "opcion"; máximo 2 preguntas "abierta".'}\n- tipo es uno de: "likert", "opcion", "multiple", "sino", "numero", "abierta".\n- En "opcion" y "multiple" da entre 3 y 6 opciones excluyentes y completas. En "likert" deja opciones vacío.\n- objetivo es el número del objetivo específico que mide (0 para caracterización).\n\nResponde exactamente: {"titulo": "nombre del instrumento", "intro": "presentación breve para el participante: propósito, que es voluntario y anónimo, y tiempo estimado", "preguntas": [{"texto": "...", "tipo": "...", "opciones": ["..."], "objetivo": 1}]}` },
+            { role: 'user', content: `Diseña ${tipo === 'entrevista' ? 'una guía de entrevista semiestructurada' : 'un cuestionario de encuesta'} para este proyecto.\n\nTÍTULO: ${String(data.titulo || '').trim()}\nPREGUNTA: ${String(data.pregunta || '').split('\n')[0]}\nOBJETIVO GENERAL: ${general || data.objetivoGeneral || ''}\nOBJETIVOS ESPECÍFICOS:\n${especificos.map((o, i) => `${i + 1}. ${o}`).join('\n') || '(sin definir)'}\nSE APLICA A: ${aplicaA || 'los participantes del estudio'}${matriz ? `\n\nOPERACIONALIZACIÓN (variable › dimensión › indicador): las preguntas deben medir estos indicadores y no otros.\n${matriz}` : ''}\n\nReglas:\n- ${cantidad} preguntas en total, repartidas entre los objetivos específicos que se pueden medir con este instrumento.\n- Empieza con 2 o 3 preguntas de caracterización (edad, sexo u otra pertinente).\n- ${tipo === 'entrevista' ? 'Todas las preguntas son de tipo "abierta", invitan a narrar y no se responden con sí o no.' : 'Usa sobre todo tipo "likert" (afirmaciones para valorar de acuerdo/desacuerdo) y "opcion"; máximo 2 preguntas "abierta".'}\n- tipo es uno de: "likert", "opcion", "multiple", "sino", "numero", "abierta".\n- En "opcion" y "multiple" da entre 3 y 6 opciones excluyentes y completas. En "likert" deja opciones vacío.\n- objetivo es el número del objetivo específico que mide (0 para caracterización).\n\nResponde exactamente: {"titulo": "nombre del instrumento", "intro": "presentación breve para el participante: propósito, que es voluntario y anónimo, y tiempo estimado", "preguntas": [{"texto": "...", "tipo": "...", "opciones": ["..."], "objetivo": 1}]}` },
         ],
         temperature: 0.4,
         max_tokens: 4000,
@@ -97,6 +99,7 @@ const Instrumentos = ({ onNavigate, embebido = false, fila = null }) => {
     const [publicadas, setPublicadas] = useState({});
     const [copiado, setCopiado] = useState(false);
     const { especificos } = partesObjetivos(data.objetivos);
+    const matriz = filasValidas(data.operacionalizacion); // variables, indicadores e ítems definidos en Metodología
     const ins = fila
         ? instrumentos.find((i) => i.filaId === fila.id) || null
         : instrumentos.find((i) => i.id === activo) || instrumentos[0] || null;
@@ -123,7 +126,11 @@ const Instrumentos = ({ onNavigate, embebido = false, fila = null }) => {
     const crear = async (conIA) => {
         setError('');
         const base = { id: uid(), ...(fila ? { filaId: fila.id } : {}), tipo: nuevo.tipo, aplicaA: nuevo.aplicaA.trim(), ubicacion: 'anexo', titulo: `${nuevo.tipo === 'entrevista' ? 'Guía de entrevista' : 'Cuestionario'}${nuevo.aplicaA.trim() ? ` para ${nuevo.aplicaA.trim()}` : ''}`, intro: '', preguntas: [] };
-        if (conIA) {
+        if (conIA === 'matriz') {
+            // Sin IA: cada ítem de la operacionalización pasa a ser una pregunta, con su objetivo y su indicador.
+            base.preguntas = preguntasDesdeMatriz(data.operacionalizacion, nuevo.tipo);
+            base.intro = `Este instrumento hace parte del proyecto «${String(data.titulo || '').trim() || 'de investigación'}». Tu participación es voluntaria y tus respuestas son anónimas; se usarán solo con fines académicos.`;
+        } else if (conIA) {
             setEstado('generando');
             try {
                 const g = await generar({ ...nuevo, data });
@@ -201,6 +208,7 @@ const Instrumentos = ({ onNavigate, embebido = false, fila = null }) => {
                     <button type="button" className="pro-btn pro-btn--primary" onClick={() => crear(true)} disabled={estado === 'generando'}>
                         {estado === 'generando' ? <Loader2 size={16} className="ins-spin" /> : <Sparkles size={16} />} {estado === 'generando' ? 'Generando preguntas…' : 'Generar con IA'}
                     </button>
+                    {matriz.some((x) => String(x.item || '').trim()) && <button type="button" className="pro-btn pro-btn--ghost" onClick={() => crear('matriz')} disabled={estado === 'generando'} title="Cada ítem de la tabla de operacionalización pasa a ser una pregunta"><Table2 size={16} /> Armar con mi operacionalización ({matriz.filter((x) => String(x.item || '').trim()).length} ítems)</button>}
                     <button type="button" className="pro-btn pro-btn--ghost" onClick={() => crear(false)} disabled={estado === 'generando'}><Plus size={16} /> Empezar en blanco</button>
                 </div>
                 <Aviso texto={error} tipo="error" />
@@ -224,6 +232,14 @@ const Instrumentos = ({ onNavigate, embebido = false, fila = null }) => {
                         <label className="ins-campo"><span>Presentación para el participante</span>
                             <textarea className="textarea-field" rows={3} value={ins.intro || ''} onChange={(e) => cambiar({ intro: e.target.value })} placeholder="Propósito del estudio, que la participación es voluntaria y anónima, y cuánto tarda." />
                         </label>
+                        {matriz.length > 0 && ins.preguntas.some((q) => q.indicador) && (() => {
+                            const faltan = indicadoresSinPregunta(matriz, ins.preguntas);
+                            return faltan.length > 0 ? (
+                                <p className="ins-faltan"><AlertTriangle size={15} aria-hidden="true" /> {faltan.length === 1 ? 'Un indicador de tu operacionalización no tiene pregunta' : `${faltan.length} indicadores de tu operacionalización no tienen pregunta`}: {faltan.slice(0, 4).map((x) => x.indicador).join('; ')}{faltan.length > 4 ? '…' : ''}.{' '}
+                                    <button type="button" className="pro-link" onClick={() => cambiar({ preguntas: [...ins.preguntas, ...preguntasDesdeMatriz(faltan, ins.tipo)] })}>Agregar sus preguntas</button>
+                                </p>
+                            ) : null;
+                        })()}
                         <ol className="ins-preguntas">
                             {ins.preguntas.map((q, i) => (
                                 <Pregunta key={q.id} q={q} n={i + 1} total={ins.preguntas.length} especificos={especificos} onChange={(patch) => cambiarPregunta(q.id, patch)} onMove={(d) => mover(i, d)} onRemove={() => cambiar({ preguntas: ins.preguntas.filter((x) => x.id !== q.id) })} />

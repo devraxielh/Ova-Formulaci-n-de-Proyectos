@@ -1,0 +1,27 @@
+/* Operacionalización de variables (pestaña de Metodología) */
+.ope { display: grid; gap: 0.7rem; }
+.ope-vacio, .ope-nota { margin: 0; font-size: 0.86rem; color: #64748b; }
+.ope-aviso { margin: 0; padding: 0.5rem 0.75rem; border-radius: 0.5rem; background: #fffbeb; color: #92400e; font-size: 0.86rem; }
+.ope-tabla-wrap { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 0.7rem; background: #fff; }
+.ope-tabla { width: 100%; min-width: 980px; border-collapse: collapse; font-size: 0.86rem; }
+.ope-tabla th { text-align: left; font-size: 0.78rem; font-weight: 600; color: #475569; padding: 0.5rem 0.5rem; border-bottom: 1px solid #e2e8f0; white-space: nowrap; background: #f8fafc; }
+.ope-tabla td { padding: 0.4rem; vertical-align: top; border-bottom: 1px solid #f1f5f9; }
+.ope-tabla tr[data-grupo='inicio'] td { border-top: 1px solid #cbd5e1; }
+.ope-tabla tbody tr:first-child td { border-top: 0; }
+.ope-tabla tbody tr:last-child td { border-bottom: 0; }
+.ope-tabla .textarea-field, .ope-tabla .input-field { width: 100%; min-width: 0; padding: 0.35rem 0.5rem; font-size: 0.85rem; line-height: 1.4; min-height: 0; height: auto; resize: vertical; }
+.ope-tabla td:nth-child(1) { width: 8.5rem; }
+.ope-tabla td:nth-child(7) { width: 9.5rem; }
+.ope-tabla td:nth-child(8) { width: 2.4rem; }
+.ope-tipo, .ope-opciones { margin-top: 0.3rem; }
+.ope-acciones { display: grid; gap: 0.25rem; }
+.ope-acciones button { display: grid; place-items: center; width: 1.9rem; height: 1.9rem; border: 1px solid #e2e8f0; border-radius: 0.45rem; background: #fff; color: #64748b; cursor: pointer; }
+.ope-acciones button:hover { background: #f1f5f9; color: #1e293b; }
+/* Columnas con ancho cómodo para leer y escribir; la tabla se desplaza dentro de su marco. */
+.ope-tabla { min-width: 1240px; }
+.ope-tabla .textarea-field, .ope-tabla .input-field { font-family: inherit; }
+.ope-tabla td:nth-child(2) { min-width: 11rem; }
+.ope-tabla td:nth-child(3) { min-width: 14rem; }
+.ope-tabla td:nth-child(4) { min-width: 10rem; }
+.ope-tabla td:nth-child(5) { min-width: 13rem; }
+.ope-tabla td:nth-child(6) { min-width: 17rem; }

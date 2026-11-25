@@ -1,3 +1,4 @@
+import { tablaOperacionalizacion } from './operacionalizacion.js';
 import { arbolCompleto, arbolSvg, explicacionArbol, leerArbol, leerArbolObjetivos } from './arbol.js';
 import { ordenarReferencias, referenciaAPA } from './apa.js';
 import { partesObjetivos } from './coherencia.js';
@@ -292,6 +293,8 @@ const partesAnexos = (d) => {
     const partes = [];
     const matriz = d.matrizOculta ? null : matrizConsistencia(d);
     if (matriz) partes.push({ titulo: 'Matriz de consistencia', blocks: [matriz] });
+    const operacional = tablaOperacionalizacion(d);
+    if (operacional) partes.push({ id: 'operacionalizacion', titulo: /cualitativ/i.test(String(d.enfoque || '')) ? 'Matriz de categorías de análisis' : 'Matriz de operacionalización de variables', blocks: [operacional] });
     list(d.instrumentosGen).forEach((ins) => {
         if (ins && ubicacionDe(ins) === 'anexo' && preguntasDe(ins).length > 0) partes.push({ id: ins.id, titulo: text(ins.titulo) || 'Instrumento de recolección', blocks: bloquesInstrumento(ins) });
     });
@@ -326,7 +329,7 @@ export const CAMPOS_SECCION = {
     justificacion: ['justificacion', 'justificacionForm'],
     alcances: ['alcances', 'alcancesForm', 'limitaciones'],
     marco: ['marcoAntecedentes', 'marcoTeorico', 'marcoConceptual', 'marcoContextual', 'marcoLegal', 'marcoForm'],
-    metodologia: ['metodologia', 'metodologiaForm', 'metEnfoque', 'metTipo', 'metDiseno', 'metPlanAnalisis', 'poblacionSugerida', 'poblacionTamano', 'poblacionTipo', 'muestraConfianza', 'muestraError', 'instrumentos', 'presupuesto', 'cronogramaItems', 'ganttPeriodos', 'ganttUnidad', 'enfoque', 'tipoInvestigacion', 'diseno', 'instrumentosGen'],
+    metodologia: ['operacionalizacion', 'metodologia', 'metodologiaForm', 'metEnfoque', 'metTipo', 'metDiseno', 'metPlanAnalisis', 'poblacionSugerida', 'poblacionTamano', 'poblacionTipo', 'muestraConfianza', 'muestraError', 'instrumentos', 'presupuesto', 'cronogramaItems', 'ganttPeriodos', 'ganttUnidad', 'enfoque', 'tipoInvestigacion', 'diseno', 'instrumentosGen'],
     fases: ['fases', 'fasesForm'],
     resultados: ['resultados', 'discusion', 'resultadosForm', 'elementos', 'cualitativo'],
     conclusiones: ['conclusiones', 'conclusionesForm', 'recomendaciones'],

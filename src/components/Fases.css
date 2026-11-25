@@ -68,3 +68,7 @@
 /* La ventana se dibuja fuera de la clase (en el body): el botón principal necesita su propio color. */
 .fas-modal .ide-btn--primary { background: #4f46e5; border-color: #4f46e5; color: #fff; }
 .fas-modal .ide-btn--primary:hover { background: #4338ca; }
+
+/* Resultados: de la encuesta al documento */
+.res-punta { padding: 0.7rem 0.85rem; border-radius: 0.7rem; background: #eef2ff; border: 1px solid #c7d2fe; }
+.res-punta .ide-btn { white-space: normal; text-align: left; }

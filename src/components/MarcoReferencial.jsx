@@ -19,6 +19,7 @@ import { autorCita } from '../services/apa';
 import { groq } from '../services/api';
 import './Marco.css';
 import './Alcances.css';
+import { Integrado, SinFuente } from './MarcoFuentes';
 
 /* Clase larga de 4 horas: el contenido de cada diapositiva está en data/marcoClase.js. */
 
@@ -122,9 +123,10 @@ const redactarNormas = (items) => [...items]
     })
     .join('\n\n');
 
+// Si el estudiante pidió la redacción integrada de un apartado (f.integrado), ese texto reemplaza al de un párrafo por ficha.
 const redactar = (f) => ({
-    marcoAntecedentes: redactarAntecedentes(f.antecedentes),
-    marcoTeorico: redactarTeorias(f.teorias),
+    marcoAntecedentes: String(f.integrado?.antecedentes || '').trim() || redactarAntecedentes(f.antecedentes),
+    marcoTeorico: String(f.integrado?.teorico || '').trim() || redactarTeorias(f.teorias),
     marcoConceptual: redactarConceptos(f.conceptos),
     marcoContextual: redactarContexto(f.contexto),
     marcoLegal: redactarNormas(f.normas),
@@ -622,6 +624,17 @@ const Constructor = ({ intro, onNavigate }) => {
                         })}
                     </div>
                     <p className="ide-field-hint mar-pregunta">{APARTADOS.find((a) => a.key === tab).pregunta}</p>
+                    {(tab === 'antecedentes' || tab === 'teorico') && (
+                        <Integrado
+                            key={`integrado-${tab}`}
+                            apartado={tab}
+                            f={f}
+                            valor={String(f.integrado?.[tab] || '')}
+                            onChange={(v) => { touch(); update({ integrado: { ...(f.integrado || {}), [tab]: v } }); }}
+                            proyecto={{ titulo, pregunta: clean(pregunta), problema: clean(idea.problema) }}
+                        />
+                    )}
+                    {['antecedentes', 'teorico', 'conceptual'].includes(tab) && <SinFuente apartado={tab} f={f} texto={partes[APARTADOS.find((a) => a.key === tab).field]} />}
 
                     {/* Búsqueda en bases de datos: en antecedentes, marco teórico y marco conceptual. La ficha se llena con el resumen. */}
                     {FICHA_DE[tab]?.buscar && (

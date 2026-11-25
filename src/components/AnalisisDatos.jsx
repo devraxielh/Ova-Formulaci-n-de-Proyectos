@@ -21,7 +21,7 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 const limpio = (nombre) => String(nombre).replace(/[¿?]/g, '').replace(/[.:\s]+$/, '').trim();
 
 // Gráfico de barras horizontales en un lienzo (PNG 1200 px de ancho, sobrio y legible al imprimir).
-const dibujarBarras = (v) => {
+export const dibujarBarras = (v) => {
     const items = v.frec.items;
     const W = 1200;
     const alto = 64;

@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import EditorRico from './EditorRico';
-import { AlertTriangle, BarChart3, CheckCircle2, Loader2, MessageSquareText, Sparkles } from 'lucide-react';
-import { recomendarResultados, reunirResultados } from '../services/resultadosIA';
+import { AlertTriangle, BarChart3, CheckCircle2, Loader2, MessageSquareText, Sparkles, Workflow } from 'lucide-react';
+import { recomendarConclusiones, recomendarResultados, reunirResultados } from '../services/resultadosIA';
+import { analizarPorObjetivo, objetivosDePreguntas } from '../services/resultadosPunta';
 import SlideDeck from './deck/SlideDeck';
 import { Generica } from './deck/Contenido';
 import { useProject, useProjectField } from '../context/ProjectContext';
@@ -13,12 +14,13 @@ import './Planteamiento.css';
 import './Objetivos.css';
 import './Justificacion.css';
 import Elementos from './Elementos';
-import AnalisisDatos from './AnalisisDatos';
+import AnalisisDatos, { dibujarBarras } from './AnalisisDatos';
+import { redactarConclusiones } from './Conclusiones';
 import { api } from '../services/api';
 import './Marco.css';
 import './Alcances.css';
 import './Fases.css';
-import { confirmar } from './Avisos';
+import { avisar, confirmar } from './Avisos';
 
 const SLIDE_KEY = 'projectsia:resultados:diapositiva';
 
@@ -186,6 +188,87 @@ const Constructor = ({ intro, onNavigate }) => {
     };
     // Guardado automático: lo redactado pasa a Mi proyecto sin tener que tocar «Guardar».
     useAutoGuardar(textos.resultados || textos.discusion ? JSON.stringify(textos) : '', save);
+
+    /* De la encuesta al documento, en un solo paso:
+       respuestas → análisis de cada objetivo según el plan → tablas y figuras en Resultados → resultados y discusión → conclusiones.
+       Las cifras las calcula el código; la IA solo redacta con ellas. */
+    const { setField } = useProject();
+    const [, setElementos] = useProjectField('elementos', []);
+    const [punta, setPunta] = useState(''); // paso en curso ('' = no está corriendo)
+    const guardarTras = useRef(false);
+    useEffect(() => {
+        if (guardarTras.current && (textos.resultados || textos.discusion)) { guardarTras.current = false; save(); }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [JSON.stringify(textos)]);
+    const dePuntaAPunta = async () => {
+        if (!project?.id) return;
+        if (hayTexto && !(await confirmar({ texto: '¿Rehacer resultados, discusión y conclusiones con los datos de la encuesta?', detalle: 'Se reemplaza lo que tienes escrito en esas secciones y las tablas y figuras que se generaron antes de esta forma. Las que agregaste tú se conservan. Lo anterior queda en el historial de versiones.', aceptar: 'Rehacer con mis datos', peligro: true }))) return;
+        try {
+            setPunta('Leyendo las respuestas de la encuesta…');
+            const { surveys } = await api.surveys(project.id);
+            const armados = Array.isArray(data.instrumentosGen) ? data.instrumentosGen : [];
+            const encuestas = [];
+            for (const s of (surveys || []).filter((x) => x.count > 0)) {
+                // eslint-disable-next-line no-await-in-loop
+                const r = await api.surveyResponses(project.id, s.instrumentId);
+                encuestas.push({ titulo: r.definition?.titulo, definition: r.definition, responses: r.responses, objetivoDe: objetivosDePreguntas(r.definition, s.instrumentId, armados) });
+            }
+            if (!encuestas.length) { setPunta(''); avisar('Tu encuesta todavía no tiene respuestas. Publícala desde Metodología › Instrumentos y vuelve cuando haya datos.', 'error'); return; }
+
+            setPunta('Corriendo el análisis de tu plan…');
+            const an = analizarPorObjetivo({ encuestas, especificos, plan: data.metodologiaForm?.analisis });
+            if (!an.tablas.length) { setPunta(''); avisar('No se pudo analizar: las preguntas de la encuesta no tienen respuestas que se puedan contar.', 'error'); return; }
+            const sinMedir = especificos.map((_, i) => i + 1).filter((k) => an.porObjetivo[k]?.sinDatos);
+
+            setPunta('Armando tablas y figuras…');
+            const uid = () => Math.random().toString(36).slice(2, 9);
+            const nuevos = an.tablas.map((x) => ({ id: uid(), seccion: 'resultados', tipo: 'tabla', auto: true, titulo: x.titulo, nota: x.nota, head: x.head, rows: x.rows }));
+            for (const fig of an.figuras.slice(0, 4)) {
+                try {
+                    const canvas = dibujarBarras(fig.variable);
+                    // eslint-disable-next-line no-await-in-loop
+                    const { file } = await api.uploadFile(project.id, { mime: 'image/png', data: canvas.toDataURL('image/png').split(',')[1] });
+                    nuevos.push({ id: uid(), seccion: 'resultados', tipo: 'figura', auto: true, titulo: fig.titulo, nota: fig.nota, fileId: file.id, w: canvas.width, h: canvas.height });
+                } catch { /* sin esa figura: sigue con las tablas */ }
+            }
+            const previos = (Array.isArray(data.elementos) ? data.elementos : []);
+            previos.filter((e) => e?.auto && e.seccion === 'resultados' && e.fileId).forEach((e) => api.deleteFile(project.id, e.fileId).catch(() => {}));
+            const propios = previos.filter((e) => !(e?.auto && e.seccion === 'resultados'));
+            setElementos([...propios, ...nuevos]);
+
+            setPunta('Redactando resultados y discusión…');
+            const otros = await reunirResultados(project.id, { ...data, elementos: propios }).catch(() => ({ texto: '' }));
+            const res = await recomendarResultados({
+                data, especificos, datos: `ANÁLISIS POR OBJETIVO (calculado con las respuestas de la encuesta)\n${an.resumen}${otros.texto ? `\n\nDETALLE DE LAS PREGUNTAS Y OTRAS FUENTES\n${otros.texto}` : ''}`,
+                antecedentes: antecedentes.map((a) => ({ ...a, cita: citaDe(a) })),
+                teorias: teorias.map((x) => ({ ...x, nombre: clean(x.nombre) })),
+                tablas: [...propios.filter((e) => e.seccion === 'resultados' && clean(e.titulo)).map((e) => clean(e.titulo)), ...an.tablas.map((x) => x.titulo)],
+                limitacionesAlcances,
+            });
+            touch();
+            guardarTras.current = true;
+            update({ ...res, sugeridos: true });
+
+            setPunta('Redactando conclusiones y recomendaciones…');
+            let conConclusiones = false;
+            try {
+                const conc = await recomendarConclusiones({ data, especificos, resultados: res });
+                const tx = redactarConclusiones(conc, especificos);
+                setField('conclusionesForm', { ...conc, sugeridas: true });
+                setField('conclusiones', tx.conclusiones);
+                setField('recomendaciones', tx.recomendaciones);
+                conConclusiones = Boolean(tx.conclusiones);
+            } catch { /* los resultados quedan; las conclusiones se pueden pedir en su módulo */ }
+            setDatos(null);
+            reunir().catch(() => {});
+            setPunta('');
+            const nFig = nuevos.length - an.tablas.length;
+            avisar(`Listo con ${an.n} respuestas: ${an.tablas.length} ${an.tablas.length === 1 ? 'tabla' : 'tablas'}${nFig ? ` y ${nFig} ${nFig === 1 ? 'figura' : 'figuras'}` : ''} en Resultados, resultados y discusión redactados${conConclusiones ? ' y conclusiones escritas' : ''}.${sinMedir.length ? ` Sin datos para ${sinMedir.length === 1 ? `el objetivo ${sinMedir[0]}` : `los objetivos ${sinMedir.join(', ')}`}: ninguna pregunta de la encuesta ${sinMedir.length === 1 ? 'lo mide' : 'los mide'}.` : ''} Revisa cada cifra contra sus tablas.`);
+        } catch (err) {
+            setPunta('');
+            avisar(err?.message && !/JSON/.test(err.message) ? `No se pudo completar: ${err.message}` : 'No se pudo completar la redacción. Las tablas que ya se armaron quedan en Resultados; inténtalo de nuevo.', 'error');
+        }
+    };
     const listos = especificos.filter((_, i) => clean(f.porObjetivo?.[i]?.hallazgo)).length;
 
     if (especificos.length === 0) {
@@ -213,8 +296,16 @@ const Constructor = ({ intro, onNavigate }) => {
 
             <div className="pla-builder">
                 <div className="obj-form">
+                    {conRespuestas > 0 && (
+                        <div className="res-llenar res-punta">
+                            <button type="button" className="ide-btn ide-btn--primary" disabled={Boolean(punta) || llenando === 'pensando'} onClick={dePuntaAPunta}>
+                                {punta ? <Loader2 size={16} className="fas-gira" /> : <Workflow size={16} />} {punta || 'De la encuesta al documento'}
+                            </button>
+                            <span>{punta ? 'Puede tardar un minuto. No cierres esta página.' : `Con las ${conRespuestas} respuestas de tu encuesta: corre el análisis de tu plan para cada objetivo, inserta las tablas y figuras, y redacta resultados, discusión y conclusiones. Las cifras las calcula la app, no la IA.`}</span>
+                        </div>
+                    )}
                     <div className="res-llenar">
-                        <button type="button" className="ide-btn ide-btn--primary" disabled={llenando === 'pensando' || !datos} onClick={() => llenarTodo(true)}>
+                        <button type="button" className="ide-btn ide-btn--primary" disabled={llenando === 'pensando' || !datos || Boolean(punta)} onClick={() => llenarTodo(true)}>
                             {llenando === 'pensando' || !datos ? <Loader2 size={16} className="fas-gira" /> : <Sparkles size={16} />} {llenando === 'pensando' ? 'Redactando con tus resultados…' : !datos ? 'Reuniendo tus datos…' : 'Llenar todo con mis resultados'}
                         </button>
                         <span>

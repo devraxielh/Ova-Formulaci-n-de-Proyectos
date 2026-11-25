@@ -48,7 +48,7 @@ const inicioDesdeObjetivo = (objetivo) => {
     return `Se ${pasado(verbo, plural)} ${resto.join(' ')}`;
 };
 
-const redactar = (form, especificos) => {
+export const redactarConclusiones = (form, especificos) => {
     const lista = especificos
         .map((_, i) => clean(form.especificas?.[i]))
         .map((txt, i) => (txt ? `${i + 1}. ${capital(txt)}.` : ''))
@@ -113,7 +113,7 @@ const Constructor = ({ intro, onNavigate }) => {
     const [saved, setSaved] = useState(false);
     const touch = () => setSaved(false);
     const n = especificos.length;
-    const textos = redactar(f, especificos);
+    const textos = redactarConclusiones(f, especificos);
     const setEsp = (i, v) => { touch(); update({ especificas: { ...f.especificas, [i]: v } }); };
     const borrador = (i) => {
         const h = hallazgos[i] || {};

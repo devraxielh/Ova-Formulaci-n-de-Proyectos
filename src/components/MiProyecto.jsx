@@ -11,6 +11,7 @@ import { fasesPng } from '../services/fasesGrafico';
 import { TEMAS, temaDe } from '../data/temasDiapositivas';
 import './Proyecto.css';
 import { Aviso } from './Avisos';
+import Propagar from './Propagar';
 
 // Mismo orden que el menú lateral.
 const MENU_ORDER = ['ideacion', 'titulo', 'pregunta', 'arbol', 'arbolobjetivos', 'planteamiento', 'objetivos', 'introduccion', 'justificacion', 'alcances', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'resumen', 'referencias'];
@@ -401,6 +402,7 @@ const MiProyecto = ({ onNavigate }) => {
                 ))}
             />
 
+            <Propagar />
             <Coherencia data={data} onNavigate={onNavigate} enVentana />
 
             <div className="pro-grid">
