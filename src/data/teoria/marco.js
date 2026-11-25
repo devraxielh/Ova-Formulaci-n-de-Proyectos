@@ -276,7 +276,7 @@ export default {
             ['Describe, no argumenta', 'Aquí no explicas causas ni justificas el estudio: presentas datos del lugar y de la población. Las cifras del **problema** van en el planteamiento; las del **lugar**, aquí.'],
             ['Embudo corto', 'Dedica una o dos oraciones al municipio, un párrafo a la institución y otro a la población. La mayor parte del espacio es para lo que está más cerca de tu estudio.'],
         ],
-        ejemplo: '«4 de cada 10 citas de medicina interna se pierden» es un dato del problema: va en el planteamiento. «El hospital tiene 12 consultorios de consulta externa y atiende de lunes a viernes» es un dato del contexto.',
+        ejemplo: '«Una de cada cinco citas de consulta externa se pierde» es un dato del problema: va en el planteamiento. «El hospital tiene 12 consultorios de consulta externa y atiende de lunes a viernes» es un dato del contexto.',
         ojo: 'No copies la reseña histórica del municipio ni la misión completa de la institución. Selecciona solo los datos que ayudan a entender tu población.',
     },
     'ctx-niveles': {

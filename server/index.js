@@ -970,7 +970,7 @@ app.post('/api/projects/:id/members', requireUser, ownProject, inviteLimit, asyn
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 200) return res.status(400).json({ error: 'Escribe un correo válido.' });
     if (email === emailOf(req.user)) return res.status(400).json({ error: 'Ese es tu propio correo.' });
     const count = db.prepare('SELECT COUNT(*) AS n FROM project_members WHERE project_id = ?').get(req.project.id).n;
-    if (count >= MAX_MEMBERS) return res.status(400).json({ error: `Un proyecto puede tener hasta ${MAX_MEMBERS} invitados.` });
+    if (count >= MAX_MEMBERS) return res.status(400).json({ error: `Un proyecto puede tener hasta ${MAX_MEMBERS} integrantes invitados.` });
     const info = db.prepare('INSERT OR IGNORE INTO project_members (project_id, email) VALUES (?, ?)').run(req.project.id, email);
     let mailed = false;
     if (info.changes && mailer) {
@@ -1551,7 +1551,7 @@ app.post('/api/admin/projects/:id/transfer', requireAdmin, (req, res) => {
         db.prepare('DELETE FROM project_members WHERE project_id = ? AND email = ?').run(row.id, nuevo.email); // el dueño no figura como invitado
         if (req.body?.keepAccess && anterior && String(anterior.email).includes('@')) db.prepare('INSERT OR IGNORE INTO project_members (project_id, email) VALUES (?, ?)').run(row.id, anterior.email);
     })();
-    bitacora(req, 'Traspasó un proyecto', `«${row.name}» (#${row.id}): de ${anterior?.email || 'cuenta eliminada'} a ${nuevo.email}${req.body?.keepAccess ? '; el anterior queda invitado' : ''}`);
+    bitacora(req, 'Traspasó un proyecto', `«${row.name}» (#${row.id}): de ${anterior?.email || 'cuenta eliminada'} a ${nuevo.email}${req.body?.keepAccess ? '; el anterior queda como integrante' : ''}`);
     return res.json({ project: projectRow(db.prepare('SELECT * FROM projects WHERE id = ?').get(row.id)), owner: nuevo });
 });
 
@@ -1605,7 +1605,7 @@ app.get('/api/admin/usage', requireAdmin, (req, res) => {
     });
     const top = db.prepare(`SELECT u.id, u.name, u.email, u.grupo, SUM(d.n) AS total, SUM(CASE WHEN d.kind = 'ia' THEN d.n ELSE 0 END) AS ia,
                                    SUM(CASE WHEN d.kind = 'guardado' THEN d.n ELSE 0 END) AS guardado, COUNT(DISTINCT d.day) AS dias
-                            FROM usage_daily d JOIN users u ON u.id = d.user_id WHERE d.day >= ? AND d.kind != 'ia_extra' GROUP BY u.id ORDER BY total DESC LIMIT 10`).all(desde);
+                            FROM usage_daily d JOIN users u ON u.id = d.user_id WHERE d.day >= ? AND d.kind NOT IN ('ia_extra', 'normas_nueva') GROUP BY u.id ORDER BY total DESC LIMIT 10`).all(desde);
     const hoy = diaDe();
     res.json({
         dias,
@@ -2381,6 +2381,7 @@ app.post('/api/buscar/teorias', requireUser, searchLimit, async (req, res) => {
 // así una misma consulta de varios estudiantes cuenta una sola vez.
 const NORMAS_CACHE = new Map(); // clave → { hasta, datos }
 const NORMAS_TTL = 24 * 60 * 60 * 1000;
+const NORMAS_POR_CUENTA = Math.max(1, parseInt(process.env.NORMAS_DAILY_PER_USER, 10) || 20);
 let normasRestantes = null; // lo que Rulex dice que queda hoy; null = aún no se sabe
 
 app.get('/api/buscar/normas', requireUser, searchLimit, async (req, res) => {
@@ -2390,9 +2391,15 @@ app.get('/api/buscar/normas', requireUser, searchLimit, async (req, res) => {
     if (!RULEX_API_KEY) return res.status(503).json({ error: 'La búsqueda de normas no está configurada.', code: 'no_key' });
     const clave = `${fuente}|${q.toLowerCase()}`;
     const guardada = NORMAS_CACHE.get(clave);
+    // El cupo del proveedor es de toda la plataforma (150 al día): cada cuenta puede gastar como mucho NORMAS_POR_CUENTA.
+    // Las búsquedas ya guardadas no gastan cupo y siguen respondiendo.
+    if (!(guardada && guardada.hasta > Date.now()) && req.user.role !== 'admin' && usoDeHoy(req.user.id, 'normas_nueva') >= NORMAS_POR_CUENTA) {
+        return res.status(429).json({ error: `Llegaste al máximo de ${NORMAS_POR_CUENTA} búsquedas nuevas de normas por día. Mañana se renueva; mientras tanto puedes agregar la norma a mano.`, code: 'cuota_normas' });
+    }
     contarUso('normas', req.user.id);
     if (guardada && guardada.hasta > Date.now()) return res.json({ ...guardada.datos, restantes: normasRestantes });
     contarUso('normas_consulta', 0); // consulta real al proveedor: es la que gasta el cupo diario
+    contarUso('normas_nueva', req.user.id);
     try {
         const r = await fetch('https://rulex.org/api/data/query', {
             method: 'POST',

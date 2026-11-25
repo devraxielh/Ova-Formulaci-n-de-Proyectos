@@ -6,7 +6,7 @@ export default {
             ['Texto que describe', 'Expone hechos comprobables sobre la situación, en tercera persona y en presente. No pide apoyo ni promete beneficios: de eso se encarga la justificación, que viene después.'],
             ['Una prueba para cada oración', 'Pregunta a cada frase: ¿describe lo que pasa (planteamiento), dice por qué conviene estudiarlo (justificación), explica un concepto (marco teórico) o anuncia lo que harás (objetivos)?'],
         ],
-        ejemplo: '«En 2025, 4 de cada 10 pacientes de consulta externa no asistieron a su cita» es planteamiento. «Conocer las causas permitirá recuperar esos cupos» es justificación. «Se diseñará un sistema de recordatorios» es solución.',
+        ejemplo: '«En 2025 se perdió una de cada cinco citas de consulta externa» es planteamiento. «Conocer las causas permitirá recuperar esos cupos» es justificación. «Se diseñará un sistema de recordatorios» es solución.',
         ojo: 'Puedes mencionar un concepto clave en el planteamiento, pero no desarrollarlo. Si un párrafo explica una teoría, pásalo al marco teórico.',
     },
     embudo: {
@@ -15,7 +15,7 @@ export default {
             ['El mismo fenómeno en cada nivel', 'Lo que se estrecha es el **lugar y la población**, no el tema. Si arriba hablas de deserción y abajo de reprobación, explica en una frase cómo se conectan.'],
             ['Proporción del texto', 'El contexto ocupa la parte menor. La mayor parte del planteamiento se dedica a tu institución y tu población: ahí están tu dato, tus causas y tus consecuencias.'],
         ],
-        ejemplo: 'Para el hospital: «La inasistencia a citas programadas es frecuente en los servicios de salud del país. En Sucre afecta sobre todo a la consulta externa. En un hospital de Sincelejo, 4 de cada 10 citas se perdieron en 2025».',
+        ejemplo: 'Para el hospital: «La inasistencia a citas programadas es frecuente en los servicios de salud del país. En Sucre afecta sobre todo a la consulta externa. En un hospital de Sincelejo, una de cada cinco citas se perdió en 2025».',
         ojo: 'Si después de tres o cuatro oraciones todavía no has nombrado tu población ni tu lugar, el embudo empieza demasiado arriba. Recorta el comienzo.',
     },
     partes: {
@@ -60,7 +60,7 @@ export default {
             ['Revisión con colores', 'Marca con un color cada parte: contexto, problema, causas, consecuencias y cierre. Lo que quede sin color sobra o está en la sección equivocada; el color que falte es la parte ausente.'],
             ['Impersonal y sin adjetivos', 'Se escribe en tercera persona. Palabras como «grave», «alarmante» o «preocupante» son valoraciones: reemplázalas por la cifra que permite al lector sacar esa conclusión por su cuenta.'],
         ],
-        ejemplo: 'Con opinión: «Es alarmante que los pacientes no valoren sus citas». Con evidencia: «En 2025 se perdieron 4 de cada 10 citas de consulta externa; el olvido de la fecha fue la razón más reportada por los pacientes».',
+        ejemplo: 'Con opinión: «Es alarmante que los pacientes no valoren sus citas». Con evidencia: «En 2025 se perdió una de cada cinco citas de consulta externa; el olvido de la fecha fue la razón más reportada por los pacientes».',
         ojo: 'Revisa después de dejar reposar el texto, o pide a un compañero que lo lea. Recién escrito, casi nadie ve sus propios vacíos.',
     },
     reescribe: {
@@ -69,7 +69,7 @@ export default {
             ['Preguntas para delimitar', '¿De quiénes hablo exactamente? ¿En qué lugar? ¿En qué periodo? Si la oración no responde al menos las dos primeras, todavía es una generalidad sin dueño.'],
             ['Qué hacer con lo que quitas', 'La solución que borras va a los objetivos o a la metodología; la opinión, si encuentras respaldo, se convierte en una causa con su fuente. Nada valioso se pierde.'],
         ],
-        ejemplo: 'Antes: «Los pacientes son irresponsables y faltan mucho, por eso hace falta una aplicación». Después: «En 2025, el 42 % de los pacientes de consulta externa de un hospital de Sincelejo no asistió a su cita (Oficina de Estadística, 2025)».',
+        ejemplo: 'Antes: «Los pacientes son irresponsables y faltan mucho, por eso hace falta una aplicación». Después: «En 2025 se perdió el 22 % de las citas de consulta externa de un hospital de Sincelejo (Oficina de Estadística, 2025)».',
         ojo: 'No agregues un dato solo para que haya un número. Debe medir exactamente lo que la oración afirma, en tu población o en la más cercana.',
     },
     coherencia: {

@@ -69,7 +69,7 @@ export const SLIDES = construccionPrimero([
         bullets: ['Sí: datos, cifras, tablas, figuras y citas de los participantes.', 'Sí: el resultado de las pruebas estadísticas.', 'No: opiniones, explicaciones ni comparaciones con otros autores (eso va en la discusión).', 'No: repetir la metodología.'],
         panel: {
             type: 'table', title: 'Resultados en pasado', head: ['Evita', 'Prefiere'], rows: [
-                ['Los pacientes olvidan sus citas.', 'El 41 % de los pacientes olvidó su cita.'],
+                ['Los pacientes olvidan sus citas.', 'El 41 % de los pacientes reportó el olvido como causa principal.'],
                 ['Se encontrará una relación.', 'Se encontró una relación positiva moderada.'],
                 ['Claramente, el olvido es lo peor.', 'El olvido fue la causa más frecuente.'],
             ],

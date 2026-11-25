@@ -15,7 +15,7 @@ export default {
             ['¿Para quién y para qué?', 'Los **beneficiarios** (directos e indirectos) y el **uso** de los resultados: una decisión, un programa, una política o una herramienta.'],
             ['¿Se puede?', 'La viabilidad cierra el argumento: hay acceso a la población, tiempo, recursos y permisos. Un estudio valioso pero imposible no se aprueba.'],
         ],
-        ejemplo: 'Por qué: 3 de cada 10 citas se pierden. Para quién: pacientes y hospital. Para qué: ajustar los recordatorios. ¿Se puede?: el hospital autorizó el acceso a la agenda del último año.',
+        ejemplo: 'Por qué: una de cada cinco citas se pierde. Para quién: pacientes y hospital. Para qué: ajustar los recordatorios. ¿Se puede?: el hospital autorizó el acceso a la agenda del último año.',
         ojo: 'Responder solo «por qué me interesa» es motivación personal. La pregunta es por qué le interesa a los demás.',
     },
     criterios: {
@@ -42,7 +42,7 @@ export default {
             ['Fuente, lugar y año', 'Un dato sin fuente no convence. Prefiere fuentes oficiales o académicas, lo más cercanas posible a tu población y de los últimos cinco años.'],
             ['Afirmación + evidencia + consecuencia', 'Estructura de un buen argumento: lo que afirmas, el dato que lo sostiene y lo que eso implica para tu estudio.'],
         ],
-        ejemplo: '«La inasistencia genera pérdidas para el sistema (afirmación). En el hospital se perdieron 4 de cada 10 cupos de medicina interna en 2025, según su oficina de estadística (evidencia). Conocer sus causas permitirá recuperar esos cupos (consecuencia)».',
+        ejemplo: '«La inasistencia genera pérdidas para el sistema (afirmación). En el hospital se perdió una de cada cinco citas de consulta externa en 2025, según su oficina de estadística (evidencia). Conocer sus causas permitirá recuperar esos cupos (consecuencia)».',
         ojo: 'Usa solo cifras que puedas rastrear hasta su fuente. Una cifra inventada o «aproximada» invalida todo el argumento ante un evaluador.',
     },
     conectores: {

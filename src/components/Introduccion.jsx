@@ -80,7 +80,7 @@ const PARTES = [
     {
         key: 'objetivo', label: 'Objetivo y pregunta', color: 'donde',
         what: 'Presenta lo que busca tu investigación: tu objetivo general y tu pregunta, tal como están en tu proyecto.',
-        hint: 'Escribe tu objetivo general y tu pregunta tal como están en tu proyecto.',
+        hint: 'Sale de tus Objetivos y de tu Pregunta.',
         placeholder: 'Ej: En consecuencia, esta investigación tiene como objetivo analizar los factores asociados a…, para responder a la pregunta: ¿…?',
         conectores: ['En consecuencia,', 'Por lo anterior,', 'Este estudio tiene como objetivo', 'Así, se busca responder'],
     },
@@ -225,7 +225,7 @@ const ALFINAL = [
 
 const EMBUDO = [
     { label: 'Tema general', text: 'En la actualidad, la inasistencia a citas médicas afecta la eficiencia de los servicios de salud en el país.', note: 'Contexto amplio.' },
-    { label: 'Tu problema', text: 'En un hospital de Sincelejo, uno de cada cinco pacientes de consulta externa no asiste a su cita.', note: 'Población y lugar.' },
+    { label: 'Tu problema', text: 'En un hospital de Sincelejo, una de cada cinco citas de consulta externa se pierde.', note: 'Población y lugar.' },
     { label: 'Lo que falta', text: 'Aunque el problema es conocido, no se han estudiado sus factores en esta institución.', note: 'El vacío que justifica el estudio.' },
     { label: 'Tu objetivo', text: 'Esta investigación tiene como objetivo analizar los factores asociados a la inasistencia de estos pacientes.', note: 'La punta del embudo.' },
 ];
@@ -234,7 +234,7 @@ const ESTILO = [
     { id: 'tiempo', label: 'Tiempo verbal', what: 'En una propuesta, presente para lo que hace el documento y futuro para lo que hará el estudio.', example: '«Este documento presenta…», «El estudio analizará…».' },
     { id: 'persona', label: 'Persona', what: 'Tercera persona o impersonal; evita «yo» y «mi».', example: '«Se propone…», «Esta investigación busca…» en lugar de «Yo quiero…».' },
     { id: 'tono', label: 'Tono', what: 'Claro y directo, sin adornos ni frases vacías.', example: 'Evita «Desde tiempos inmemoriales…» o «Es bien sabido que…».' },
-    { id: 'citas', label: 'Citas', what: 'Pocas y solo para datos clave; la teoría va en el marco referencial.', example: '«…uno de cada cinco pacientes no asiste (Ministerio de Salud, 2024)».' },
+    { id: 'citas', label: 'Citas', what: 'Pocas y solo para datos clave; la teoría va en el marco referencial.', example: '«…una de cada cinco citas se pierde (Oficina de Estadística, 2025)».' },
 ];
 
 const CONECTORES = [
@@ -484,7 +484,7 @@ const Constructor = ({ intro, onNavigate }) => {
                                     {String(f[parte.key]).trim()}
                                 </p>
                             ))
-                            : <span className="tit-empty">Toca «Armar un borrador con mi proyecto» o escribe cada movimiento. Tab en una caja vacía escribe su ejemplo.</span>}
+                            : <span className="tit-empty">«Objetivo y pregunta» y «Método» se llenan solos con tu proyecto. Para los demás, toca «Armar un borrador con mi proyecto» o escríbelos; Tab en una caja vacía escribe su ejemplo.</span>}
                     </div>
                 </aside>
             </div>

@@ -96,7 +96,7 @@ export default {
             ['La prueba del minuto', 'Explícale tu idea en un minuto a alguien de otra carrera. Si no logra repetir qué problema hay, a quiénes afecta y dónde, la idea aún no está clara, tampoco para ti.'],
             ['Qué cuenta como evidencia', 'Para idear basta un indicio verificable: una cifra oficial, un informe de la institución, un estudio previo o una observación sistemática tuya. Una impresión personal no cuenta hasta que la contrastas.'],
         ],
-        ejemplo: 'Sin evidencia: «Creo que los pacientes están inconformes con las citas». Con evidencia: «Según la oficina de estadística del hospital, tres de cada diez citas de consulta externa programadas en 2025 no se cumplieron».',
+        ejemplo: 'Sin evidencia: «Creo que los pacientes están inconformes con las citas». Con evidencia: «Según la oficina de estadística del hospital, una de cada cinco citas de consulta externa programadas en 2025 no se cumplió».',
         ojo: 'Corregir un error suele destapar otro: al acotar un tema amplio quizá descubras que no tienes acceso a esa población. Revisa los cinco otra vez después de cada ajuste.',
     },
 };

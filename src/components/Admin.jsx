@@ -442,7 +442,7 @@ const Admin = () => {
         return accion(async () => {
             if (mover.modo === 'traspasar') {
                 await api.admin.transferProject(pr.id, destino.id, mover.keep);
-                setNotice(`«${pr.name}» ahora es de ${destino.name}.${mover.keep ? ` ${openProject.owner?.name || 'El dueño anterior'} queda como invitado.` : ''}`);
+                setNotice(`«${pr.name}» ahora es de ${destino.name}.${mover.keep ? ` ${openProject.owner?.name || 'El dueño anterior'} sigue pudiendo abrirlo, como integrante.` : ''}`);
                 setOpenProject(await api.admin.project(pr.id));
             } else {
                 const r = await api.admin.duplicateProject(pr.id, destino.id, mover.name.trim());
@@ -501,7 +501,7 @@ const Admin = () => {
         ...visible.map((u) => [u.name, u.email, nombreRol(u.role), u.grupo || '', u.teacherName || '', STATUS[u.status] || u.status, u.projectCount, u.role === 'admin' ? '' : u.projectLimit, formatDate(u.lastActivity || u.lastLoginAt), formatDate(u.createdAt)]),
     ]));
     const exportarProyectos = () => descargar('proyectos-projectsia.csv', csv([
-        ['Título', 'Nombre del proyecto', 'Dueño', 'Correo', 'Rol', 'Avance (%)', 'Coherencia (%)', 'Invitados', 'Actualizado'],
+        ['Título', 'Nombre del proyecto', 'Dueño', 'Correo', 'Rol', 'Avance (%)', 'Coherencia (%)', 'Integrantes', 'Actualizado'],
         ...proyectosVisibles.map((p) => [p.titulo, p.name, p.owner, p.ownerEmail, nombreRol(p.ownerRole), p.avance, p.coherencia ? p.coherencia.score : '', p.miembros, formatDate(p.updatedAt)]),
     ]));
 
@@ -548,8 +548,8 @@ const Admin = () => {
                         <form className="adm-mover" onSubmit={aplicarMover}>
                             <b>{mover.modo === 'traspasar' ? 'Traspasar el proyecto a otra cuenta' : 'Duplicar el proyecto como plantilla'}</b>
                             <p className="adm-muted">{mover.modo === 'traspasar'
-                                ? 'Cambia el dueño. El proyecto es el mismo: conserva su contenido, historial, figuras, encuestas e invitados.'
-                                : 'Crea un proyecto nuevo con el mismo contenido y las mismas figuras. No copia el historial, los invitados ni las encuestas con sus respuestas.'}</p>
+                                ? 'Cambia el dueño. El proyecto es el mismo: conserva su contenido, historial, figuras, encuestas e integrantes.'
+                                : 'Crea un proyecto nuevo con el mismo contenido y las mismas figuras. No copia el historial, los integrantes ni las encuestas con sus respuestas.'}</p>
                             <div className="adm-mover-campos">
                                 <div className="cue-campo"><span>{mover.modo === 'traspasar' ? 'Nuevo dueño' : 'Cuenta donde se crea'}</span>
                                     <Selector buscar etiqueta="Cuenta de destino" vacio="Elegir cuenta…" value={mover.userId} onChange={(v) => setMover({ ...mover, userId: v })} opciones={users.filter((u) => u.role !== 'guest').filter((u) => mover.modo === 'duplicar' || u.id !== openProject.owner?.id).map((u) => ({ value: u.id, label: u.name, nota: `${u.email} · ${nombreRol(u.role)}${u.grupo ? ` · ${u.grupo}` : ''}` }))} />
@@ -907,7 +907,7 @@ const Admin = () => {
                                     <Th id="dueno" orden={pOrden} onOrden={ordenarP}>Dueño</Th>
                                     <Th id="avance" orden={pOrden} onOrden={ordenarP}>Avance</Th>
                                     <Th id="coherencia" orden={pOrden} onOrden={ordenarP}>Coherencia</Th>
-                                    <th scope="col" className="adm-num" title="Compañeros invitados al proyecto">Invitados</th>
+                                    <th scope="col" className="adm-num" title="Compañeros que comparten el proyecto">Integrantes</th>
                                     <Th id="actualizado" orden={pOrden} onOrden={ordenarP}>Actualizado</Th>
                                 </tr>
                             </thead>

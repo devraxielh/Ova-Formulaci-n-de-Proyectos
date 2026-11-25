@@ -488,10 +488,10 @@ function App() {
                     <button
                         className={`nav-button ${activeTab === 'marco' ? 'active' : ''} ${doneTabs.has('marco') ? 'nav-button--done' : ''}`}
                         onClick={() => handleTabChange('marco')}
-                        title="Marco Referencial"
+                        title="Marco referencial"
                     >
                         <Library size={20} />
-                        <span>Marco Referencial</span>
+                        <span>Marco referencial</span>
                         {doneTabs.has('marco') && <CheckCircle2 size={16} className="nav-done-check" aria-label="completado" />}
                     </button>
 

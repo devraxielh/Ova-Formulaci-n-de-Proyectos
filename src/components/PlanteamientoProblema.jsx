@@ -193,7 +193,7 @@ const ERRORES = [
 
 const JUZGA_QUIZ = [
     { text: '«La tecnología ha cambiado el mundo desde la Revolución Industrial y hoy está en todas partes.»', options: ['Bien planteado', 'Mejorable'], answer: 1, why: 'Empieza demasiado lejos, sin datos ni población.' },
-    { text: '«En 2025, el 42 % de los pacientes de consulta externa de un hospital de Sincelejo no asistió a su cita (Oficina de Estadística, 2025).»', options: ['Bien planteado', 'Mejorable'], answer: 0, why: 'Dato con fuente, población, lugar y periodo.' },
+    { text: '«En 2025 se perdió el 22 % de las citas de consulta externa de un hospital de Sincelejo (Oficina de Estadística, 2025).»', options: ['Bien planteado', 'Mejorable'], answer: 0, why: 'Dato con fuente, población, lugar y periodo.' },
     { text: '«Por eso es necesario crear una app de recordatorios para el hospital.»', options: ['Bien planteado', 'Mejorable'], answer: 1, why: 'Propone la solución: eso va en los objetivos.' },
     { text: '«Esta inasistencia se debe, entre otras causas, al olvido de la cita y a la dificultad para reprogramarla (Gómez, 2023).»', options: ['Bien planteado', 'Mejorable'], answer: 0, why: 'Explica causas y las respalda con una fuente.' },
 ];

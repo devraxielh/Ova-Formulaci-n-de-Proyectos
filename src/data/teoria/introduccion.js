@@ -6,7 +6,7 @@ export default {
             ['Resume, no desarrolla', 'Cada sección del proyecto aparece aquí reducida a una o dos oraciones. El detalle (las cifras, las teorías, el procedimiento) se queda en su sección; la introducción solo deja ver que existe.'],
             ['Introducción frente a resumen', 'El resumen se entiende solo y cabe en un párrafo de máximo 250 palabras. La introducción tiene varios párrafos, entre 500 y 1000 palabras, y **conduce** al lector hacia el resto del documento.'],
         ],
-        ejemplo: 'Planteamiento: tres párrafos con cifras de inasistencia por servicio y por año. Introducción: «En un hospital de Sincelejo, uno de cada cinco pacientes de consulta externa no asiste a su cita». Una oración resume lo que el planteamiento demuestra.',
+        ejemplo: 'Planteamiento: tres párrafos con cifras de inasistencia por servicio y por año. Introducción: «En un hospital de Sincelejo, una de cada cinco citas de consulta externa se pierde». Una oración resume lo que el planteamiento demuestra.',
         ojo: 'Prueba rápida: dale tu introducción a alguien que no conoce el proyecto. Debe poder decirte qué vas a estudiar, en quiénes y para qué.',
     },
     alfinal: {
