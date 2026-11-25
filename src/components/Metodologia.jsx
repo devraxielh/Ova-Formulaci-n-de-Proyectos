@@ -1000,7 +1000,11 @@ const Constructor = ({ intro, onNavigate }) => {
                                         </select>
                                     </label>
                                     {fila.nota && clean(fila.tecnica) && <p className="mar-wide met-nota-fila"><Sparkles size={13} aria-hidden="true" /> Sugerida porque {fila.nota}.</p>}
-                                    {f.analisis.length > 1 && <button type="button" className="ide-link" onClick={() => { touch(); update({ analisis: f.analisis.filter((_, k) => k !== i) }); }}><Trash2 size={13} /> Quitar</button>}
+                                    {f.analisis.length > 1 && (
+                                        <div className="mar-wide met-fila-pie">
+                                            <button type="button" className="met-quitar" onClick={() => { touch(); update({ analisis: f.analisis.filter((_, k) => k !== i) }); }}><Trash2 size={15} aria-hidden="true" /> Quitar esta fila</button>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                             <button type="button" className="ide-btn ide-btn--ghost obj-add" onClick={() => { touch(); update({ analisis: [...f.analisis, { id: uid(), objetivo: '', tecnica: '', software: '' }] }); }}><Plus size={15} /> Agregar fila</button>
@@ -1072,11 +1076,12 @@ const Constructor = ({ intro, onNavigate }) => {
                                                 ))}
                                             </ul>
                                         )}
-                                        <button type="button" className="ide-link" onClick={() => setModal({ index: i, metodo: validacionesDe(it)[0] || VALIDACION_DETALLE[0].id })}>
-                                            <BookOpenCheck size={14} aria-hidden="true" /> ¿Cómo se hace? Paso a paso, ejemplo y calculadora
-                                        </button>
                                     </div>
-                                    {f.instrumentos.length > 1 && <button type="button" className="ide-link" onClick={() => { touch(); update({ instrumentos: f.instrumentos.filter((_, k) => k !== i) }); }}><Trash2 size={13} /> Quitar</button>}
+                                    {f.instrumentos.length > 1 && (
+                                        <div className="mar-wide met-fila-pie">
+                                            <button type="button" className="met-quitar" onClick={() => { if (!window.confirm(`¿Quitar el instrumento «${clean(it.instrumento) || it.tecnica}»? Se pierden sus datos de validación.`)) return; touch(); update({ instrumentos: f.instrumentos.filter((_, k) => k !== i) }); }}><Trash2 size={15} aria-hidden="true" /> Quitar este instrumento</button>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                             <button type="button" className="ide-btn ide-btn--ghost obj-add" onClick={() => { touch(); update({ instrumentos: [...f.instrumentos, { id: uid(), tecnica: 'Entrevista', instrumento: 'guía de entrevista semiestructurada', aplicaA: '', objetivo: '', validez: 'juicio de expertos', validaciones: ['juicio de expertos'] }] }); }}><Plus size={15} /> Agregar instrumento</button>

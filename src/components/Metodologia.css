@@ -52,3 +52,12 @@
 
 /* Cuenta con que se estimó un rubro sugerido */
 .met-pres-row .met-pres-cuenta { grid-column: 1 / -1; display: flex; align-items: center; gap: 0.3rem; margin: -0.15rem 0 0.2rem; font-size: 0.8rem; color: #4338ca; }
+
+/* Quitar una fila (instrumento o plan de análisis): al pie de la tarjeta, a la derecha */
+.met-fila-pie { display: flex; justify-content: flex-end; padding-top: 0.6rem; margin-top: 0.2rem; border-top: 1px solid #eef2f7; }
+.met-quitar { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.75rem; border: 1px solid #fecaca; border-radius: 0.5rem; background: #fff; color: #b91c1c; font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+.met-quitar:hover { background: #fef2f2; border-color: #fca5a5; }
+.met-quitar:focus-visible { outline: 3px solid #fecaca; outline-offset: 2px; }
+/* El título del instrumento armado se lee como una sola frase: icono, nombre y número de preguntas seguidos. */
+.met-armar > span { display: block; line-height: 1.5; }
+.met-armar > span > svg { display: inline-block; vertical-align: -3px; margin-right: 0.3rem; }
