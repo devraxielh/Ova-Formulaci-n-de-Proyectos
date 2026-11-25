@@ -246,7 +246,7 @@ const BASE_ELEMENTOS = {
         if (!texto.length || datos.fases.length < 2) return texto;
         const total = datos.fases.reduce((s, f) => s + f.duracion, 0);
         const { w, h } = fasesSvg(datos);
-        const presentacion = { type: 'paragraph', text: `El proyecto se desarrolla en ${datos.fases.length} fases durante ${total} ${datos.unidad === 'meses' ? (total === 1 ? 'mes' : 'meses') : (total === 1 ? 'semana' : 'semanas')}. La [[fasesfig]] presenta la ruta del proyecto: cada fase con su duración, sus actividades principales, sus instrumentos y el producto que entrega.`, citaDe: ['fasesfig'] };
+        const presentacion = { type: 'paragraph', text: `El proyecto se desarrolla en ${datos.fases.length} fases durante ${total} ${datos.unidad === 'meses' ? (total === 1 ? 'mes' : 'meses') : (total === 1 ? 'semana' : 'semanas')}. La [[fasesfig]] presenta la ruta del proyecto: el orden de las fases, su duración, el producto que entrega cada una y su lugar en el calendario.`, citaDe: ['fasesfig'] };
         const figura = { type: 'figure', elementoId: 'fasesfig', fileId: 'fasesfig', fases: datos, caption: 'Ruta de las fases del proyecto', nota: 'Elaboración propia.', w, h };
         return [presentacion, figura, ...texto];
     },
