@@ -1,0 +1,17 @@
+/* Teoría ampliada bajo el contenido de cada diapositiva: ocupa todo el ancho, en columnas de lectura corta. */
+.teo { grid-column: 1 / -1; align-self: start; display: grid; gap: 1rem; padding-top: 1.4rem; border-top: 1px solid var(--ide-line, #e2e8f0); }
+.teo h3 { display: flex; align-items: center; gap: 0.45rem; margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--ide-primary-strong, #4338ca); }
+.teo-claves { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1.1rem 2rem; margin: 0; }
+.teo-claves dt { font-size: 1rem; font-weight: 700; color: var(--ide-ink, #0f172a); margin-bottom: 0.25rem; text-wrap: balance; }
+.teo-claves dd { margin: 0; font-size: 0.98rem; line-height: 1.6; color: var(--ide-body, #334155); text-wrap: pretty; }
+.teo-claves dd b, .teo-pie b { color: var(--ide-ink, #0f172a); font-weight: 600; }
+.teo-pie { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: 0.8rem 1rem; }
+.ide-slide .teo-pie p { display: flex; gap: 0.6rem; align-items: flex-start; margin: 0; max-width: none; padding: 0.8rem 1rem; border-radius: 0.8rem; font-size: 0.96rem; line-height: 1.55; }
+.teo-pie p svg { flex: none; margin-top: 0.2rem; }
+.teo-ejemplo { background: #eef2ff; color: #312e81; }
+.teo-ejemplo b { color: #312e81; }
+.teo-ojo { background: #fffbeb; color: #78350f; }
+.teo-ojo b { color: #78350f; }
+/* La diapositiva deja de centrar su contenido en vertical cuando lleva teoría debajo: se lee de arriba abajo. */
+.ide-slide:has(> .teo) { align-items: start; align-content: start; }
+@media print { .teo { break-inside: avoid; } }

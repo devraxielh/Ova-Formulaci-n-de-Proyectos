@@ -20,6 +20,7 @@ import { groq } from '../services/api';
 import './Marco.css';
 import './Alcances.css';
 import { Integrado, SinFuente } from './MarcoFuentes';
+import TEORIA from '../data/teoria/marco';
 
 /* Clase larga de 4 horas: el contenido de cada diapositiva está en data/marcoClase.js. */
 
@@ -949,6 +950,7 @@ const MarcoReferencial = ({ onNavigate }) => {
             slides={SLIDES}
             storageKey={SLIDE_KEY}
             label="Marco referencial"
+            teoria={TEORIA}
             renderSlide={renderSlide}
             finish={onNavigate ? { label: 'Definir la metodología', onClick: () => onNavigate('metodologia') } : null}
         />

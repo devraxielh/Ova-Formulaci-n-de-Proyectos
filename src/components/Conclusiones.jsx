@@ -15,6 +15,7 @@ import './Justificacion.css';
 import './Marco.css';
 import './Fases.css';
 import { confirmar } from './Avisos';
+import TEORIA from '../data/teoria/conclusiones';
 
 const SLIDE_KEY = 'projectsia:conclusiones:diapositiva';
 
@@ -397,6 +398,7 @@ const Conclusiones = ({ onNavigate }) => {
             slides={SLIDES}
             storageKey={SLIDE_KEY}
             label="Conclusiones"
+            teoria={TEORIA}
             renderSlide={renderSlide}
             finish={onNavigate ? { label: 'Escribir la introducción', onClick: () => onNavigate('introduccion') } : null}
         />

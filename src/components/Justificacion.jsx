@@ -12,6 +12,7 @@ import './Planteamiento.css';
 import './Objetivos.css';
 import './Justificacion.css';
 import { construccionPrimero } from './deck/orden';
+import TEORIA from '../data/teoria/justificacion';
 
 /* Clase de 60 minutos: la suma de `min` de todas las diapositivas. */
 const SECTIONS = construccionPrimero([
@@ -674,6 +675,7 @@ const Justificacion = ({ onNavigate }) => {
             slides={SLIDES}
             storageKey={SLIDE_KEY}
             label="Justificación"
+            teoria={TEORIA}
             renderSlide={renderSlide}
             finish={onNavigate ? { label: 'Definir alcances y limitaciones', onClick: () => onNavigate('alcances') } : null}
         />

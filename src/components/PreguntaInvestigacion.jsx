@@ -9,6 +9,7 @@ import { ALCANCES } from '../data/alcances';
 import { conArticulo, segundaVariable } from '../data/ejemplos';
 import './Titulo.css';
 import { construccionPrimero } from './deck/orden';
+import TEORIA from '../data/teoria/pregunta';
 
 /* Clase de 60 minutos: la suma de `min` de todas las diapositivas. */
 const SECTIONS = construccionPrimero([
@@ -905,6 +906,7 @@ const PreguntaInvestigacion = ({ onNavigate }) => {
             slides={SLIDES}
             storageKey={SLIDE_KEY}
             label="Pregunta de investigación"
+            teoria={TEORIA}
             renderSlide={renderSlide}
             finish={onNavigate ? { label: 'Plantear el problema', onClick: () => onNavigate('planteamiento') } : null}
         />

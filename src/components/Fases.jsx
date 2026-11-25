@@ -21,6 +21,7 @@ import './Justificacion.css';
 import './Marco.css';
 import './Fases.css';
 import { confirmar } from './Avisos';
+import TEORIA from '../data/teoria/fases';
 
 const SLIDE_KEY = 'projectsia:fases:diapositiva';
 
@@ -699,6 +700,7 @@ const Fases = ({ onNavigate }) => {
             slides={SLIDES}
             storageKey={SLIDE_KEY}
             label="Desarrollo de las fases del proyecto"
+            teoria={TEORIA}
             renderSlide={renderSlide}
             finish={onNavigate ? { label: 'Resultados y discusión', onClick: () => onNavigate('resultados') } : null}
         />

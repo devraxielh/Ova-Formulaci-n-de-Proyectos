@@ -7,6 +7,7 @@ import Redactar from './Redactar';
 import { campoDe, fijarValor, placeholderDe, valorDe } from './campo';
 import { useProject } from '../../context/ProjectContext';
 import '../Ideacion.css';
+import Teoria from './Teoria';
 
 /* Piezas compartidas por las clases en diapositivas (Ideación, Título…). */
 
@@ -162,7 +163,7 @@ const fillExample = (event) => {
  * - la «Presentación», en una ventana grande: la teoría de la clase (Apertura … Cierre).
  * `onFuera(seccion)` avisa cuando se pide una sección que está en el otro mazo.
  */
-const Mazo = ({ sections, slides, label, renderSlide, finish, soloVer = false, enModal = false, activo = true, seccionInicial, salto, pantallaRef, onPresentacion, onFuera, onCerrar, totalClase, minutosDe }) => {
+const Mazo = ({ sections, slides, label, renderSlide, teoria, finish, soloVer = false, enModal = false, activo = true, seccionInicial, salto, pantallaRef, onPresentacion, onFuera, onCerrar, totalClase, minutosDe }) => {
     // Abre siempre en su primera diapositiva (o en la sección pedida): no se recuerda dónde quedó la vez anterior.
     const [index, setIndex] = useState(() => Math.max(0, slides.findIndex((item) => item.section === seccionInicial)));
     const [direction, setDirection] = useState(1);
@@ -314,12 +315,14 @@ const Mazo = ({ sections, slides, label, renderSlide, finish, soloVer = false, e
                             }}
                         >
                             {renderSlide({ slide, heading, goTo, goToSection, sectionMinutes, totalMinutes })}
+                            <Teoria datos={teoria?.[slide.id]} />
                         </motion.div>
                     </AnimatePresence>
                     {/* En la página, una pestaña con varias partes (p. ej. «Construye tu título» y «Mejóralo con IA») las muestra todas, una bajo otra. */}
                     {sinPasos && slides.filter((item) => item.section === slide.section && item.id !== slide.id).map((item) => (
                         <div key={item.id} className={`ide-slide ide-slide--split ide-slide--extra${item.layout ? ` ide-slide--${item.layout}` : ''}`} role="group" aria-label={item.title}>
                             {renderSlide({ slide: item, heading: <h2>{item.title}</h2>, goTo, goToSection, sectionMinutes, totalMinutes })}
+                            <Teoria datos={teoria?.[item.id]} />
                         </div>
                     ))}
                 </div>
@@ -389,7 +392,8 @@ const Mazo = ({ sections, slides, label, renderSlide, finish, soloVer = false, e
 const DE_TRABAJO = new Set(['construccion', 'sintesis', 'revision']);
 
 // `storageKey` se sigue aceptando para no cambiar las clases, pero ya no se usa.
-const SlideDeck = ({ sections, slides, label, renderSlide, finish }) => {
+// `teoria`: teoría ampliada por diapositiva ({ idDeLaDiapositiva: { claves, ejemplo, ojo } }), de src/data/teoria/.
+const SlideDeck = ({ sections, slides, label, renderSlide, teoria: ampliada, finish }) => {
     const { user } = useProject();
     const invitado = user?.role === 'guest'; // solo ve la presentación: sin construcción, revisión ni herramientas de escritura
     const [presentacion, setPresentacion] = useState(null); // null = cerrada; { seccion } = abierta (en esa sección)
@@ -402,6 +406,7 @@ const SlideDeck = ({ sections, slides, label, renderSlide, finish }) => {
     const comunes = {
         label,
         renderSlide,
+        teoria: ampliada,
         totalClase: slides.reduce((sum, item) => sum + item.min, 0),
         minutosDe: (id) => slides.filter((item) => item.section === id).reduce((sum, item) => sum + item.min, 0),
     };

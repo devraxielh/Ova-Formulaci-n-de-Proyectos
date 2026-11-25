@@ -10,6 +10,7 @@ import { ALCANCES, ALL_VERBS, VERBS, alcanceOfVerb, findVerb, verbAtStart } from
 import { objetoTitulo, proposito } from '../data/ejemplos';
 import './Titulo.css';
 import { construccionPrimero } from './deck/orden';
+import TEORIA from '../data/teoria/titulo';
 
 /* Clase de 60 minutos: la suma de `min` de todas las diapositivas. */
 const SECTIONS = construccionPrimero([
@@ -941,6 +942,7 @@ const Titulo = ({ onNavigate }) => {
             slides={SLIDES}
             storageKey={SLIDE_KEY}
             label="Construcción del título"
+            teoria={TEORIA}
             renderSlide={renderSlide}
             finish={onNavigate ? { label: 'Formular la pregunta', onClick: () => onNavigate('pregunta') } : null}
         />

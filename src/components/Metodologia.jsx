@@ -33,6 +33,7 @@ import './Alcances.css';
 import './Metodologia.css';
 import { avisar, confirmar } from './Avisos';
 import { basePresupuesto, cronogramaDesdeFases, desfaseCronograma, desfasePresupuesto } from '../services/derivados';
+import TEORIA from '../data/teoria/metodologia';
 
 /* Clase larga de 4 horas: el contenido de cada diapositiva está en data/metodologiaClase.js. */
 
@@ -1442,6 +1443,7 @@ const Metodologia = ({ onNavigate }) => {
             slides={SLIDES}
             storageKey={SLIDE_KEY}
             label="Metodología"
+            teoria={TEORIA}
             renderSlide={renderSlide}
             finish={onNavigate ? { label: 'Desarrollar las fases del proyecto', onClick: () => onNavigate('fases') } : null}
         />

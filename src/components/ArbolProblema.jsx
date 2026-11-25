@@ -8,6 +8,7 @@ import { SECTIONS, SLIDES } from '../data/arbolClase';
 import './Titulo.css';
 import './Proyecto.css';
 import './Arbol.css';
+import TEORIA from '../data/teoria/arbolProblema';
 
 /*
  * Árbol del problema: el estudiante escribe el problema central, sus causas (raíces) y sus efectos (ramas),
@@ -98,6 +99,7 @@ const ArbolProblema = ({ onNavigate }) => {
             sections={SECTIONS}
             slides={SLIDES}
             label="Árbol del problema"
+            teoria={TEORIA}
             renderSlide={renderSlide}
             finish={onNavigate ? { label: 'Armar el árbol de objetivos', onClick: () => onNavigate('arbolobjetivos') } : null}
         />

@@ -12,6 +12,7 @@ import './Titulo.css';
 import './Planteamiento.css';
 import './Objetivos.css';
 import { construccionPrimero } from './deck/orden';
+import TEORIA from '../data/teoria/objetivos';
 
 /* Clase de 60 minutos: la suma de `min` de todas las diapositivas. */
 const SECTIONS = construccionPrimero([
@@ -858,6 +859,7 @@ const Objetivos = ({ onNavigate }) => {
             slides={SLIDES}
             storageKey={SLIDE_KEY}
             label="Objetivos de investigación"
+            teoria={TEORIA}
             renderSlide={renderSlide}
             finish={onNavigate ? { label: 'Escribir la justificación', onClick: () => onNavigate('justificacion') } : null}
         />

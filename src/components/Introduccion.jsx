@@ -10,6 +10,7 @@ import './Planteamiento.css';
 import './Objetivos.css';
 import './Justificacion.css';
 import { construccionPrimero } from './deck/orden';
+import TEORIA from '../data/teoria/introduccion';
 
 /* Clase de 60 minutos: la suma de `min` de todas las diapositivas. */
 const SECTIONS = construccionPrimero([
@@ -760,6 +761,7 @@ const Introduccion = ({ onNavigate }) => {
             slides={SLIDES}
             storageKey={SLIDE_KEY}
             label="Introducción"
+            teoria={TEORIA}
             renderSlide={renderSlide}
             finish={onNavigate ? { label: 'Ver mi proyecto completo', onClick: () => onNavigate('proyecto') } : null}
         />

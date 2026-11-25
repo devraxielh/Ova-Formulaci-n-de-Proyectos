@@ -16,6 +16,7 @@ import './Justificacion.css';
 import './Marco.css';
 import './Alcances.css';
 import './Resumen.css';
+import TEORIA from '../data/teoria/resumen';
 
 const SLIDE_KEY = 'projectsia:resumen:diapositiva';
 
@@ -436,6 +437,7 @@ const Resumen = ({ onNavigate }) => {
             slides={SLIDES}
             storageKey={SLIDE_KEY}
             label="Resumen"
+            teoria={TEORIA}
             renderSlide={renderSlide}
             finish={onNavigate ? { label: 'Ver mi proyecto completo', onClick: () => onNavigate('proyecto') } : null}
         />

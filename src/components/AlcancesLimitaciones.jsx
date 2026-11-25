@@ -13,6 +13,7 @@ import './Objetivos.css';
 import './Justificacion.css';
 import './Alcances.css';
 import { construccionPrimero } from './deck/orden';
+import TEORIA from '../data/teoria/alcances';
 
 /* Clase de 60 minutos: la suma de `min` de todas las diapositivas. */
 const SECTIONS = construccionPrimero([
@@ -758,6 +759,7 @@ const AlcancesLimitaciones = ({ onNavigate }) => {
             slides={SLIDES}
             storageKey={SLIDE_KEY}
             label="Alcances y limitaciones"
+            teoria={TEORIA}
             renderSlide={renderSlide}
             finish={onNavigate ? { label: 'Construir el marco referencial', onClick: () => onNavigate('marco') } : null}
         />

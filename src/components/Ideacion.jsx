@@ -9,6 +9,7 @@ import { useProjectField } from '../context/ProjectContext';
 import { ALCANCES, ALL_VERBS, findVerb } from '../data/alcances';
 import './Ideacion.css';
 import { construccionPrimero } from './deck/orden';
+import TEORIA from '../data/teoria/ideacion';
 
 /* La clase completa dura 50 minutos: la suma de `min` de todas las diapositivas. */
 const SECTIONS = construccionPrimero([
@@ -1316,6 +1317,7 @@ const Ideacion = ({ onNavigate }) => {
             slides={SLIDES}
             storageKey={SLIDE_KEY}
             label="Fase de Ideación"
+            teoria={TEORIA}
             renderSlide={renderSlide}
             finish={onNavigate ? { label: 'Construir el título', onClick: () => onNavigate('titulo') } : null}
         />

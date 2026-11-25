@@ -21,6 +21,7 @@ import './Marco.css';
 import './Alcances.css';
 import './Fases.css';
 import { avisar, confirmar } from './Avisos';
+import TEORIA from '../data/teoria/resultados';
 
 const SLIDE_KEY = 'projectsia:resultados:diapositiva';
 
@@ -567,6 +568,7 @@ const Resultados = ({ onNavigate }) => {
             slides={SLIDES}
             storageKey={SLIDE_KEY}
             label="Resultados y discusión"
+            teoria={TEORIA}
             renderSlide={renderSlide}
             finish={onNavigate ? { label: 'Escribir las conclusiones', onClick: () => onNavigate('conclusiones') } : null}
         />

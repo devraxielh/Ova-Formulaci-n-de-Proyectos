@@ -11,6 +11,7 @@ import { parrafosPlanteamiento } from '../data/ejemplos';
 import './Titulo.css';
 import './Planteamiento.css';
 import { construccionPrimero } from './deck/orden';
+import TEORIA from '../data/teoria/planteamiento';
 
 /* Clase de 60 minutos: la suma de `min` de todas las diapositivas. */
 const SECTIONS = construccionPrimero([
@@ -739,6 +740,7 @@ const PlanteamientoProblema = ({ onNavigate }) => {
             slides={SLIDES}
             storageKey={SLIDE_KEY}
             label="Planteamiento del problema"
+            teoria={TEORIA}
             renderSlide={renderSlide}
             finish={onNavigate ? { label: 'Definir los objetivos', onClick: () => onNavigate('objetivos') } : null}
         />

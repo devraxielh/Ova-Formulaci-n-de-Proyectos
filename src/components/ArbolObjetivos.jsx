@@ -8,6 +8,7 @@ import { SECTIONS, SLIDES } from '../data/arbolObjetivosClase';
 import './Titulo.css';
 import './Proyecto.css';
 import './Arbol.css';
+import TEORIA from '../data/teoria/arbolObjetivos';
 
 /*
  * Árbol de objetivos: el árbol del problema «en positivo». El estudiante escribe el objetivo central,
@@ -125,6 +126,7 @@ const ArbolObjetivos = ({ onNavigate }) => {
             sections={SECTIONS}
             slides={SLIDES}
             label="Árbol de objetivos"
+            teoria={TEORIA}
             renderSlide={renderSlide}
             finish={onNavigate ? { label: 'Plantear el problema', onClick: () => onNavigate('planteamiento') } : null}
         />
