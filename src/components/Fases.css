@@ -37,3 +37,7 @@
 .pla-part .fas-recomendar { margin: 0 0 0.3rem; padding-bottom: 0.7rem; border-bottom: 1px solid #eef2f7; }
 .fas-gira { animation: fas-gira 1s linear infinite; }
 @keyframes fas-gira { to { transform: rotate(360deg); } }
+
+/* Resultados: llenar todo con los datos */
+.res-llenar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.9rem; margin: 0 0 0.8rem; font-size: 0.85rem; color: #64748b; }
+.res-llenar span { flex: 1 1 18rem; line-height: 1.45; }

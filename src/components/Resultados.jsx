@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import EditorRico from './EditorRico';
-import { AlertTriangle, BarChart3, CheckCircle2, MessageSquareText } from 'lucide-react';
+import { AlertTriangle, BarChart3, CheckCircle2, Loader2, MessageSquareText, Sparkles } from 'lucide-react';
+import { recomendarResultados, reunirResultados } from '../services/resultadosIA';
 import SlideDeck from './deck/SlideDeck';
 import { Generica } from './deck/Contenido';
 import { useProject, useProjectField } from '../context/ProjectContext';
@@ -71,7 +72,7 @@ const redactar = (form, especificos, antecedentes, teorias) => {
 /* ---------- Estado ---------- */
 
 const useResState = () => {
-    const { data } = useProject();
+    const { data, project } = useProject();
     const [form, setForm] = useProjectField('resultadosForm', { porObjetivo: {}, limitaciones: '', futuras: '' });
     const [, setResultados] = useProjectField('resultados', '');
     const [, setDiscusion] = useProjectField('discusion', '');
@@ -83,7 +84,7 @@ const useResState = () => {
     const teorias = (marco.teorias || []).filter((t) => clean(t.nombre));
     const limitacionesAlcances = String(data.limitaciones || '').split('\n').map((l) => l.replace(/^\d+\.\s*/, '').split('. Para reducir')[0].trim()).filter(Boolean).join(' ');
     return {
-        f, update, setResultados, setDiscusion,
+        data, project, f, update, setResultados, setDiscusion,
         especificos: especificos.map((o) => o.replace(/\.$/, '')), antecedentes, teorias, limitacionesAlcances,
     };
 };
@@ -127,7 +128,49 @@ const Constructor = ({ intro, onNavigate }) => {
         }).catch(() => {});
         return () => { vivo = false; };
     }, [project?.id]);
-    const { f, update, setResultados, setDiscusion, especificos, antecedentes, teorias, limitacionesAlcances } = useResState();
+    const { data, f, update, setResultados, setDiscusion, especificos, antecedentes, teorias, limitacionesAlcances } = useResState();
+    // Llenar con los resultados reales: encuestas con respuestas, tablas de Resultados y análisis cualitativo.
+    const [datos, setDatos] = useState(null); // { texto, n, fuentes } | null mientras se reúne
+    const [llenando, setLlenando] = useState(''); // '' | 'pensando' | 'fallo'
+    const tablasResultados = (Array.isArray(data.elementos) ? data.elementos : []).filter((e) => e && e.seccion === 'resultados' && clean(e.titulo)).map((e) => clean(e.titulo));
+    const reunir = async () => {
+        const r = await reunirResultados(project?.id, data);
+        setDatos(r);
+        return r;
+    };
+    const hayTexto = especificos.some((_, i) => Object.entries(f.porObjetivo?.[i] || {}).some(([k, v]) => !['relacion', 'apoyoTipo', 'sugerido'].includes(k) && clean(v))) || clean(f.limitaciones) || clean(f.futuras);
+    const llenarTodo = async (preguntar = true) => {
+        if (preguntar && hayTexto && !window.confirm('Se reemplazará lo que escribiste en resultados y discusión por lo recomendado con tus datos. ¿Continuar?')) return;
+        setLlenando('pensando');
+        try {
+            const r = datos?.fuentes ? datos : await reunir();
+            if (!r.fuentes) { setLlenando('sin'); return; }
+            const res = await recomendarResultados({
+                data, especificos, datos: r.texto,
+                antecedentes: antecedentes.map((a) => ({ ...a, cita: citaDe(a) })),
+                teorias: teorias.map((x) => ({ ...x, nombre: clean(x.nombre) })),
+                tablas: tablasResultados, limitacionesAlcances,
+            });
+            touch();
+            update({ ...res, sugeridos: true });
+            setLlenando('');
+        } catch {
+            setLlenando('fallo');
+        }
+    };
+    // Al abrir: se reúnen los datos y, si aún no hay nada escrito, se llena todo solo.
+    const yaLleno = useRef(false);
+    useEffect(() => {
+        if (!project?.id || !especificos.length) return;
+        let vivo = true;
+        reunirResultados(project.id, data).then((r) => {
+            if (!vivo) return;
+            setDatos(r);
+            if (!yaLleno.current && r.fuentes && !hayTexto && !f.sugeridos) { yaLleno.current = true; llenarTodo(false); }
+        }).catch(() => vivo && setDatos({ texto: '', n: 0, fuentes: 0 }));
+        return () => { vivo = false; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [project?.id, especificos.length]);
     const [tab, setTab] = useState(0);
     const [saved, setSaved] = useState(false);
     const touch = () => setSaved(false);
@@ -169,6 +212,17 @@ const Constructor = ({ intro, onNavigate }) => {
 
             <div className="pla-builder">
                 <div className="obj-form">
+                    <div className="res-llenar">
+                        <button type="button" className="ide-btn ide-btn--primary" disabled={llenando === 'pensando' || !datos} onClick={() => llenarTodo(true)}>
+                            {llenando === 'pensando' || !datos ? <Loader2 size={16} className="fas-gira" /> : <Sparkles size={16} />} {llenando === 'pensando' ? 'Redactando con tus resultados…' : !datos ? 'Reuniendo tus datos…' : 'Llenar todo con mis resultados'}
+                        </button>
+                        <span>
+                            {llenando === 'fallo' && 'No se pudo redactar: inténtalo de nuevo.'}
+                            {llenando !== 'fallo' && datos && !datos.fuentes && 'Aún no hay datos: cuando tu encuesta tenga respuestas, o lleves tablas o el análisis de entrevistas a Resultados, se llenará todo con ellos.'}
+                            {llenando !== 'fallo' && datos?.fuentes > 0 && `Con ${datos.fuentes} ${datos.fuentes === 1 ? 'fuente de datos' : 'fuentes de datos'}${datos.n ? ` (n = ${datos.n})` : ''}, tus antecedentes y tus teorías. Solo usa cifras de tus datos.`}
+                        </span>
+                    </div>
+                    {f.sugeridos && <p className="obj-warn"><AlertTriangle size={14} aria-hidden="true" /> Redactado por la IA con tus datos: revisa cada cifra contra tus tablas antes de entregar.</p>}
                     <div className="fas-tabs" role="tablist" aria-label="Objetivos específicos">
                         {especificos.map((o, i) => (
                             <button key={o} type="button" role="tab" aria-selected={tab === i} onClick={() => setTab(i)}>
@@ -183,6 +237,7 @@ const Constructor = ({ intro, onNavigate }) => {
                     {!cierre ? (
                         <>
                             <p className="ide-field-hint mar-pregunta">Objetivo específico {tab + 1}: {especificos[tab]}</p>
+                            {r.sugerido && !clean(r.hallazgo) && <p className="obj-warn"><AlertTriangle size={14} aria-hidden="true" /> Tus datos todavía no responden este objetivo: sus resultados quedaron vacíos para no inventar cifras. Complétalos cuando tengas la información (por ejemplo, las entrevistas o la propuesta).</p>}
                             <div className="input-group pla-part mar-grid">
                                 <h3 className="alc-block-title mar-wide"><BarChart3 size={17} aria-hidden="true" /> Resultados (qué encontraste, en pasado)</h3>
                                 <Campo className="mar-wide" id="res-hal" label="Hallazgo principal" rows={2} value={r.hallazgo} onChange={(v) => setR({ hallazgo: v })} placeholder="Ej: El olvido fue la causa más frecuente de inasistencia (41,0 %), seguido del costo del transporte (21,9 %)" />

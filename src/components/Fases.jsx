@@ -55,60 +55,113 @@ const productoSugerido = (objetivo) => {
     return 'Propuesta validada (documento o prototipo)';
 };
 
+// Instrumentos declarados en la Metodología, numerados. `objetivo` = número del objetivo al que sirven (0 = todos).
+const instrumentosDeclarados = (data, especificos) => {
+    const t = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
+    const met = data.metodologiaForm || {};
+    const armados = Array.isArray(data.instrumentosGen) ? data.instrumentosGen : [];
+    return (Array.isArray(met.instrumentos) ? met.instrumentos : [])
+        .filter((it) => t(it.tecnica))
+        .map((it, i) => {
+            const armado = armados.find((a) => a && it.id && a.filaId === it.id);
+            const m = t(it.objetivo).match(/objetivo específico (\d+)/i);
+            const k = m ? Number(m[1]) : 0;
+            return {
+                n: i + 1,
+                tecnica: t(it.tecnica),
+                instrumento: t(it.instrumento) || 'instrumento',
+                aplicaA: t(it.aplicaA),
+                objetivo: k >= 1 && k <= especificos.length ? k : 0,
+                validaciones: (Array.isArray(it.validaciones) ? it.validaciones : [it.validez]).filter(Boolean),
+                preguntas: armado ? preguntasDe(armado).length : 0,
+            };
+        });
+};
+// Los que puede usar la fase de un objetivo (1, 2…): los de ese objetivo y los que sirven a todos. La de cierre (0), ninguno.
+const permitidosPara = (declarados, k) => (k >= 1 ? declarados.filter((d) => d.objetivo === 0 || d.objetivo === k) : []);
+
+// Palabras con que una actividad nombra una técnica de recolección (para avisar si no está declarada).
+const NOMBRES_TECNICA = [
+    { tecnica: 'Encuesta', re: /\b(encuestas?|cuestionarios?)\b/i },
+    { tecnica: 'Entrevista', re: /\bentrevist/i },
+    { tecnica: 'Observación', re: /\b(observaci[oó]n|observar|lista de chequeo)\b/i },
+    { tecnica: 'Grupo focal', re: /\bgrupos? focal/i },
+    { tecnica: 'Revisión documental', re: /\b(revisi[oó]n documental|ficha de registro|historias? cl[ií]nicas?|registros? (?:del|de la) (?:hospital|instituci))/i },
+    { tecnica: 'Prueba o test', re: /\b(pre-?test|pos-?test|prueba estandarizada|aplicar (?:la|una) prueba)\b/i },
+];
+// Técnicas que la fase nombra y que no están declaradas para su objetivo.
+const instrumentosAjenos = (fase, declarados, especificos) => {
+    const k = especificos.findIndex((o) => clean(o).toLowerCase() === clean(fase.objetivo).toLowerCase()) + 1;
+    const permitidas = new Set(permitidosPara(declarados, k).map((d) => d.tecnica));
+    const texto = [fase.descripcion, ...(fase.actividades || [])].join(' ').replace(/\bprueba piloto\b/gi, '');
+    return NOMBRES_TECNICA.filter((x) => !permitidas.has(x.tecnica) && x.re.test(texto)).map((x) => x.tecnica);
+};
+
 // Lo que la IA necesita saber del proyecto para recomendar las fases: objetivos y metodología ya definidos.
 const contextoFases = (data, especificos, unidad) => {
     const t = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
     const met = data.metodologiaForm || {};
-    const armados = Array.isArray(data.instrumentosGen) ? data.instrumentosGen : [];
-    const instrumentos = (Array.isArray(met.instrumentos) ? met.instrumentos : [])
-        .filter((it) => t(it.tecnica))
-        .map((it) => {
-            const armado = armados.find((a) => a && it.id && a.filaId === it.id);
-            const n = armado ? preguntasDe(armado).length : 0;
-            return `${t(it.tecnica)} (${t(it.instrumento) || 'instrumento'}${n ? `, ${n} preguntas` : ''}) aplicada a ${t(it.aplicaA) || 'los participantes'} para ${t(it.objetivo) || 'el estudio'}; validación: ${(it.validaciones || [it.validez]).filter(Boolean).join(', ') || 'sin definir'}`;
-        });
+    const declarados = instrumentosDeclarados(data, especificos);
     const analisis = (Array.isArray(met.analisis) ? met.analisis : []).filter((x) => t(x.tecnica)).map((x) => `«${t(x.objetivo)}»: ${t(x.tecnica)}${t(x.software) ? ` en ${t(x.software)}` : ''}`);
     const general = t(data.objetivoGeneral) || t(partesObjetivos(data.objetivos).general);
     const crono = Number(data.ganttPeriodos) > 0 && (data.ganttUnidad === 'semanal') === (unidad === 'semanas') ? Number(data.ganttPeriodos) : 0;
+    const lista = declarados.map((d) => `[${d.n}] ${d.tecnica}: ${d.instrumento}${d.preguntas ? ` (${d.preguntas} preguntas)` : ''}, se aplica a ${d.aplicaA || 'los participantes'}, ${d.objetivo ? `para el objetivo ${d.objetivo}` : 'para todos los objetivos'}; validación: ${d.validaciones.join(', ') || 'sin definir'}`).join('\n');
+    const porObjetivo = especificos.map((_, i) => {
+        const ok = permitidosPara(declarados, i + 1);
+        return `Objetivo ${i + 1}: ${ok.length ? ok.map((d) => `[${d.n}] ${d.tecnica}`).join(', ') : 'ninguno (no recoge datos nuevos)'}`;
+    }).join('\n');
     return {
         crono,
-        texto: `PROYECTO\nTítulo: ${t(data.titulo) || '(sin título)'}\nPregunta: ${t(data.pregunta) || '(sin definir)'}\nObjetivo general: ${general || '(sin definir)'}\nObjetivos específicos:\n${especificos.map((o, i) => `${i + 1}. ${o}`).join('\n') || '(sin definir)'}\n\nMETODOLOGÍA\nEnfoque: ${t(data.enfoque) || '(sin definir)'} · Tipo: ${t(data.tipoInvestigacion) || '(sin definir)'} · Diseño: ${t(data.diseno) || '(sin definir)'}\nPoblación: ${t(met.poblacion?.descripcion) || '(sin describir)'} · Muestreo: ${t(met.poblacion?.muestreo) || '(sin definir)'}${Number(data.poblacionTamano) > 0 ? ` · Población de ${Number(data.poblacionTamano)}` : ''}\nInstrumentos:\n${instrumentos.map((x) => `- ${x}`).join('\n') || '(sin definir)'}\nPlan de análisis:\n${analisis.map((x) => `- ${x}`).join('\n') || '(sin definir)'}`,
+        declarados,
+        texto: `PROYECTO\nTítulo: ${t(data.titulo) || '(sin título)'}\nPregunta: ${t(data.pregunta) || '(sin definir)'}\nObjetivo general: ${general || '(sin definir)'}\nObjetivos específicos:\n${especificos.map((o, i) => `${i + 1}. ${o}`).join('\n') || '(sin definir)'}\n\nMETODOLOGÍA\nEnfoque: ${t(data.enfoque) || '(sin definir)'} · Tipo: ${t(data.tipoInvestigacion) || '(sin definir)'} · Diseño: ${t(data.diseno) || '(sin definir)'}\nPoblación: ${t(met.poblacion?.descripcion) || '(sin describir)'} · Muestreo: ${t(met.poblacion?.muestreo) || '(sin definir)'}${Number(data.poblacionTamano) > 0 ? ` · Población de ${Number(data.poblacionTamano)}` : ''}\nPlan de análisis:\n${analisis.map((x) => `- ${x}`).join('\n') || '(sin definir)'}\n\nINSTRUMENTOS DECLARADOS (son los ÚNICOS que existen en este proyecto)\n${lista || '(ninguno declarado)'}\n\nINSTRUMENTOS QUE PUEDE USAR CADA OBJETIVO\n${porObjetivo || '(sin objetivos)'}`,
     };
 };
 
-const REGLAS_FASE = `Cada fase:\n- "objetivo": el NÚMERO del objetivo específico que cumple (1, 2, 3…), o 0 si es una fase de cierre o de socialización.\n- "nombre": nombre corto de la fase con un sustantivo de acción (por ejemplo «Caracterización de la población»), de 3 a 9 palabras, sin «Fase» ni número.\n- "descripcion": una o dos frases que digan qué se hace en la fase y para qué, con los datos del proyecto (población, lugar, instrumento). Sin punto final.\n- "actividades": de 4 a 6 actividades en orden, cada una empezando con un verbo en infinitivo y concreta (qué, a quién, con qué). Usa los instrumentos, la muestra y las técnicas de análisis que ya definió el proyecto; no inventes instrumentos nuevos. La validación de un instrumento (juicio de expertos, prueba piloto, alfa de Cronbach) es una actividad propia, antes de aplicarlo; no la mezcles con la aplicación.\n- "tecnicas": las técnicas, instrumentos y software que usa la fase, separados por coma, tomados de la metodología.\n- "productos": el entregable verificable de la fase, en minúscula.\n- "duracion": número entero de unidades de tiempo.\n- "responsable": quién la lidera (por ejemplo «investigadores» o «investigador principal con el asesor»).\nNo inventes cifras, fechas ni nombres de personas.`;
+const REGLAS_FASE = `Cada fase:\n- "objetivo": el NÚMERO del objetivo específico que cumple (1, 2, 3…), o 0 si es una fase de cierre o de socialización.\n- "instrumentos": los números entre corchetes de los instrumentos declarados que usa la fase, SOLO de los que puede usar su objetivo (lista «INSTRUMENTOS QUE PUEDE USAR CADA OBJETIVO»). La fase de socialización no usa ninguno: [].\n- "nombre": nombre corto de la fase con un sustantivo de acción (por ejemplo «Caracterización de la población»), de 3 a 9 palabras, sin «Fase» ni número.\n- "descripcion": una o dos frases que digan qué se hace en la fase y para qué, con los datos del proyecto (población, lugar, instrumento). Sin punto final.\n- "actividades": de 4 a 6 actividades en orden, cada una empezando con un verbo en infinitivo y concreta (qué, a quién, con qué). REGLA ESTRICTA DE INSTRUMENTOS: las actividades solo nombran los instrumentos declarados que usa la fase, con su nombre (por ejemplo «el cuestionario»). No propongas ninguna otra técnica de recolección (entrevistas, grupos focales, observación, revisión de historias clínicas, pruebas) si no está declarada para ese objetivo. Si el objetivo no tiene instrumentos, sus actividades trabajan con los datos ya recogidos en las fases anteriores o diseñan y validan su producto, sin recoger datos nuevos. La validación de un instrumento (juicio de expertos, prueba piloto, alfa de Cronbach) es una actividad propia, antes de aplicarlo, y usa solo los métodos de validación declarados para ese instrumento.\n- "software": el software del plan de análisis que usa la fase, o cadena vacía.\n- "productos": el entregable verificable de la fase, en minúscula.\n- "duracion": número entero de unidades de tiempo.\n- "responsable": quién la lidera (por ejemplo «investigadores» o «investigador principal con el asesor»).\nNo inventes cifras, fechas ni nombres de personas.`;
 
-const leerFase = (x, especificos) => {
+// Técnicas y herramientas de la fase: las arma el código con los instrumentos declarados que la fase puede usar.
+const tecnicasDe = (usados, software) => [
+    ...usados.map((d) => `${d.tecnica.toLowerCase()} (${d.instrumento})`),
+    ...[...new Set(usados.flatMap((d) => d.validaciones))],
+    ...(software ? [software] : []),
+].join(', ');
+
+const leerFase = (x, especificos, declarados) => {
     const t = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
     const sinPunto = (v) => t(v).replace(/[.\s]+$/, '');
     const k = Math.round(Number(x?.objetivo) || 0);
+    const permitidos = permitidosPara(declarados, k >= 1 && k <= especificos.length ? k : 0);
+    const pedidos = (Array.isArray(x?.instrumentos) ? x.instrumentos : []).map(Number);
+    const usados = permitidos.filter((d) => pedidos.includes(d.n));
     return {
         nombre: capital(sinPunto(x?.nombre).replace(/^fase\s*\d*[.:-]?\s*/i, '')).slice(0, 90),
         objetivo: k >= 1 && k <= especificos.length ? especificos[k - 1] : 'Socializar los resultados del proyecto',
         descripcion: sinPunto(x?.descripcion).slice(0, 400),
         actividades: (Array.isArray(x?.actividades) ? x.actividades : []).map((a) => capital(sinPunto(a))).filter(Boolean).slice(0, 7),
-        tecnicas: sinPunto(x?.tecnicas).slice(0, 200),
+        tecnicas: tecnicasDe(usados, sinPunto(x?.software)).slice(0, 240),
         productos: lower(sinPunto(x?.productos)).slice(0, 160),
         duracion: Math.max(1, Math.min(52, Math.round(Number(x?.duracion) || 4))),
         responsable: sinPunto(x?.responsable).slice(0, 80),
     };
 };
 
+const JSON_FASE = '{"objetivo": 1, "instrumentos": [1], "nombre": "…", "descripcion": "…", "actividades": ["…"], "software": "…", "productos": "…", "duracion": 4, "responsable": "…"}';
+
 // Recomienda todas las fases del proyecto: una por objetivo específico y, al final, la socialización.
 const recomendarFases = async ({ data, especificos, unidad }) => {
     const ctx = contextoFases(data, especificos, unidad);
     const r = await groq.chat.completions.create({
         messages: [
-            { role: 'system', content: 'Eres asesor de proyectos de investigación formativa. Organizas la ejecución de un proyecto en fases coherentes con sus objetivos específicos y con la metodología que ya definió el estudiante. Escribes en español, en forma impersonal. Respondes solo JSON válido.' },
-            { role: 'user', content: `${ctx.texto}\n\nRecomienda las fases del proyecto: una fase por cada objetivo específico, en el mismo orden, y una fase final de socialización de resultados (objetivo 0). Si el proyecto necesita preparar o validar sus instrumentos antes de recoger los datos, incluye esas actividades al inicio de la primera fase, no como fase aparte. La unidad de tiempo es ${unidad}.${ctx.crono ? ` La suma de las duraciones debe ser exactamente ${ctx.crono} ${unidad}, como en el cronograma.` : ` Usa duraciones realistas para un proyecto de estudiantes (en total, entre ${unidad === 'meses' ? '4 y 8 meses' : '16 y 32 semanas'}).`}\n\n${REGLAS_FASE}\n\nResponde exactamente con este JSON: {"fases": [{"objetivo": 1, "nombre": "…", "descripcion": "…", "actividades": ["…"], "tecnicas": "…", "productos": "…", "duracion": 4, "responsable": "…"}]}` },
+            { role: 'system', content: 'Eres asesor de proyectos de investigación formativa. Organizas la ejecución de un proyecto en fases coherentes con sus objetivos específicos y con la metodología que ya definió el estudiante. Solo usas los instrumentos que el proyecto declaró; nunca agregas otros. Escribes en español, en forma impersonal. Respondes solo JSON válido.' },
+            { role: 'user', content: `${ctx.texto}\n\nRecomienda las fases del proyecto: una fase por cada objetivo específico, en el mismo orden, y una fase final de socialización de resultados (objetivo 0). Si un instrumento declarado se usa en varios objetivos, se diseña, valida y aplica una sola vez (en la primera fase que lo usa) y las fases siguientes analizan sus datos sin volver a aplicarlo. La unidad de tiempo es ${unidad}.${ctx.crono ? ` La suma de las duraciones debe ser exactamente ${ctx.crono} ${unidad}, como en el cronograma.` : ` Usa duraciones realistas para un proyecto de estudiantes (en total, entre ${unidad === 'meses' ? '4 y 8 meses' : '16 y 32 semanas'}).`}\n\n${REGLAS_FASE}\n\nResponde exactamente con este JSON: {"fases": [${JSON_FASE}]}` },
         ],
-        temperature: 0.3,
+        temperature: 0.2,
         max_tokens: 3500,
         response_format: { type: 'json_object' },
     });
     const content = r.choices?.[0]?.message?.content || '';
     const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
-    const fases = (Array.isArray(json.fases) ? json.fases : []).map((x) => leerFase(x, especificos)).filter((x) => x.nombre && x.actividades.length >= 2).slice(0, 8);
+    const fases = (Array.isArray(json.fases) ? json.fases : []).map((x) => leerFase(x, especificos, ctx.declarados)).filter((x) => x.nombre && x.actividades.length >= 2).slice(0, 8);
     if (!fases.length) throw new Error('vacio');
     return fases;
 };
@@ -119,15 +172,15 @@ const recomendarUnaFase = async ({ data, especificos, unidad, fase, otras }) => 
     const k = especificos.findIndex((o) => clean(o).toLowerCase() === clean(fase.objetivo).toLowerCase());
     const r = await groq.chat.completions.create({
         messages: [
-            { role: 'system', content: 'Eres asesor de proyectos de investigación formativa. Diseñas una fase de ejecución coherente con su objetivo específico y con la metodología que ya definió el estudiante. Escribes en español, en forma impersonal. Respondes solo JSON válido.' },
-            { role: 'user', content: `${ctx.texto}\n\nOTRAS FASES DEL PROYECTO (no repitas sus actividades)\n${otras.map((o, i) => `- ${o}`).join('\n') || '(ninguna)'}\n\nRecomienda la fase que cumple ${k >= 0 ? `el objetivo específico ${k + 1}: «${especificos[k]}»` : clean(fase.objetivo) ? `«${clean(fase.objetivo)}»` : 'la socialización de los resultados'}. La unidad de tiempo es ${unidad}; la duración actual es ${Number(fase.duracion) || 4}: consérvala salvo que sea claramente irreal.\n\n${REGLAS_FASE}\n\nResponde exactamente con este JSON: {"objetivo": ${k >= 0 ? k + 1 : 0}, "nombre": "…", "descripcion": "…", "actividades": ["…"], "tecnicas": "…", "productos": "…", "duracion": 4, "responsable": "…"}` },
+            { role: 'system', content: 'Eres asesor de proyectos de investigación formativa. Diseñas una fase de ejecución coherente con su objetivo específico y con la metodología que ya definió el estudiante. Solo usas los instrumentos que el proyecto declaró; nunca agregas otros. Escribes en español, en forma impersonal. Respondes solo JSON válido.' },
+            { role: 'user', content: `${ctx.texto}\n\nOTRAS FASES DEL PROYECTO (no repitas sus actividades; si un instrumento ya se aplica en una fase anterior, no lo vuelvas a aplicar: analiza sus datos)\n${otras.map((o) => `- ${o}`).join('\n') || '(ninguna)'}\n\nRecomienda la fase que cumple ${k >= 0 ? `el objetivo específico ${k + 1}: «${especificos[k]}»` : clean(fase.objetivo) ? `«${clean(fase.objetivo)}»` : 'la socialización de los resultados'}. La unidad de tiempo es ${unidad}; la duración actual es ${Number(fase.duracion) || 4}: consérvala salvo que sea claramente irreal.\n\n${REGLAS_FASE}\n\nResponde exactamente con este JSON: ${JSON_FASE.replace('"objetivo": 1', `"objetivo": ${k >= 0 ? k + 1 : 0}`)}` },
         ],
-        temperature: 0.3,
+        temperature: 0.2,
         max_tokens: 1500,
         response_format: { type: 'json_object' },
     });
     const content = r.choices?.[0]?.message?.content || '';
-    const x = leerFase(JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1)), especificos);
+    const x = leerFase(JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1)), especificos, ctx.declarados);
     if (!x.nombre || x.actividades.length < 2) throw new Error('vacio');
     // La fase sigue asociada al objetivo que ya tenía.
     return { ...x, objetivo: clean(fase.objetivo) ? fase.objetivo : x.objetivo };
@@ -235,6 +288,7 @@ const Constructor = ({ intro, onNavigate }) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [especificos.length]);
 
+    const declarados = instrumentosDeclarados(data, especificos);
     const total = fases.reduce((sum, x) => sum + (Number(x.duracion) || 0), 0);
     const texto = redactarFases(fases, f.unidad);
     const fase = fases[Math.min(active, fases.length - 1)];
@@ -310,8 +364,11 @@ const Constructor = ({ intro, onNavigate }) => {
                             <button type="button" className="ide-btn ide-btn--ghost" disabled={Boolean(recomendando) && recomendando !== 'fallo'} onClick={() => recomendarTodas(true)}>
                                 {recomendando === 'todas' ? <Loader2 size={15} className="fas-gira" /> : <Sparkles size={15} />} {recomendando === 'todas' ? 'Recomendando las fases…' : 'Recomendar todas las fases'}
                             </button>
-                            <span>{recomendando === 'fallo' ? 'No se pudo recomendar: inténtalo de nuevo.' : 'Una por objetivo específico y la de socialización, con actividades, técnicas y productos tomados de tu metodología.'}</span>
+                            <span>{recomendando === 'fallo' ? 'No se pudo recomendar: inténtalo de nuevo.' : `Una por objetivo específico y la de socialización. Solo usa ${declarados.length ? `tus ${declarados.length} ${declarados.length === 1 ? 'instrumento declarado' : 'instrumentos declarados'} (${declarados.map((d) => d.tecnica.toLowerCase()).join(', ')})` : 'los instrumentos que declares en la Metodología'}.`}</span>
                         </div>
+                    )}
+                    {especificos.length > 0 && declarados.length === 0 && (
+                        <p className="obj-warn"><AlertTriangle size={14} aria-hidden="true" /> Aún no declaras instrumentos de recolección en la Metodología: las fases no tendrán con qué recoger datos.{onNavigate && <> <button type="button" className="ide-link" onClick={() => onNavigate('metodologia')}>Ir a la Metodología</button></>}</p>
                     )}
 
                     <div className="fas-tabs" role="tablist" aria-label="Fases del proyecto">
@@ -371,6 +428,9 @@ const Constructor = ({ intro, onNavigate }) => {
                                     })}
                                 </ol>
                                 <button type="button" className="ide-btn ide-btn--ghost obj-add" onClick={() => setFase(ai, { actividades: [...fase.actividades, ''] })}><Plus size={15} /> Agregar actividad</button>
+                                {instrumentosAjenos(fase, declarados, especificos).length > 0 && (
+                                    <p className="obj-warn"><AlertTriangle size={14} aria-hidden="true" /> Esta fase menciona {instrumentosAjenos(fase, declarados, especificos).map((x) => `«${x.toLowerCase()}»`).join(', ')}, que no {instrumentosAjenos(fase, declarados, especificos).length === 1 ? 'está declarada' : 'están declaradas'} en tu Metodología para este objetivo. Declárala allí o ajusta la actividad.</p>
+                                )}
                             </div>
 
                             <label className="mar-campo mar-wide">
