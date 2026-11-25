@@ -405,8 +405,8 @@ const Admin = () => {
     const marcarPagina = () => setMarcados((prev) => { const s = new Set(prev); marcables.forEach((u) => (todosMarcados ? s.delete(u.id) : s.add(u.id))); return s; });
 
     const exportar = () => descargar('usuarios-projectsia.csv', csv([
-        ['Nombre', 'Correo', 'Rol', 'Grupo', 'Profesor a cargo', 'Estado', 'Proyectos', 'Cupo', 'Coherencia (%)', 'Última actividad', 'Registro'],
-        ...visible.map((u) => [u.name, u.email, nombreRol(u.role), u.grupo || '', u.teacherName || '', STATUS[u.status] || u.status, u.projectCount, u.role === 'admin' ? '' : u.projectLimit, u.coherencia ? u.coherencia.score : '', formatDate(u.lastActivity || u.lastLoginAt), formatDate(u.createdAt)]),
+        ['Nombre', 'Correo', 'Rol', 'Grupo', 'Profesor a cargo', 'Estado', 'Proyectos', 'Cupo', 'Última actividad', 'Registro'],
+        ...visible.map((u) => [u.name, u.email, nombreRol(u.role), u.grupo || '', u.teacherName || '', STATUS[u.status] || u.status, u.projectCount, u.role === 'admin' ? '' : u.projectLimit, formatDate(u.lastActivity || u.lastLoginAt), formatDate(u.createdAt)]),
     ]));
     const exportarProyectos = () => descargar('proyectos-projectsia.csv', csv([
         ['Título', 'Nombre del proyecto', 'Dueño', 'Correo', 'Rol', 'Avance (%)', 'Coherencia (%)', 'Invitados', 'Actualizado'],
@@ -538,7 +538,6 @@ const Admin = () => {
                                         <button type="button" onClick={() => viewUser(e.id)}>
                                             <span><b>{e.name}</b><small>{e.email}</small></span>
                                             <small>{e.projectCount} {e.projectCount === 1 ? 'proyecto' : 'proyectos'} · {e.projectLimit ? `puede crear ${e.projectLimit}` : 'sin permiso para crear'}</small>
-                                            <CoherenciaBadge value={e.coherencia} />
                                             <ChevronRight size={16} aria-hidden="true" />
                                         </button>
                                     </li>
@@ -691,15 +690,14 @@ const Admin = () => {
                                         <th scope="col">Estado</th>
                                         <Th id="proyectos" orden={orden} onOrden={ordenar} num>Proyectos</Th>
                                         <th scope="col" title="Cuántos proyectos puede crear. 0 = sin permiso todavía">Puede crear</th>
-                                        <th scope="col" title="Coherencia entre secciones del proyecto más reciente">Coherencia</th>
                                         <Th id="actividad" orden={orden} onOrden={ordenar}>Actividad</Th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {loading && users.length === 0 && <Esqueleto columnas={8} />}
+                                    {loading && users.length === 0 && <Esqueleto columnas={7} />}
                                     {!loading && visible.length === 0 && (
                                         <tr>
-                                            <td colSpan={8} className="adm-empty">
+                                            <td colSpan={7} className="adm-empty">
                                                 {users.length <= 1 && !hayFiltros
                                                     ? <><Users size={22} aria-hidden="true" /><b>Todavía no hay cuentas</b><span>Nadie se registra solo: crea las primeras con «Crear cuentas», una a una o pegando una lista.</span><button type="button" className="pro-btn pro-btn--primary" onClick={() => setCreando(true)}><UserPlus size={15} /> Crear cuentas</button></>
                                                     : <><b>Ninguna cuenta coincide</b><span>Prueba con otro nombre o quita los filtros.</span><button type="button" className="pro-btn pro-btn--ghost" onClick={limpiarFiltros}>Quitar filtros</button></>}
@@ -726,7 +724,6 @@ const Admin = () => {
                                             <td><StatusBadge status={user.status} />{user.mustChangePassword && user.role !== 'admin' && <small className="adm-sub" title="Todavía no ha entrado a cambiar su contraseña temporal">Sin estrenar</small>}</td>
                                             <td className="adm-num">{user.projectCount}</td>
                                             <td><Cupo user={user} onChange={changeLimit} busy={busy} /></td>
-                                            <td><CoherenciaBadge value={user.coherencia} /></td>
                                             <td title={formatDate(user.lastActivity || user.lastLoginAt)}>{haceCuanto(user.lastActivity || user.lastLoginAt)}</td>
                                         </tr>
                                     ))}
