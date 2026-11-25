@@ -1,6 +1,7 @@
 import React from 'react';
 import { documentoNumerado, splitInline } from '../services/projectDoc';
 import { arbolDataUrl, nivelesDe } from '../services/arbol';
+import { fasesDataUrl } from '../services/fasesGrafico';
 import './Proyecto.css';
 
 // Pinta los bloques del documento (títulos, párrafos, listas y tablas) sin HTML crudo.
@@ -16,7 +17,9 @@ export const Block = ({ block, fileUrl }) => {
         return (
             <figure className="pro-figura">
                 <Rotulo block={block} />
-                {block.arbol
+                {block.fases
+                    ? <img src={fasesDataUrl(block.fases)} alt={`Ruta del proyecto: ${block.fases.fases.map((f, i) => `fase ${i + 1}, ${f.nombre} (${f.duracion} ${block.fases.unidad})`).join('; ')}`} />
+                    : block.arbol
                     ? <img src={arbolDataUrl(block.arbol)} alt={`${nivelesDe(block.arbol).nombre}. ${nivelesDe(block.arbol).centro}: ${block.arbol.problema}. ${nivelesDe(block.arbol).abajoPlural}: ${block.arbol.causas.join('; ')}. ${nivelesDe(block.arbol).arribaPlural}: ${block.arbol.efectos.join('; ')}.`} />
                     : fileUrl ? <img src={fileUrl(block.fileId)} alt={block.caption} loading="lazy" /> : <p className="pro-nota">La imagen se ve al iniciar sesión.</p>}
                 <Nota text={block.nota} />

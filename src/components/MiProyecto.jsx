@@ -7,6 +7,7 @@ import Coherencia from './Coherencia';
 import ProyectoPaneles from './ProyectoPaneles';
 import { api, groq } from '../services/api';
 import { arbolPng } from '../services/arbol';
+import { fasesPng } from '../services/fasesGrafico';
 import { TEMAS, temaDe } from '../data/temasDiapositivas';
 import './Proyecto.css';
 
@@ -138,11 +139,15 @@ const MiProyecto = ({ onNavigate }) => {
     // Descarga las figuras del proyecto para incluirlas en el Word o en el PDF.
     const cargarImagenes = async () => {
         const figuras = sections.flatMap((section) => section.content).filter((b) => b.type === 'figure');
-        const ids = [...new Set(figuras.filter((b) => !b.arbol).map((b) => b.fileId))];
+        const ids = [...new Set(figuras.filter((b) => !b.arbol && !b.fases).map((b) => b.fileId))];
         const imagenes = {};
         // El árbol del problema no es un archivo subido: se dibuja aquí mismo.
         await Promise.all(figuras.filter((b) => b.arbol).map(async (b) => {
             try { imagenes[b.fileId] = await arbolPng(b.arbol); } catch { /* queda con un aviso en el documento */ }
+        }));
+        // La ruta de fases también se dibuja aquí.
+        await Promise.all(figuras.filter((b) => b.fases).map(async (b) => {
+            try { imagenes[b.fileId] = await fasesPng(b.fases); } catch { /* queda con un aviso en el documento */ }
         }));
         if (!project.id) return imagenes;
         await Promise.all(ids.map(async (fid) => {

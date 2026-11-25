@@ -3,6 +3,7 @@ import { ordenarReferencias, referenciaAPA } from './apa.js';
 import { partesObjetivos } from './coherencia.js';
 import { bloquesInstrumento, preguntasDe, ubicacionDe } from './instrumentos.js';
 import { LEYENDA_MUESTRA, ecuacionEnLinea, ecuacionesMuestreo } from '../data/muestreoEcuaciones.js';
+import { datosFases, fasesSvg } from './fasesGrafico.js';
 
 // Arma el documento del proyecto a partir de lo guardado en cada herramienta.
 // Cada sección produce "bloques" neutros que se pintan en pantalla o se exportan a Word.
@@ -238,7 +239,17 @@ const BASE_ELEMENTOS = {
         ...titled('Plan de análisis de la información', d.metPlanAnalisis),
         ...titled('Instrumentos de recolección de información', conAnexos(d, d.instrumentos), 3),
     ],
-    fases: (d) => cuerpo(d.fases),
+    // La ruta de fases va como figura al inicio del apartado, presentada por un párrafo que la cita.
+    fases: (d) => {
+        const texto = cuerpo(d.fases);
+        const datos = datosFases(d.fasesForm, partesObjetivos(d.objetivos).especificos.map((o) => o.replace(/\.$/, '')));
+        if (!texto.length || datos.fases.length < 2) return texto;
+        const total = datos.fases.reduce((s, f) => s + f.duracion, 0);
+        const { w, h } = fasesSvg(datos);
+        const presentacion = { type: 'paragraph', text: `El proyecto se desarrolla en ${datos.fases.length} fases durante ${total} ${datos.unidad === 'meses' ? (total === 1 ? 'mes' : 'meses') : (total === 1 ? 'semana' : 'semanas')}. La [[fasesfig]] presenta la ruta del proyecto: cada fase con su duración, sus actividades principales, sus instrumentos y el producto que entrega.`, citaDe: ['fasesfig'] };
+        const figura = { type: 'figure', elementoId: 'fasesfig', fileId: 'fasesfig', fases: datos, caption: 'Ruta de las fases del proyecto', nota: 'Elaboración propia.', w, h };
+        return [presentacion, figura, ...texto];
+    },
 };
 export const parrafosDe = (d, seccion) => (BASE_ELEMENTOS[seccion]?.(d || {}) || []).filter((b) => b.type === 'paragraph').map((b) => b.text);
 
