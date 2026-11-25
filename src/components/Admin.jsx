@@ -5,6 +5,7 @@ import { buildDocument } from '../services/projectDoc';
 import { DocumentPaper } from './ProjectDocument';
 import Coherencia from './Coherencia';
 import AdminEstado from './AdminEstado';
+import { CuotaIA, GruposProfesor, ServiciosExternos } from './AdminServicios';
 import { CrearCuentas, Credenciales, ROLES, csv, descargar, nombreRol } from './Cuentas';
 import Selector from './Selector';
 import { avisar, confirmar } from './Avisos';
@@ -989,6 +990,7 @@ const Admin = () => {
                             </table>
                         </div>
                     </section>
+                    <GruposProfesor profesores={profesores} version={users.map((u) => `${u.id}:${u.grupo}:${u.role}`).join('|')} onCambio={load} />
                     <section className="pro-card adm-panel">
                         <div className="adm-bitacora-cabeza">
                             <h2>Por profesor</h2>
@@ -1055,6 +1057,7 @@ const Admin = () => {
 
             {vista === 'uso' && (
                 <>
+                    <CuotaIA onVerUsuario={viewUser} />
                     <section className="pro-card adm-panel">
                         <div className="adm-papelera-cabeza adm-bitacora-cabeza">
                             <div>
@@ -1147,6 +1150,7 @@ const Admin = () => {
                             El envío de correo no está configurado en el servidor: las cuentas nuevas no reciben el correo con su acceso. Entrega tú la contraseña temporal que aparece al crearlas.
                         </p>
                     )}
+                    <ServiciosExternos />
                     <AdminEstado fijo onRestaurada={() => { setProjects(null); setSelected(null); load(); api.admin.log().then((r) => setBitacora(r.log)).catch(() => {}); }} />
                     <section className="pro-card adm-panel adm-bitacora">
                         <div className="adm-bitacora-cabeza">

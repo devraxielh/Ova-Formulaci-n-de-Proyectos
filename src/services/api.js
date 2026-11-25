@@ -65,7 +65,11 @@ export const api = {
     uploadFile: (id, payload) => request(`/projects/${id}/files`, { method: 'POST', body: payload }),
     deleteFile: (id, fid) => request(`/projects/${id}/files/${fid}`, { method: 'DELETE' }),
     fileUrl: (id, fid) => `/api/projects/${id}/files/${fid}`,
-    chat: (payload) => request('/ai/chat', { method: 'POST', body: payload }),
+    // Si la cuenta agotó su cuota de IA, se avisa siempre (cada módulo muestra su propio mensaje genérico de fallo).
+    chat: (payload) => request('/ai/chat', { method: 'POST', body: payload }).catch((error) => {
+        if (error?.code === 'cuota_ia' && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('psia:aviso', { detail: { texto: error.message, tipo: 'error' } }));
+        throw error;
+    }),
     admin: {
         users: () => request('/admin/users'),
         estado: () => request('/admin/estado'),
@@ -99,6 +103,15 @@ export const api = {
         restore: (id) => request(`/admin/trash/${id}/restore`, { method: 'POST' }),
         purge: (id) => request(id ? `/admin/trash/${id}` : '/admin/trash', { method: 'DELETE' }),
         renameGroup: (from, to) => request('/admin/groups/rename', { method: 'POST', body: { from, to } }),
+        // Grupos: profesor a cargo y cuota de IA. Cuota de IA por cuenta. Estado de los servicios externos.
+        groups: () => request('/admin/groups'),
+        groupTeacher: (grupo, teacherId) => request('/admin/groups/teacher', { method: 'POST', body: { grupo, teacherId } }),
+        groupAiLimit: (grupo, limit) => request('/admin/groups/ai-limit', { method: 'POST', body: { grupo, limit } }),
+        aiQuota: () => request('/admin/ia-cuota'),
+        aiQuotaGeneral: (limit) => request('/admin/ia-cuota/general', { method: 'POST', body: { limit } }),
+        userAi: (id, cambios) => request(`/admin/users/${id}/ia`, { method: 'POST', body: cambios }),
+        services: () => request('/admin/servicios'),
+        testService: (id) => request(`/admin/servicios/${encodeURIComponent(id)}/probar`, { method: 'POST' }),
     },
     // Profesor: los estudiantes a su cargo y sus proyectos (solo lectura).
     teacher: {

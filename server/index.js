@@ -407,6 +407,75 @@ const bitacora = (req, action, detail = '') => {
 };
 const grupoLimpio = (texto) => String(texto || '').trim().replace(/\s+/g, ' ').slice(0, 60);
 
+/* ---------- Grupos (profesor a cargo), cuota de IA y estado de los servicios externos ---------- */
+
+// Un grupo es el texto `users.grupo`; aquí va lo que es del grupo y no de cada cuenta: su profesor y su cuota de IA.
+db.exec('CREATE TABLE IF NOT EXISTS grupos (name TEXT PRIMARY KEY, teacher_id INTEGER, ai_limit INTEGER)');
+// Quién ha tenido a cargo cada grupo y desde cuándo: al cambiar de profesor no se pierde quién estuvo antes.
+db.exec(`CREATE TABLE IF NOT EXISTS grupo_profesores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    grupo TEXT NOT NULL,
+    teacher_id INTEGER,
+    teacher TEXT NOT NULL DEFAULT '',
+    desde INTEGER NOT NULL,
+    hasta INTEGER,
+    actor TEXT NOT NULL DEFAULT ''
+)`);
+db.exec('CREATE TABLE IF NOT EXISTS ajustes (clave TEXT PRIMARY KEY, valor TEXT NOT NULL)');
+addColumn('users', 'ai_limit', 'INTEGER'); // solicitudes de IA por día para esta cuenta; NULL = la de su grupo o la general
+const ajuste = (clave, porDefecto) => { try { const r = db.prepare('SELECT valor FROM ajustes WHERE clave = ?').get(clave); return r ? JSON.parse(r.valor) : porDefecto; } catch { return porDefecto; } };
+const guardarAjuste = (clave, valor) => db.prepare('INSERT INTO ajustes (clave, valor) VALUES (?, ?) ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor').run(clave, JSON.stringify(valor));
+
+// Cuota de IA: solicitudes por día y por cuenta. Vale la de la cuenta; si no tiene, la de su grupo; si no, la general.
+// «Extra» es una ampliación solo por hoy (se guarda como un contador más del día).
+const AI_DIARIO_DEFECTO = Math.min(5000, Math.max(1, parseInt(process.env.AI_DAILY_LIMIT, 10) || 300));
+const AI_DIARIO_MAX = 5000;
+const cuotaGeneral = () => { const v = Number(ajuste('ia_diaria', AI_DIARIO_DEFECTO)); return Number.isInteger(v) && v >= 1 ? Math.min(AI_DIARIO_MAX, v) : AI_DIARIO_DEFECTO; };
+const usoDeHoy = (userId, kind) => db.prepare('SELECT n FROM usage_daily WHERE day = ? AND user_id = ? AND kind = ?').get(diaDe(), userId, kind)?.n || 0;
+const cuotaDe = (user, usadas = null, extra = null) => {
+    const delGrupo = user.grupo ? db.prepare('SELECT ai_limit FROM grupos WHERE name = ?').get(user.grupo)?.ai_limit : null;
+    const [limite, origen] = user.ai_limit != null ? [user.ai_limit, 'cuenta'] : delGrupo != null ? [delGrupo, 'grupo'] : [cuotaGeneral(), 'general'];
+    return { limite, origen, extra: extra ?? usoDeHoy(user.id, 'ia_extra'), usadas: usadas ?? usoDeHoy(user.id, 'ia') };
+};
+const limiteValido = (v) => { const n = parseInt(v, 10); return Number.isInteger(n) && n >= 0 && n <= AI_DIARIO_MAX && String(v).trim() !== '' ? n : null; };
+
+// Profesor de un grupo: sus estudiantes quedan a su cargo; el anterior queda en el historial con sus fechas.
+const ponerProfesorDeGrupo = (grupo, prof, actor) => db.transaction(() => {
+    const ahora = Date.now();
+    db.prepare('INSERT INTO grupos (name, teacher_id) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET teacher_id = excluded.teacher_id').run(grupo, prof ? prof.id : null);
+    db.prepare('UPDATE grupo_profesores SET hasta = ? WHERE grupo = ? AND hasta IS NULL').run(ahora, grupo);
+    if (prof) db.prepare('INSERT INTO grupo_profesores (grupo, teacher_id, teacher, desde, actor) VALUES (?, ?, ?, ?, ?)').run(grupo, prof.id, prof.name, ahora, String(actor || '').slice(0, 80));
+    return db.prepare("UPDATE users SET teacher_id = ? WHERE grupo = ? AND role = 'student'").run(prof ? prof.id : null, grupo).changes;
+})();
+// Un estudiante que entra a un grupo con profesor queda a cargo de ese profesor.
+const heredarProfesor = (ids) => {
+    const upd = db.prepare(`UPDATE users SET teacher_id = (SELECT teacher_id FROM grupos WHERE name = users.grupo)
+                            WHERE id = ? AND role = 'student' AND EXISTS (SELECT 1 FROM grupos WHERE name = users.grupo AND teacher_id IS NOT NULL)`);
+    ids.forEach((id) => upd.run(id));
+};
+// Quien deja de ser profesor (o se elimina) deja sus grupos sin profesor; el historial conserva su paso.
+const soltarGrupos = (teacherId) => {
+    db.prepare('UPDATE grupo_profesores SET hasta = ? WHERE teacher_id = ? AND hasta IS NULL').run(Date.now(), teacherId);
+    db.prepare('UPDATE grupos SET teacher_id = NULL WHERE teacher_id = ?').run(teacherId);
+};
+
+// Estado de los servicios externos: última vez que respondieron bien, último error y fallos seguidos.
+// Se guarda para que no se pierda al reiniciar.
+const servicios = ajuste('servicios', {});
+let serviciosGuardado = 0;
+const marcarServicio = (id, ok, error = '') => {
+    const e = servicios[id] || (servicios[id] = { okAt: 0, errAt: 0, error: '', fallos: 0 });
+    if (ok) { e.okAt = Date.now(); e.fallos = 0; } else { e.errAt = Date.now(); e.error = String(error || 'sin detalle').replace(/\s+/g, ' ').slice(0, 200); e.fallos = (e.fallos || 0) + 1; }
+    if (!ok || Date.now() - serviciosGuardado > 60000) { serviciosGuardado = Date.now(); try { guardarAjuste('servicios', servicios); } catch { /* el estado nunca debe tumbar la solicitud */ } }
+};
+// Todo correo que sale pasa por aquí: se cuenta y se anota si el servidor de correo respondió.
+if (mailer) {
+    const enviar = mailer.sendMail.bind(mailer);
+    mailer.sendMail = async (mensaje) => {
+        try { const r = await enviar(mensaje); marcarServicio('correo', true); contarUso('correo', 0); return r; } catch (error) { marcarServicio('correo', false, error?.message); throw error; }
+    };
+}
+
 const logError = (kind, message, detail = '', userId = null) => {
     try {
         db.prepare('INSERT INTO error_log (kind, user_id, message, detail, created_at) VALUES (?, ?, ?, ?, ?)')
@@ -535,7 +604,7 @@ app.use((req, _res, next) => {
     const token = readCookie(req, SESSION_COOKIE);
     if (token) {
         const row = db.prepare(`
-            SELECT users.id, users.email, users.name, users.role, users.status, users.must_change_password, users.project_limit, sessions.expires_at
+            SELECT users.id, users.email, users.name, users.role, users.status, users.must_change_password, users.project_limit, users.grupo, users.ai_limit, sessions.expires_at
             FROM sessions JOIN users ON users.id = sessions.user_id
             WHERE sessions.token_hash = ?`).get(sha256(token));
         if (row && row.expires_at > Date.now() && row.status === 'active') {
@@ -1088,6 +1157,7 @@ const adminUserRow = (row) => ({
     lastActivity: row.last_activity,
     teacherId: row.teacher_id || null,
     grupo: row.grupo || '',
+    aiLimit: row.ai_limit ?? null,
     ...(row.email === INVITADO_COMUN ? { comun: true } : {}),
     teacherName: row.teacher_id ? (db.prepare('SELECT name FROM users WHERE id = ?').get(row.teacher_id)?.name || '') : '',
     mustChangePassword: Boolean(row.must_change_password),
@@ -1166,6 +1236,7 @@ app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
     if (email !== target.email && db.prepare('SELECT 1 FROM users WHERE email = ? AND id != ?').get(email, target.id)) return res.status(400).json({ error: 'Ya existe una cuenta con ese correo.' });
     db.transaction(() => {
         db.prepare('UPDATE users SET name = ?, email = ?, grupo = ? WHERE id = ?').run(name, email, grupo, target.id);
+        if (grupo !== (target.grupo || '')) heredarProfesor([target.id]);
         if (email !== target.email) {
             db.prepare('UPDATE OR IGNORE project_members SET email = ? WHERE email = ?').run(email, target.email);
             db.prepare('DELETE FROM project_members WHERE email = ?').run(target.email);
@@ -1183,6 +1254,7 @@ app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
 const borrarCuenta = (target, actor = '') => db.transaction(() => {
     archivarCuenta(target, actor);
     db.prepare('UPDATE users SET teacher_id = NULL WHERE teacher_id = ?').run(target.id);
+    if (target.role === 'teacher') soltarGrupos(target.id);
     db.prepare('DELETE FROM project_members WHERE email = ?').run(target.email);
     db.prepare('DELETE FROM users WHERE id = ?').run(target.id);
 })();
@@ -1228,7 +1300,7 @@ app.post('/api/admin/users/bulk', requireAdmin, async (req, res) => {
     } else if (action === 'group') {
         const grupo = grupoLimpio(value);
         const upd = db.prepare('UPDATE users SET grupo = ? WHERE id = ?');
-        hacer = (u) => upd.run(grupo, u.id);
+        hacer = (u) => { upd.run(grupo, u.id); if (grupo) heredarProfesor([u.id]); };
         texto = grupo ? `Puso en el grupo «${grupo}»` : 'Sacó del grupo';
     } else if (action === 'limit') {
         const limit = parseInt(value, 10);
@@ -1253,7 +1325,7 @@ app.post('/api/admin/users/bulk', requireAdmin, async (req, res) => {
         hacer = (u) => {
             const cupo = cupoAlCambiar(value, u.project_limit);
             upd.run(value, value === 'student' ? u.teacher_id : null, cupo, u.id);
-            if (u.role === 'teacher') soltar.run(u.id);
+            if (u.role === 'teacher') { soltar.run(u.id); soltarGrupos(u.id); }
         };
         texto = `Cambió el rol a ${ROL_NOMBRE[value] || value}`;
     } else if (action === 'access') {
@@ -1287,9 +1359,139 @@ app.post('/api/admin/groups/rename', requireAdmin, (req, res) => {
     const n = db.prepare('SELECT COUNT(*) AS n FROM users WHERE grupo = ?').get(from).n;
     if (!n) return res.status(404).json({ error: 'No hay cuentas en ese grupo.' });
     const unido = to ? db.prepare('SELECT COUNT(*) AS n FROM users WHERE grupo = ?').get(to).n > 0 : false;
-    db.prepare('UPDATE users SET grupo = ? WHERE grupo = ?').run(to, from);
+    db.transaction(() => {
+        db.prepare('UPDATE users SET grupo = ? WHERE grupo = ?').run(to, from);
+        const propio = db.prepare('SELECT * FROM grupos WHERE name = ?').get(from);
+        if (!to) {
+            // El grupo desaparece: se cierra su historial (los estudiantes conservan su profesor).
+            db.prepare('UPDATE grupo_profesores SET hasta = ? WHERE grupo = ? AND hasta IS NULL').run(Date.now(), from);
+        } else if (unido) {
+            // Al unir, manda el grupo de destino: su profesor y su cuota; los que llegan quedan a cargo de ese profesor.
+            db.prepare('UPDATE grupo_profesores SET hasta = ? WHERE grupo = ? AND hasta IS NULL').run(Date.now(), from);
+            const destino = db.prepare('SELECT teacher_id FROM grupos WHERE name = ?').get(to);
+            if (destino?.teacher_id) db.prepare("UPDATE users SET teacher_id = ? WHERE grupo = ? AND role = 'student'").run(destino.teacher_id, to);
+        } else {
+            db.prepare('DELETE FROM grupos WHERE name = ?').run(to); // fila sin cuentas que hubiera quedado de antes
+            if (propio) db.prepare('UPDATE grupos SET name = ? WHERE name = ?').run(to, from);
+            db.prepare('UPDATE grupo_profesores SET grupo = ? WHERE grupo = ?').run(to, from);
+        }
+        if (!to || unido) db.prepare('DELETE FROM grupos WHERE name = ?').run(from);
+    })();
     bitacora(req, !to ? 'Quitó un grupo' : unido ? 'Unió dos grupos' : 'Cambió el nombre de un grupo', `«${from}»${to ? ` → «${to}»` : ''}, ${n} ${n === 1 ? 'cuenta' : 'cuentas'}`);
     return res.json({ cuentas: n, unido, grupo: to });
+});
+
+// Grupos con su profesor a cargo, su cuota de IA y quién los ha tenido.
+app.get('/api/admin/groups', requireAdmin, (_req, res) => {
+    const cuentas = new Map(db.prepare("SELECT grupo, COUNT(*) AS n, SUM(CASE WHEN role = 'student' THEN 1 ELSE 0 END) AS est FROM users WHERE grupo != '' GROUP BY grupo").all().map((r) => [r.grupo, r]));
+    const propios = new Map(db.prepare('SELECT g.*, u.name AS teacher FROM grupos g LEFT JOIN users u ON u.id = g.teacher_id').all().map((r) => [r.name, r]));
+    const historial = db.prepare('SELECT grupo, teacher, teacher_id, desde, hasta, actor FROM grupo_profesores ORDER BY desde DESC, id DESC').all();
+    res.json({
+        groups: [...cuentas.keys()].sort((a, b) => a.localeCompare(b, 'es', { numeric: true })).map((name) => ({
+            name,
+            cuentas: cuentas.get(name).n,
+            estudiantes: cuentas.get(name).est,
+            teacherId: propios.get(name)?.teacher_id || null,
+            teacherName: propios.get(name)?.teacher || '',
+            aiLimit: propios.get(name)?.ai_limit ?? null,
+            historial: historial.filter((h) => h.grupo === name).slice(0, 10).map((h) => ({ teacher: h.teacher, teacherId: h.teacher_id, desde: h.desde, hasta: h.hasta, actor: h.actor })),
+        })),
+        iaGeneral: cuotaGeneral(),
+    });
+});
+
+// Asignar (o quitar) el profesor de un grupo: todos sus estudiantes pasan a su cargo.
+app.post('/api/admin/groups/teacher', requireAdmin, (req, res) => {
+    const grupo = grupoLimpio(req.body?.grupo);
+    if (!grupo || !db.prepare('SELECT 1 FROM users WHERE grupo = ?').get(grupo)) return res.status(404).json({ error: 'No hay cuentas en ese grupo.' });
+    const prof = req.body?.teacherId ? db.prepare("SELECT id, name FROM users WHERE id = ? AND role = 'teacher'").get(Number(req.body.teacherId)) : null;
+    if (req.body?.teacherId && !prof) return res.status(400).json({ error: 'El profesor indicado no existe.' });
+    const antes = db.prepare('SELECT u.id, u.name FROM grupos g JOIN users u ON u.id = g.teacher_id WHERE g.name = ?').get(grupo);
+    if ((antes?.id || null) === (prof?.id || null)) return res.status(400).json({ error: prof ? 'Ese profesor ya tiene a cargo el grupo.' : 'El grupo no tiene profesor.' });
+    const estudiantes = ponerProfesorDeGrupo(grupo, prof, req.user.name);
+    bitacora(req, prof ? (antes ? 'Cambió el profesor de un grupo' : 'Asignó profesor a un grupo') : 'Quitó el profesor de un grupo', `«${grupo}»: ${antes ? antes.name : 'sin profesor'} → ${prof ? prof.name : 'sin profesor'}, ${estudiantes} ${estudiantes === 1 ? 'estudiante' : 'estudiantes'}`);
+    return res.json({ grupo, teacherId: prof?.id || null, teacherName: prof?.name || '', estudiantes });
+});
+
+// Cuota de IA de un grupo (null = la general).
+app.post('/api/admin/groups/ai-limit', requireAdmin, (req, res) => {
+    const grupo = grupoLimpio(req.body?.grupo);
+    if (!grupo || !db.prepare('SELECT 1 FROM users WHERE grupo = ?').get(grupo)) return res.status(404).json({ error: 'No hay cuentas en ese grupo.' });
+    const quitar = req.body?.limit === null || req.body?.limit === '';
+    const limite = quitar ? null : limiteValido(req.body?.limit);
+    if (!quitar && limite === null) return res.status(400).json({ error: `La cuota debe estar entre 0 y ${AI_DIARIO_MAX} solicitudes por día.` });
+    db.prepare('INSERT INTO grupos (name, ai_limit) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET ai_limit = excluded.ai_limit').run(grupo, limite);
+    bitacora(req, 'Cambió la cuota de IA de un grupo', `«${grupo}»: ${limite === null ? 'la general' : `${limite} por día`}`);
+    return res.json({ grupo, aiLimit: limite });
+});
+
+// Cuota de IA: la general, quién la está gastando hoy y cómo va cada grupo.
+app.get('/api/admin/ia-cuota', requireAdmin, (_req, res) => {
+    const hoy = diaDe();
+    const uso = new Map();
+    db.prepare("SELECT user_id, kind, n FROM usage_daily WHERE day = ? AND user_id > 0 AND kind IN ('ia', 'ia_extra')").all(hoy).forEach((r) => {
+        const u = uso.get(r.user_id) || { ia: 0, ia_extra: 0 };
+        u[r.kind] = r.n;
+        uso.set(r.user_id, u);
+    });
+    const todas = db.prepare("SELECT id, name, email, role, grupo, ai_limit FROM users WHERE role NOT IN ('admin', 'guest')").all();
+    const filas = todas.map((u) => {
+        const c = cuotaDe(u, uso.get(u.id)?.ia || 0, uso.get(u.id)?.ia_extra || 0);
+        return { id: u.id, name: u.name, email: u.email, role: u.role, grupo: u.grupo || '', propia: u.ai_limit, ...c, tope: c.limite + c.extra };
+    });
+    const pct = (f) => (f.tope > 0 ? f.usadas / f.tope : (f.usadas > 0 || f.tope === 0 ? 1 : 0));
+    const grupos = new Map();
+    filas.forEach((f) => {
+        const g = grupos.get(f.grupo) || { grupo: f.grupo, cuentas: 0, usadas: 0, agotaron: 0, limite: null };
+        g.cuentas += 1; g.usadas += f.usadas; if (f.tope > 0 && f.usadas >= f.tope) g.agotaron += 1;
+        grupos.set(f.grupo, g);
+    });
+    db.prepare('SELECT name, ai_limit FROM grupos WHERE ai_limit IS NOT NULL').all().forEach((r) => { const g = grupos.get(r.name); if (g) g.limite = r.ai_limit; });
+    res.json({
+        general: cuotaGeneral(),
+        maximo: AI_DIARIO_MAX,
+        dia: hoy,
+        solicitudesHoy: filas.reduce((s, f) => s + f.usadas, 0),
+        agotaron: filas.filter((f) => f.tope > 0 && f.usadas >= f.tope).length,
+        cerca: filas.filter((f) => f.tope > 0 && f.usadas < f.tope && f.usadas >= f.tope * 0.8).length,
+        // Solo las cuentas con algo que mostrar: usaron la IA hoy, tienen cuota propia o una ampliación de hoy.
+        cuentas: filas.filter((f) => f.usadas > 0 || f.propia != null || f.extra > 0).sort((a, b) => pct(b) - pct(a) || b.usadas - a.usadas).slice(0, 200),
+        grupos: [...grupos.values()].filter((g) => g.grupo && (g.usadas > 0 || g.limite != null)).sort((a, b) => b.usadas - a.usadas),
+    });
+});
+
+app.post('/api/admin/ia-cuota/general', requireAdmin, (req, res) => {
+    const limite = limiteValido(req.body?.limit);
+    if (limite === null || limite < 1) return res.status(400).json({ error: `La cuota general debe estar entre 1 y ${AI_DIARIO_MAX} solicitudes por día.` });
+    const antes = cuotaGeneral();
+    guardarAjuste('ia_diaria', limite);
+    bitacora(req, 'Cambió la cuota general de IA', `${antes} → ${limite} por día`);
+    return res.json({ general: limite });
+});
+
+// Cuota de IA de una cuenta: `limit` (null = la de su grupo o la general) y/o `extra` (ampliación solo por hoy).
+app.post('/api/admin/users/:id/ia', requireAdmin, (req, res) => {
+    const target = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(req.params.id));
+    if (!target || target.role === 'admin' || target.role === 'guest') return res.status(404).json({ error: 'No se encontró la cuenta.' });
+    const cambios = [];
+    if (req.body?.limit !== undefined) {
+        const quitar = req.body.limit === null || req.body.limit === '';
+        const limite = quitar ? null : limiteValido(req.body.limit);
+        if (!quitar && limite === null) return res.status(400).json({ error: `La cuota debe estar entre 0 y ${AI_DIARIO_MAX} solicitudes por día.` });
+        db.prepare('UPDATE users SET ai_limit = ? WHERE id = ?').run(limite, target.id);
+        target.ai_limit = limite;
+        cambios.push(limite === null ? 'cuota heredada' : `cuota ${limite} por día`);
+    }
+    if (req.body?.extra !== undefined) {
+        const extra = limiteValido(req.body.extra);
+        if (extra === null) return res.status(400).json({ error: `La ampliación debe estar entre 0 y ${AI_DIARIO_MAX} solicitudes.` });
+        db.prepare("INSERT INTO usage_daily (day, user_id, kind, n) VALUES (?, ?, 'ia_extra', ?) ON CONFLICT(day, user_id, kind) DO UPDATE SET n = excluded.n").run(diaDe(), target.id, extra);
+        cambios.push(`${extra} solicitudes más por hoy`);
+    }
+    if (!cambios.length) return res.status(400).json({ error: 'No hay nada que cambiar.' });
+    bitacora(req, 'Cambió la cuota de IA de una cuenta', `${target.name} (${target.email}): ${cambios.join(', ')}`);
+    const c = cuotaDe(target);
+    return res.json({ id: target.id, propia: target.ai_limit, ...c, tope: c.limite + c.extra });
 });
 
 // Traspasar un proyecto a otra cuenta (cambia el dueño; no se copia nada). El dueño anterior puede quedar invitado.
@@ -1347,7 +1549,7 @@ app.get('/api/admin/usage', requireAdmin, (req, res) => {
     const porDia = new Map();
     for (let i = dias - 1; i >= 0; i -= 1) porDia.set(diaDe(Date.now() - i * 86400000), { day: diaDe(Date.now() - i * 86400000), activos: 0, ...Object.fromEntries(TIPOS_USO.map((t) => [t, 0])) });
     db.prepare('SELECT day, kind, SUM(n) AS n FROM usage_daily WHERE day >= ? GROUP BY day, kind').all(desde).forEach((r) => { const d = porDia.get(r.day); if (d && TIPOS_USO.includes(r.kind)) d[r.kind] = r.n; });
-    db.prepare('SELECT day, COUNT(DISTINCT user_id) AS n FROM usage_daily WHERE day >= ? AND user_id > 0 GROUP BY day').all(desde).forEach((r) => { const d = porDia.get(r.day); if (d) d.activos = r.n; });
+    db.prepare("SELECT day, COUNT(DISTINCT user_id) AS n FROM usage_daily WHERE day >= ? AND user_id > 0 AND kind != 'ia_extra' GROUP BY day").all(desde).forEach((r) => { const d = porDia.get(r.day); if (d) d.activos = r.n; });
     const grupos = new Map();
     db.prepare(`SELECT u.grupo AS grupo, d.kind AS kind, SUM(d.n) AS n, COUNT(DISTINCT d.user_id) AS cuentas
                 FROM usage_daily d JOIN users u ON u.id = d.user_id WHERE d.day >= ? GROUP BY u.grupo, d.kind`).all(desde).forEach((r) => {
@@ -1358,7 +1560,7 @@ app.get('/api/admin/usage', requireAdmin, (req, res) => {
     });
     const top = db.prepare(`SELECT u.id, u.name, u.email, u.grupo, SUM(d.n) AS total, SUM(CASE WHEN d.kind = 'ia' THEN d.n ELSE 0 END) AS ia,
                                    SUM(CASE WHEN d.kind = 'guardado' THEN d.n ELSE 0 END) AS guardado, COUNT(DISTINCT d.day) AS dias
-                            FROM usage_daily d JOIN users u ON u.id = d.user_id WHERE d.day >= ? GROUP BY u.id ORDER BY total DESC LIMIT 10`).all(desde);
+                            FROM usage_daily d JOIN users u ON u.id = d.user_id WHERE d.day >= ? AND d.kind != 'ia_extra' GROUP BY u.id ORDER BY total DESC LIMIT 10`).all(desde);
     const hoy = diaDe();
     res.json({
         dias,
@@ -1366,7 +1568,7 @@ app.get('/api/admin/usage', requireAdmin, (req, res) => {
         serie: [...porDia.values()],
         grupos: [...grupos.values()].sort((a, b) => (b.ia + b.guardado) - (a.ia + a.guardado)),
         top,
-        activosPeriodo: db.prepare('SELECT COUNT(DISTINCT user_id) AS n FROM usage_daily WHERE day >= ? AND user_id > 0').get(desde).n,
+        activosPeriodo: db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM usage_daily WHERE day >= ? AND user_id > 0 AND kind != 'ia_extra'").get(desde).n,
         cuentas: db.prepare("SELECT COUNT(*) AS n FROM users WHERE role != 'admin'").get().n,
         normas: {
             configurada: Boolean(RULEX_API_KEY),
@@ -1541,6 +1743,7 @@ const crearCuenta = async ({ name, email, role, teacherId = null, projectLimit =
     const cupo = role === 'guest' ? 0 : projectLimit ?? (role === 'student' ? 0 : CUPO_AUTONOMO);
     const info = db.prepare(`INSERT INTO users (email, name, password_hash, role, status, must_change_password, project_limit, teacher_id, grupo)
                              VALUES (?, ?, ?, ?, 'active', 1, ?, ?, ?)`).run(correo, nombre, hashPassword(clave), role, Math.min(MAX_PROJECTS, Math.max(0, cupo)), role === 'student' ? teacherId : null, grupoLimpio(grupo));
+    if (role === 'student' && !teacherId) heredarProfesor([Number(info.lastInsertRowid)]);
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(info.lastInsertRowid));
     const emailSent = await sendInvite(user, creador);
     return { user, clave, emailSent };
@@ -1637,7 +1840,7 @@ app.post('/api/admin/users/:id/role', requireAdmin, (req, res) => {
     db.prepare('UPDATE users SET role = ?, teacher_id = ?, project_limit = ? WHERE id = ?').run(role, teacherId, cupo, target.id);
     bitacora(req, role !== target.role ? 'Cambió un rol' : 'Cambió el profesor a cargo', `${target.name} (${target.email}): ${ROL_NOMBRE[role] || role}${teacherId ? `, profesor #${teacherId}` : ''}`);
     // Si deja de ser profesor, sus estudiantes quedan sin profesor a cargo (el administrador los reasigna).
-    if (target.role === 'teacher' && role !== 'teacher') db.prepare('UPDATE users SET teacher_id = NULL WHERE teacher_id = ?').run(target.id);
+    if (target.role === 'teacher' && role !== 'teacher') { db.prepare('UPDATE users SET teacher_id = NULL WHERE teacher_id = ?').run(target.id); soltarGrupos(target.id); }
     const row = db.prepare(`${ADMIN_USERS_SQL} WHERE users.id = ? GROUP BY users.id`).get(target.id);
     return res.json({ user: adminUserRow(row) });
 });
@@ -1761,6 +1964,60 @@ app.get('/api/teacher/projects/:id', requireTeacher, (req, res) => {
 
 const STARTED_AT = Date.now();
 const aiState = { fails: 0, lastOk: 0, lastError: '' };
+
+// Servicios externos: si están configurados, cómo respondieron la última vez y cuánto se han usado hoy.
+const SERVICIOS = [
+    { id: 'ia', nombre: 'Inteligencia artificial', proveedor: 'Groq', usa: 'ia', configurado: () => Boolean(GROQ_API_KEY), detalle: () => `Modelo ${GROQ_MODEL}` },
+    { id: 'articulos_openalex', nombre: 'Artículos: OpenAlex', proveedor: 'OpenAlex', usa: 'articulos_openalex', configurado: () => Boolean(OPENALEX_API_KEY) },
+    { id: 'articulos_semantic', nombre: 'Artículos: Semantic Scholar', proveedor: 'Semantic Scholar', usa: 'articulos_semantic', configurado: () => true, detalle: () => (SEMANTIC_SCHOLAR_API_KEY ? 'Con clave propia' : 'Sin clave: usa el cupo público, que se satura con facilidad') },
+    { id: 'articulos_arxiv', nombre: 'Artículos: arXiv', proveedor: 'arXiv', usa: 'articulos_arxiv', configurado: () => true, detalle: () => 'No necesita clave' },
+    { id: 'teorias', nombre: 'Obras de teorías y conceptos', proveedor: 'OpenAlex', usa: 'teorias', configurado: () => Boolean(OPENALEX_API_KEY) },
+    { id: 'normas', nombre: 'Normas y sentencias', proveedor: 'Rulex', usa: 'normas_consulta', configurado: () => Boolean(RULEX_API_KEY), detalle: () => `Cupo diario de 150 consultas${normasRestantes === null ? '' : `; hoy quedan ${normasRestantes}`}` },
+    { id: 'correo', nombre: 'Correo', proveedor: 'SMTP', usa: 'correo', configurado: () => Boolean(mailer), detalle: () => (mailer ? `Sale por ${SMTP_HOST}` : 'Sin correo: las cuentas se entregan con contraseña temporal') },
+];
+const estadoServicios = () => {
+    const hoy = diaDe();
+    const uso = new Map(db.prepare('SELECT kind, SUM(n) AS n FROM usage_daily WHERE day = ? GROUP BY kind').all(hoy).map((r) => [r.kind, r.n]));
+    return SERVICIOS.map((s) => {
+        const e = servicios[s.id] || { okAt: 0, errAt: 0, error: '', fallos: 0 };
+        const configurado = s.configurado();
+        return {
+            id: s.id, nombre: s.nombre, proveedor: s.proveedor, configurado,
+            estado: !configurado ? 'sin_configurar' : !e.okAt && !e.errAt ? 'sin_datos' : e.errAt > e.okAt ? 'falla' : 'bien',
+            okAt: e.okAt || null, errAt: e.errAt || null, error: e.error || '', fallos: e.errAt > e.okAt ? e.fallos || 1 : 0,
+            hoy: uso.get(s.usa) || 0,
+            detalle: s.detalle ? s.detalle() : '',
+            probar: configurado && s.id !== 'normas' && s.id !== 'teorias',
+        };
+    });
+};
+app.get('/api/admin/servicios', requireAdmin, (_req, res) => res.json({ servicios: estadoServicios(), dia: diaDe() }));
+
+// Probar un servicio ahora, con una consulta mínima. Las normas no se prueban: cada consulta gasta el cupo del día.
+app.post('/api/admin/servicios/:id/probar', requireAdmin, rateLimit({ name: 'probar-servicio', limit: 30, windowMs: 10 * 60 * 1000, key: (req) => String(req.user?.id || req.ip) }), async (req, res) => {
+    const s = SERVICIOS.find((x) => x.id === req.params.id);
+    if (!s) return res.status(404).json({ error: 'Ese servicio no existe.' });
+    if (!s.configurado()) return res.status(400).json({ error: 'Ese servicio no está configurado en el servidor.' });
+    if (s.id === 'normas' || s.id === 'teorias') return res.status(400).json({ error: 'Este servicio no se prueba desde aquí: su estado sale del uso real.' });
+    try {
+        if (s.id === 'ia') {
+            // Pedir la lista de modelos comprueba la clave y la conexión sin gastar tokens.
+            const r = await fetch(GROQ_URL.replace(/chat\/completions\/?$/, 'models'), { headers: { Authorization: `Bearer ${GROQ_API_KEY}` }, signal: AbortSignal.timeout(15000) });
+            if (!r.ok) throw new Error(r.status === 401 ? 'la clave no es válida (401)' : `respondió ${r.status}`);
+        } else if (s.id === 'correo') {
+            await mailer.verify();
+        } else {
+            const r = await FUENTES_ARTICULOS[s.id.replace('articulos_', '')]({ q: 'education research', desde: '2020', idioma: '' });
+            if (r.status) throw new Error(r.status === 429 ? 'saturada (429)' : `respondió ${r.status}`);
+        }
+        marcarServicio(s.id, true);
+    } catch (error) {
+        marcarServicio(s.id, false, `${error?.name && error.name !== 'Error' ? `${error.name} ` : ''}${error?.message || 'no respondió'}`);
+    }
+    guardarAjuste('servicios', servicios);
+    bitacora(req, 'Probó un servicio externo', s.nombre);
+    return res.json({ servicio: estadoServicios().find((x) => x.id === s.id) });
+});
 
 app.get('/api/admin/estado', requireAdmin, (_req, res) => {
     const errors = db.prepare(`
@@ -1978,6 +2235,8 @@ app.get('/api/buscar/articulos', requireUser, searchLimit, async (req, res) => {
     try {
         const r = await FUENTES_ARTICULOS[fuente]({ q, desde, idioma });
         if (r.code === 'no_key') return res.status(503).json({ error: 'La búsqueda por el servidor no está configurada.', code: 'no_key' });
+        contarUso(`articulos_${fuente}`, 0);
+        marcarServicio(`articulos_${fuente}`, !r.status, r.status === 429 ? 'saturada (429)' : `respondió ${r.status}`);
         if (r.status) {
             if (r.status !== 429) logError('buscar', `${fuente} respondió ${r.status}`, '', req.user.id);
             return res.status(r.status === 429 ? 429 : 502).json({
@@ -1987,6 +2246,7 @@ app.get('/api/buscar/articulos', requireUser, searchLimit, async (req, res) => {
         }
         return res.json(r);
     } catch (error) {
+        marcarServicio(`articulos_${fuente}`, false, `no respondió: ${error?.name || ''} ${error?.message || ''}`);
         logError('buscar', `${fuente} no respondió`, `${error?.name || ''} ${error?.message || ''}`, req.user.id);
         return res.status(504).json({ error: 'La base de artículos tardó demasiado.', code: 'upstream' });
     }
@@ -2045,8 +2305,10 @@ app.post('/api/buscar/teorias', requireUser, searchLimit, async (req, res) => {
             if (error?.status === 429) throw error;
             return { obras: [], fallo: true }; // una teoría que falla no tumba a las demás
         })));
+        marcarServicio('teorias', true);
         return res.json({ items });
     } catch (error) {
+        marcarServicio('teorias', false, error?.status === 429 ? 'saturada (429)' : `${error?.name || ''} ${error?.message || ''}`);
         if (error?.status !== 429) logError('buscar', 'openalex (teorías) no respondió', `${error?.name || ''} ${error?.message || ''}`, req.user.id);
         return res.status(error?.status === 429 ? 429 : 504).json({
             error: error?.status === 429 ? 'La base de artículos está saturada en este momento. Inténtalo en unos minutos.' : 'La base de artículos tardó demasiado.',
@@ -2080,12 +2342,14 @@ app.get('/api/buscar/normas', requireUser, searchLimit, async (req, res) => {
             body: JSON.stringify({ tool: 'rulex_rag_juridico', args: { query: q, limit: 8, ...(fuente === 'normas' ? { fuente: 'normas' } : {}) } }),
             signal: AbortSignal.timeout(25000),
         });
-        if (r.status === 429) { normasRestantes = 0; return res.status(429).json({ error: 'Se agotaron las búsquedas de normas de hoy. Vuelve mañana o agrega la norma a mano.', code: 'cuota' }); }
+        if (r.status === 429) { normasRestantes = 0; marcarServicio('normas', false, 'se agotó el cupo de hoy (429)'); return res.status(429).json({ error: 'Se agotaron las búsquedas de normas de hoy. Vuelve mañana o agrega la norma a mano.', code: 'cuota' }); }
         if (!r.ok) {
+            marcarServicio('normas', false, r.status === 401 ? 'la clave no es válida (401)' : `respondió ${r.status}`);
             logError('buscar', `rulex respondió ${r.status}`, '', req.user.id);
             return res.status(502).json({ error: r.status === 401 ? 'La clave de la búsqueda de normas no es válida.' : 'La base de normas no respondió.', code: 'upstream' });
         }
         const json = await r.json();
+        marcarServicio('normas', true);
         if (Number.isFinite(json?.usage?.remainingToday)) normasRestantes = json.usage.remainingToday;
         const datos = {
             total: Number(json?.data?.total_encontrados) || 0,
@@ -2104,6 +2368,7 @@ app.get('/api/buscar/normas', requireUser, searchLimit, async (req, res) => {
         if (NORMAS_CACHE.size > 400) NORMAS_CACHE.delete(NORMAS_CACHE.keys().next().value);
         return res.json({ ...datos, restantes: normasRestantes });
     } catch (error) {
+        marcarServicio('normas', false, `no respondió: ${error?.name || ''} ${error?.message || ''}`);
         logError('buscar', 'rulex no respondió', `${error?.name || ''} ${error?.message || ''}`, req.user.id);
         return res.status(504).json({ error: 'La base de normas tardó demasiado.', code: 'upstream' });
     }
@@ -2123,6 +2388,18 @@ app.post('/api/ai/chat', aiLimit, async (req, res) => {
 
     const messages = Array.isArray(req.body?.messages) ? req.body.messages : null;
     if (!messages || messages.length === 0 || messages.length > 12) return res.status(400).json({ error: 'Solicitud de IA no válida.' });
+    // Cuota diaria de la cuenta (el administrador no tiene).
+    if (req.user && req.user.role !== 'admin') {
+        const c = cuotaDe(req.user);
+        if (c.usadas >= c.limite + c.extra) {
+            return res.status(429).json({
+                error: c.limite + c.extra === 0
+                    ? 'Tu cuenta no tiene solicitudes de IA habilitadas. Pídele al administrador que las habilite.'
+                    : `Llegaste al límite de IA de hoy (${c.limite + c.extra} solicitudes). Mañana se renueva; si necesitas más hoy, pídele al administrador que lo amplíe.`,
+                code: 'cuota_ia', limite: c.limite + c.extra, usadas: c.usadas,
+            });
+        }
+    }
     contarUso('ia', req.user?.id);
 
     let total = 0;
@@ -2159,6 +2436,7 @@ app.post('/api/ai/chat', aiLimit, async (req, res) => {
             console.error('Groq error', upstream.status, body?.error?.message);
             aiState.fails += 1;
             aiState.lastError = `${upstream.status} ${body?.error?.message || ''}`.slice(0, 200);
+            marcarServicio('ia', false, upstream.status === 429 ? `saturada (429): ${String(body?.error?.message || '').replace(/ in organization `[^`]*`/, '')}` : aiState.lastError);
             logError('ia', `La IA respondió ${upstream.status}`, body?.error?.message, req.user?.id || null);
             if (aiState.fails >= 3) alertar('ia', 'La IA está fallando', `Van ${aiState.fails} solicitudes seguidas con error. Último: ${aiState.lastError}`);
             const status = upstream.status === 429 ? 429 : 502;
@@ -2169,11 +2447,13 @@ app.post('/api/ai/chat', aiLimit, async (req, res) => {
         }
         aiState.fails = 0;
         aiState.lastOk = Date.now();
+        marcarServicio('ia', true);
         return res.json({ choices: (body.choices || []).map((choice) => ({ message: { role: 'assistant', content: choice?.message?.content || '' } })) });
     } catch (error) {
         console.error('Groq request failed', error?.name, error?.message);
         aiState.fails += 1;
         aiState.lastError = `${error?.name || ''} ${error?.message || ''}`.slice(0, 200);
+        marcarServicio('ia', false, `no respondió: ${aiState.lastError}`);
         logError('ia', 'La IA no respondió', aiState.lastError, req.user?.id || null);
         if (aiState.fails >= 3) alertar('ia', 'La IA está fallando', `Van ${aiState.fails} solicitudes seguidas sin respuesta. Último: ${aiState.lastError}`);
         return res.status(504).json({ error: 'El servicio de IA tardó demasiado en responder. Inténtalo de nuevo.' });

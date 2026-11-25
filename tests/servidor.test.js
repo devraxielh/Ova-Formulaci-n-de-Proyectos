@@ -946,3 +946,140 @@ test('búsqueda de artículos: exige sesión y, sin clave en el servidor, avisa 
     assert.equal((await ana.api('/buscar/articulos?fuente=otra&q=citas%20medicas')).body.code, 'no_key');
     assert.equal((await ana.api('/buscar/articulos?fuente=arxiv&q=a')).status, 400);
 });
+
+test('grupos con profesor, cuota de IA y estado de los servicios', async () => {
+    // Servidor aparte con una IA de mentira, para poder gastar la cuota sin llamar a nadie.
+    const http = await import('node:http');
+    let falla = false;
+    const ia = http.createServer((req, res) => {
+        req.resume();
+        req.on('end', () => {
+            res.setHeader('Content-Type', 'application/json');
+            if (req.url.endsWith('/models')) return res.end(JSON.stringify({ data: [] }));
+            if (falla) { res.statusCode = 500; return res.end(JSON.stringify({ error: { message: 'se cayó' } })); }
+            return res.end(JSON.stringify({ choices: [{ message: { content: 'hola' } }] }));
+        });
+    });
+    await new Promise((r) => { ia.listen(0, '127.0.0.1', r); });
+    const puerto = PORT + 3;
+    const dir = path.join(tmp, 'cuota');
+    const hijo = spawn(process.execPath, ['index.js'], { cwd: path.join(root, 'server'), env: { ...process.env, PORT: String(puerto), DB_PATH: path.join(dir, 'c.db'), BACKUP_DIR: path.join(dir, 'copias'), NODE_ENV: 'test', OPENALEX_API_KEY: '', SEMANTIC_SCHOLAR_API_KEY: '', SMTP_HOST: '', RULEX_API_KEY: '', GROQ_API_KEY: 'clave-de-prueba', GROQ_URL: `http://127.0.0.1:${ia.address().port}/v1/chat/completions`, AI_DAILY_LIMIT: '3', ADMIN_INITIAL_PASSWORD: 'inicial-de-prueba' } });
+    try {
+        const base = `http://127.0.0.1:${puerto}/api`;
+        for (let i = 0; i < 50; i += 1) { try { if ((await fetch(`${base}/health`)).ok) break; } catch { /* arrancando */ } await new Promise((r) => setTimeout(r, 100)); }
+        const nav = () => { let cookie = ''; return async (ruta, method = 'GET', body) => { const res = await fetch(base + ruta, { method, headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) }, body: method === 'GET' ? undefined : JSON.stringify(body || {}) }); const set = res.headers.get('set-cookie'); if (set) cookie = set.split(';')[0]; return { status: res.status, body: await res.json().catch(() => ({})) }; }; };
+        const admin = nav();
+        await admin('/auth/login', 'POST', { email: 'admin', password: 'inicial-de-prueba' });
+        await admin('/auth/password', 'POST', { current: 'inicial-de-prueba', next: clave() });
+        const crear = async (nombre, role, grupo = '') => {
+            const r = await admin('/admin/users', 'POST', { name: nombre, email: `${nombre}@example.test`, role, grupo });
+            assert.equal(r.status, 201);
+            const api = nav(); const password = clave();
+            await api('/auth/login', 'POST', { email: `${nombre}@example.test`, password: r.body.clave });
+            await api('/auth/password', 'POST', { current: r.body.clave, next: password });
+            return { api, id: r.body.user.id, user: r.body.user };
+        };
+        const cuenta = async (id) => (await admin('/admin/users')).body.users.find((u) => u.id === id);
+        const grupo = async (name) => (await admin('/admin/groups')).body.groups.find((g) => g.name === name);
+
+        /* --- Profesor del grupo --- */
+        const rosa = await crear('rosa', 'teacher');
+        const tito = await crear('tito', 'teacher');
+        const ana = await crear('ana', 'student', 'Sexto A');
+        const beto = await crear('beto', 'student', 'Sexto A');
+        assert.equal(ana.user.teacherId, null);
+        // Solo el administrador; el grupo debe existir y el profesor ser profesor.
+        assert.equal((await rosa.api('/admin/groups/teacher', 'POST', { grupo: 'Sexto A', teacherId: rosa.id })).status, 403);
+        assert.equal((await admin('/admin/groups/teacher', 'POST', { grupo: 'No existe', teacherId: rosa.id })).status, 404);
+        assert.equal((await admin('/admin/groups/teacher', 'POST', { grupo: 'Sexto A', teacherId: ana.id })).status, 400);
+        const pone = await admin('/admin/groups/teacher', 'POST', { grupo: 'Sexto A', teacherId: rosa.id });
+        assert.deepEqual([pone.status, pone.body.estudiantes, pone.body.teacherName], [200, 2, 'rosa']);
+        assert.equal((await admin('/admin/groups/teacher', 'POST', { grupo: 'Sexto A', teacherId: rosa.id })).status, 400); // ya lo tiene
+        assert.equal((await cuenta(ana.id)).teacherId, rosa.id);
+        assert.equal((await rosa.api('/teacher/students')).body.students.length, 2);
+        // Quien entra después al grupo queda con su profesor: al crearlo, al editarlo y por lote.
+        const caro = await crear('caro', 'student', 'Sexto A');
+        assert.equal(caro.user.teacherId, rosa.id);
+        const dani = await crear('dani', 'student');
+        const eva = await crear('eva', 'student');
+        await admin(`/admin/users/${dani.id}`, 'PUT', { grupo: 'Sexto A' });
+        await admin('/admin/users/bulk', 'POST', { ids: [eva.id], action: 'group', value: 'Sexto A' });
+        assert.deepEqual([(await cuenta(dani.id)).teacherId, (await cuenta(eva.id)).teacherId], [rosa.id, rosa.id]);
+        // Cambio de profesor: los estudiantes pasan al nuevo y el anterior queda en el historial con su fecha de salida.
+        const cambia = await admin('/admin/groups/teacher', 'POST', { grupo: 'Sexto A', teacherId: tito.id });
+        assert.equal(cambia.body.estudiantes, 5);
+        assert.equal((await rosa.api('/teacher/students')).body.students.length, 0);
+        assert.equal((await tito.api('/teacher/students')).body.students.length, 5);
+        let g = await grupo('Sexto A');
+        assert.deepEqual([g.teacherName, g.estudiantes, g.historial.map((h) => h.teacher), g.historial.map((h) => Boolean(h.hasta))], ['tito', 5, ['tito', 'rosa'], [false, true]]);
+        // Al cambiar el nombre del grupo, el profesor y el historial siguen con él.
+        await admin('/admin/groups/rename', 'POST', { from: 'Sexto A', to: 'Séptimo A' });
+        g = await grupo('Séptimo A');
+        assert.deepEqual([g.teacherName, g.historial.length, await grupo('Sexto A')], ['tito', 2, undefined]);
+        // Si el profesor deja de serlo, el grupo queda sin profesor y el historial lo conserva.
+        await admin(`/admin/users/${tito.id}/role`, 'POST', { role: 'researcher' });
+        g = await grupo('Séptimo A');
+        assert.deepEqual([g.teacherId, g.historial.map((h) => Boolean(h.hasta))], [null, [true, true]]);
+        assert.equal((await cuenta(ana.id)).teacherId, null);
+        const log = (await admin('/admin/log')).body;
+        assert.ok(JSON.stringify(log).includes('Cambió el profesor de un grupo'));
+
+        /* --- Cuota de IA --- */
+        const pedir = (api) => api('/ai/chat', 'POST', { messages: [{ role: 'user', content: 'hola' }] });
+        // La general es 3 por día: la cuarta se rechaza con un mensaje claro.
+        for (let i = 0; i < 3; i += 1) assert.equal((await pedir(ana.api)).status, 200);
+        const tope = await pedir(ana.api);
+        assert.deepEqual([tope.status, tope.body.code, tope.body.limite], [429, 'cuota_ia', 3]);
+        assert.match(tope.body.error, /límite de IA de hoy \(3 solicitudes\)/);
+        assert.equal((await pedir(beto.api)).status, 200); // la cuota es de cada cuenta
+        assert.equal((await pedir(admin)).status, 200); // el administrador no tiene cuota
+        // El panel muestra quién la agotó.
+        let q = (await admin('/admin/ia-cuota')).body;
+        assert.deepEqual([q.general, q.agotaron, q.cuentas[0].email, q.cuentas[0].usadas, q.cuentas[0].origen], [3, 1, 'ana@example.test', 3, 'general']);
+        assert.equal((await ana.api('/admin/ia-cuota')).status, 403);
+        // Ampliación solo por hoy.
+        assert.equal((await admin(`/admin/users/${ana.id}/ia`, 'POST', { extra: 2 })).body.tope, 5);
+        assert.equal((await pedir(ana.api)).status, 200);
+        assert.equal((await pedir(ana.api)).status, 200);
+        assert.equal((await pedir(ana.api)).status, 429);
+        // Cuota del grupo y cuota propia: manda la de la cuenta, luego la del grupo, luego la general.
+        assert.equal((await admin('/admin/groups/ai-limit', 'POST', { grupo: 'Séptimo A', limit: 10 })).body.aiLimit, 10);
+        assert.equal((await pedir(ana.api)).status, 200);
+        assert.equal((await admin(`/admin/users/${ana.id}/ia`, 'POST', { limit: 0, extra: 0 })).body.origen, 'cuenta');
+        const sinIa = await pedir(ana.api);
+        assert.deepEqual([sinIa.status, /no tiene solicitudes de IA habilitadas/.test(sinIa.body.error)], [429, true]);
+        assert.equal((await admin(`/admin/users/${ana.id}/ia`, 'POST', { limit: null })).body.origen, 'grupo');
+        assert.equal((await admin('/admin/groups/ai-limit', 'POST', { grupo: 'Séptimo A', limit: null })).body.aiLimit, null);
+        assert.equal((await admin('/admin/ia-cuota/general', 'POST', { limit: 50 })).body.general, 50);
+        assert.equal((await pedir(ana.api)).status, 200);
+        // Valores no válidos.
+        assert.equal((await admin('/admin/ia-cuota/general', 'POST', { limit: 0 })).status, 400);
+        assert.equal((await admin(`/admin/users/${ana.id}/ia`, 'POST', { limit: 'mucho' })).status, 400);
+        assert.equal((await admin(`/admin/users/${ana.id}/ia`, 'POST', {})).status, 400);
+        q = (await admin('/admin/ia-cuota')).body;
+        assert.equal(q.agotaron, 0);
+        // La ampliación de hoy no cuenta como actividad en la pestaña de uso.
+        const uso = (await admin('/admin/usage')).body;
+        assert.equal(uso.top.find((t) => t.email === 'ana@example.test').ia, uso.top.find((t) => t.email === 'ana@example.test').total - uso.top.find((t) => t.email === 'ana@example.test').guardado - 1); // total = ia + guardados + 1 ingreso
+
+        /* --- Estado de los servicios --- */
+        const servicio = async (id) => (await admin('/admin/servicios')).body.servicios.find((s) => s.id === id);
+        let s = await servicio('ia');
+        assert.deepEqual([s.estado, s.configurado, s.fallos, s.hoy > 0], ['bien', true, 0, true]);
+        assert.deepEqual([(await servicio('correo')).estado, (await servicio('normas')).estado, (await servicio('articulos_arxiv')).estado], ['sin_configurar', 'sin_configurar', 'sin_datos']);
+        falla = true;
+        assert.equal((await pedir(beto.api)).status, 502);
+        s = await servicio('ia');
+        assert.deepEqual([s.estado, s.fallos, /500 se cayó/.test(s.error)], ['falla', 1, true]);
+        // Probar ahora: pide la lista de modelos (no gasta) y, si responde, el servicio vuelve a estar bien.
+        const prueba = await admin('/admin/servicios/ia/probar', 'POST');
+        assert.deepEqual([prueba.status, prueba.body.servicio.estado, prueba.body.servicio.fallos], [200, 'bien', 0]);
+        assert.equal((await admin('/admin/servicios/normas/probar', 'POST')).status, 400);
+        assert.equal((await admin('/admin/servicios/correo/probar', 'POST')).status, 400); // sin configurar
+        assert.equal((await admin('/admin/servicios/otro/probar', 'POST')).status, 404);
+        assert.equal((await beto.api('/admin/servicios')).status, 403);
+    } finally {
+        hijo.kill();
+        ia.close();
+    }
+});

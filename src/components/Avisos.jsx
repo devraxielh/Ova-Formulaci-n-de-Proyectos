@@ -79,6 +79,12 @@ const Tarjeta = ({ aviso }) => {
 const Avisos = () => {
     const [lista, setLista] = useState(pila);
     useEffect(() => { oyentes.add(setLista); return () => { oyentes.delete(setLista); }; }, []);
+    // Avisos que llegan de fuera de React (el cliente del API): window.dispatchEvent(new CustomEvent('psia:aviso', { detail })).
+    useEffect(() => {
+        const oir = (e) => avisar(e.detail?.texto, e.detail?.tipo);
+        window.addEventListener('psia:aviso', oir);
+        return () => window.removeEventListener('psia:aviso', oir);
+    }, []);
     if (lista.length === 0) return null;
     return createPortal(<div className="avi-pila">{lista.map((a) => <Tarjeta key={a.id} aviso={a} />)}</div>, document.body);
 };

@@ -324,3 +324,48 @@ span.adm-user-link { cursor: default; }
 }
 
 .adm-rolb[data-rol='guest'] { background: #fef3c7; color: #92400e; }
+
+/* Grupos: profesor a cargo, historial y cuota de IA */
+.adm-panel h2 > svg { vertical-align: -3px; margin-right: 0.25rem; color: #4f46e5; }
+.adm-grupo-prof { min-width: 12rem; max-width: 18rem; }
+.adm-cuota-campo { width: 6rem; }
+.adm-historial summary { cursor: pointer; color: #4f46e5; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.3rem; }
+.adm-historial ul { margin: 0.4rem 0 0; padding: 0; list-style: none; display: grid; gap: 0.3rem; font-size: 0.82rem; min-width: 14rem; }
+.adm-historial li { display: grid; }
+.adm-historial li span { color: #475569; }
+.adm-historial li small { color: #94a3b8; }
+
+/* Uso: cuota de IA */
+.adm-cuota-general { display: grid; gap: 0.2rem; font-size: 0.8rem; font-weight: 600; color: #475569; }
+.adm-cuota-resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.6rem; margin: 0 0 0.9rem; }
+.adm-cuota-resumen > div { padding: 0.6rem 0.8rem; border: 1px solid #e2e8f0; border-radius: 0.6rem; background: #f8fafc; }
+.adm-cuota-resumen > div[data-alerta] { background: #fef2f2; border-color: #fecaca; }
+.adm-cuota-resumen dt { font-size: 0.78rem; color: #64748b; }
+.adm-cuota-resumen dd { margin: 0; font-size: 1.35rem; font-weight: 700; color: #0f172a; }
+.adm-cuota-uso { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.85rem; }
+.adm-cuota-uso small { color: #64748b; }
+.adm-cuota-barra { width: 7rem; height: 0.5rem; border-radius: 99px; background: #e2e8f0; overflow: hidden; }
+.adm-cuota-barra i { display: block; height: 100%; background: #4f46e5; border-radius: 99px; }
+.adm-cuota-uso[data-estado='cerca'] .adm-cuota-barra i { background: #d97706; }
+.adm-cuota-uso[data-estado='agotada'] .adm-cuota-barra i, .adm-cuota-uso[data-estado='sin'] .adm-cuota-barra i { background: #dc2626; }
+.adm-cuota-uso[data-estado='agotada'] small:first-of-type, .adm-cuota-uso[data-estado='sin'] small:first-of-type { color: #b91c1c; font-weight: 700; }
+.adm-cuota-celda { display: inline-flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.adm-cuota-grupos { margin: 0.8rem 0 0; }
+
+/* Sistema: servicios externos */
+.adm-servicios { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: 0.7rem; }
+.adm-servicios > li { display: grid; gap: 0.4rem; align-content: start; justify-items: start; padding: 0.8rem 0.9rem; border: 1px solid #e2e8f0; border-left: 4px solid #cbd5e1; border-radius: 0.6rem; background: #fff; min-width: 0; }
+.adm-servicios > li[data-estado='bien'] { border-left-color: #16a34a; }
+.adm-servicios > li[data-estado='falla'] { border-left-color: #dc2626; background: #fffafa; }
+.adm-servicio-cabeza { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; width: 100%; flex-wrap: wrap; }
+.adm-servicio-estado { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.8rem; font-weight: 700; color: #64748b; white-space: nowrap; }
+li[data-estado='bien'] .adm-servicio-estado { color: #15803d; }
+li[data-estado='falla'] .adm-servicio-estado { color: #b91c1c; }
+.adm-servicios dl { display: flex; gap: 1.2rem; margin: 0; flex-wrap: wrap; }
+.adm-servicios dt { font-size: 0.74rem; color: #64748b; }
+.adm-servicios dd { margin: 0; font-size: 0.88rem; font-weight: 600; color: #0f172a; }
+.adm-servicio-error { margin: 0; font-size: 0.8rem; color: #64748b; overflow-wrap: anywhere; }
+.adm-servicio-error[data-vigente] { color: #b91c1c; }
+.adm-servicio-error svg { vertical-align: -2px; }
+.adm-gira { animation: adm-gira 0.9s linear infinite; }
+@keyframes adm-gira { to { transform: rotate(360deg); } }
