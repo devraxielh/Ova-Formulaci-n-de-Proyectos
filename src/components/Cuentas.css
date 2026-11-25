@@ -1,0 +1,50 @@
+/* Creación de cuentas (administrador y profesor) */
+.cue { display: grid; gap: 0.8rem; }
+.cue-cabeza { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem; }
+.cue-cabeza h2 { display: flex; align-items: center; gap: 0.45rem; margin: 0; }
+.cue-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.7rem; align-items: end; }
+.cue-form label { display: grid; gap: 0.25rem; }
+.cue-form label > span { font-size: 0.82rem; font-weight: 600; color: #475569; }
+.cue-form .cue-nota { grid-column: 1 / -1; margin: 0; font-size: 0.84rem; color: #64748b; }
+.cue-form > button { justify-self: start; }
+.cue-check { display: flex !important; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: #334155; }
+.cue-lote { display: grid; gap: 0.7rem; }
+.cue-lote p { margin: 0; line-height: 1.55; color: #475569; font-size: 0.9rem; }
+.cue-texto { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; }
+.cue-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
+.cue-archivo { position: relative; overflow: hidden; cursor: pointer; }
+.cue-archivo input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.cue-resumen { color: #0f172a !important; }
+.cue-mal { color: #b91c1c; font-weight: 600; }
+.cue-tabla-wrap { max-height: 18rem; overflow: auto; border: 1px solid #e2e8f0; border-radius: 0.6rem; }
+.cue-tabla { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+.cue-tabla th, .cue-tabla td { padding: 0.45rem 0.6rem; text-align: left; border-bottom: 1px solid #eef2f7; }
+.cue-tabla th { position: sticky; top: 0; background: #f8fafc; font-size: 0.78rem; color: #475569; }
+.cue-tabla tr[data-mal] td { background: #fef2f2; color: #991b1b; }
+.cue-tabla code { font-size: 0.95rem; font-weight: 700; letter-spacing: 0.04em; color: #3730a3; user-select: all; }
+.cue-credenciales { display: grid; gap: 0.7rem; padding: 0.9rem 1rem; border: 2px solid #a5b4fc; border-radius: 0.8rem; background: #eef2ff; }
+.cue-credenciales h3 { display: flex; align-items: center; gap: 0.4rem; margin: 0; font-size: 1rem; color: #3730a3; }
+.cue-credenciales p { margin: 0; font-size: 0.9rem; line-height: 1.55; color: #334155; }
+.cue-credenciales .cue-tabla-wrap { background: #fff; }
+.cue-malas { padding: 0.6rem 0.8rem; border-radius: 0.6rem; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; font-size: 0.86rem; }
+.cue-malas b { display: flex; align-items: center; gap: 0.35rem; }
+.cue-malas ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+.cue-rol { padding: 0.25rem 0.4rem; border: 1px solid #cbd5e1; border-radius: 0.4rem; background: #fff; font: inherit; font-size: 0.84rem; max-width: 10rem; }
+.cue-rol-celda { display: grid; gap: 0.25rem; }
+
+/* Profesor: mis estudiantes */
+.prf-lista { display: grid; gap: 0.8rem; }
+.prf-estudiante { display: grid; gap: 0.6rem; padding: 0.9rem 1rem; border: 1px solid #e2e8f0; border-radius: 0.8rem; background: #fff; }
+.prf-estudiante header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem; }
+.prf-estudiante header b { font-size: 1.02rem; }
+.prf-estudiante header small { display: block; color: #64748b; }
+.prf-permiso { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: 0.88rem; color: #334155; }
+.prf-etiqueta { padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.76rem; font-weight: 700; background: #fef3c7; color: #92400e; }
+.prf-etiqueta[data-ok] { background: #d1fae5; color: #065f46; }
+.prf-avance { display: inline-block; width: 5rem; height: 0.4rem; border-radius: 999px; background: #e2e8f0; overflow: hidden; vertical-align: middle; }
+.prf-avance span { display: block; height: 100%; background: #4f46e5; }
+
+/* Administración: rol y profesor a cargo en la tabla de usuarios */
+.adm-rol { display: grid; gap: 0.3rem; min-width: 9.5rem; }
+.adm-rol select.input-field { padding: 0.3rem 0.5rem; font-size: 0.85rem; height: auto; }
+.adm-user-acciones { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }

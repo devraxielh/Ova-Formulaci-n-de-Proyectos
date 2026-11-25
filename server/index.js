@@ -108,6 +108,9 @@ addColumn('users', 'role', "TEXT NOT NULL DEFAULT 'student'");
 addColumn('users', 'status', "TEXT NOT NULL DEFAULT 'active'"); // pending | active | blocked
 addColumn('users', 'must_change_password', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('users', 'last_login_at', 'TEXT');
+// Roles: admin | teacher (profesor) | student (estudiante) | researcher (investigador). Los asigna el administrador.
+// `teacher_id`: el profesor que tiene a cargo a un estudiante.
+addColumn('users', 'teacher_id', 'INTEGER');
 // Cupo de proyectos que el administrador le autoriza a cada cuenta.
 if (!db.prepare('PRAGMA table_info(users)').all().some((col) => col.name === 'project_limit')) {
     db.exec('ALTER TABLE users ADD COLUMN project_limit INTEGER NOT NULL DEFAULT 0');
@@ -233,6 +236,13 @@ const publicUser = (user) => ({
     mustChangePassword: Boolean(user.must_change_password),
     projectLimit: user.role === 'admin' ? MAX_PROJECTS : Number(user.project_limit) || 0,
 });
+
+const ROLES = ['admin', 'teacher', 'student', 'researcher'];
+const ROL_NOMBRE = { admin: 'administrador', teacher: 'profesor', student: 'estudiante', researcher: 'investigador' };
+// Cupo de proyectos con que nace una cuenta de profesor o investigador (el administrador lo puede cambiar).
+const CUPO_AUTONOMO = 10;
+// Cuántos proyectos puede permitirle un profesor a un estudiante.
+const CUPO_MAX_ESTUDIANTE = 5;
 
 /* ---------- Correo ---------- */
 
@@ -473,24 +483,10 @@ const perAccount = (req) => `${req.ip}|${String(req.body?.email || '').trim().to
 const loginLimit = rateLimit({ name: 'login', limit: 10, windowMs: 15 * 60 * 1000, key: perAccount });
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-app.post('/api/auth/register', authLimit, async (req, res) => {
-    const name = String(req.body?.name || '').trim().slice(0, 80);
-    const email = String(req.body?.email || '').trim().toLowerCase().slice(0, 160);
-    const password = String(req.body?.password || '');
-
-    if (!name) return res.status(400).json({ error: 'Escribe tu nombre.' });
-    if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Escribe un correo válido.' });
-    if (password.length < 8) return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres.' });
-    if (password.length > 200) return res.status(400).json({ error: 'La contraseña es demasiado larga.' });
-
-    if (db.prepare('SELECT 1 FROM users WHERE email = ?').get(email)) {
-        return res.status(409).json({ error: 'Ya existe una cuenta con ese correo. Inicia sesión o pide un nuevo enlace de activación.' });
-    }
-
-    const info = db.prepare("INSERT INTO users (email, name, password_hash, status, project_limit) VALUES (?, ?, ?, 'pending', ?)").run(email, name, hashPassword(password), DEFAULT_PROJECT_LIMIT);
-    const emailSent = await sendActivation({ id: Number(info.lastInsertRowid), email, name });
-    return res.status(201).json({ pending: true, email, emailSent });
-});
+// El registro por cuenta propia está cerrado: las cuentas las crea el administrador (o el profesor, las de sus estudiantes).
+app.post('/api/auth/register', authLimit, (_req, res) => res.status(403).json({
+    error: 'El registro está cerrado. Pide tu cuenta al administrador o a tu profesor.', code: 'registro_cerrado',
+}));
 
 app.post('/api/auth/verify', authLimit, (req, res) => {
     const token = String(req.body?.token || '');
@@ -633,8 +629,9 @@ app.get('/api/projects', requireUser, (req, res) => {
 app.post('/api/projects', requireUser, (req, res) => {
     const count = db.prepare('SELECT COUNT(*) AS n FROM projects WHERE user_id = ?').get(req.user.id).n;
     const limit = req.user.role === 'admin' ? MAX_PROJECTS : Number(req.user.project_limit) || 0;
-    if (limit === 0) return res.status(403).json({ error: 'Tu cuenta todavía no tiene permiso para crear proyectos. El administrador debe autorizarlo.', code: 'no_quota' });
-    if (count >= limit) return res.status(403).json({ error: `Tu cuenta puede tener hasta ${limit} ${limit === 1 ? 'proyecto' : 'proyectos'}. Pide al administrador que amplíe tu cupo o elimina uno.`, code: 'quota_full' });
+    const quien = req.user.role === 'student' ? 'tu profesor' : 'el administrador';
+    if (limit === 0) return res.status(403).json({ error: `Tu cuenta todavía no tiene permiso para crear proyectos: ${quien} debe permitirlo.`, code: 'no_quota' });
+    if (count >= limit) return res.status(403).json({ error: `Tu cuenta puede tener hasta ${limit} ${limit === 1 ? 'proyecto' : 'proyectos'}. Pide a ${quien} que amplíe tu cupo o elimina uno.`, code: 'quota_full' });
     const data = serializeData(req.body?.data ?? {});
     if (data === null) return res.status(400).json({ error: 'El contenido del proyecto no es válido o es demasiado grande.' });
     const info = db.prepare('INSERT INTO projects (user_id, name, data) VALUES (?, ?, ?)').run(req.user.id, cleanName(req.body?.name), data);
@@ -964,6 +961,9 @@ const adminUserRow = (row) => ({
     lastLoginAt: row.last_login_at,
     projectCount: row.project_count ?? 0,
     lastActivity: row.last_activity,
+    teacherId: row.teacher_id || null,
+    teacherName: row.teacher_id ? (db.prepare('SELECT name FROM users WHERE id = ?').get(row.teacher_id)?.name || '') : '',
+    mustChangePassword: Boolean(row.must_change_password),
 });
 
 // Coherencia entre secciones de un proyecto (misma evaluación que ve el estudiante en Mi proyecto).
@@ -1051,6 +1051,185 @@ app.post('/api/admin/users/:id/resend', requireAdmin, async (req, res) => {
     const emailSent = await sendActivation(target);
     if (!emailSent) return res.status(503).json({ error: 'No se pudo enviar el correo. Revisa la configuración de correo o activa la cuenta manualmente.' });
     return res.json({ ok: true });
+});
+
+/* ---------- Cuentas: las crea el administrador (y el profesor, las de sus estudiantes) ---------- */
+
+// Contraseña temporal legible (sin 0/O ni 1/l): se muestra una sola vez a quien crea la cuenta.
+const claveTemporal = () => {
+    const letras = 'abcdefghjkmnpqrstuvwxyz23456789';
+    return Array.from(crypto.randomBytes(10), (b) => letras[b % letras.length]).join('');
+};
+
+// Correo de bienvenida con un enlace para que la persona cree su propia contraseña (vale 72 horas).
+const sendInvite = async (user, creador) => {
+    if (!mailer || !String(user.email).includes('@')) return false;
+    const token = crypto.randomBytes(32).toString('hex');
+    db.prepare("DELETE FROM email_tokens WHERE user_id = ? AND purpose = 'reset'").run(user.id);
+    db.prepare("INSERT INTO email_tokens (token_hash, user_id, purpose, expires_at) VALUES (?, ?, 'reset', ?)").run(sha256(token), user.id, Date.now() + 72 * 3600 * 1000);
+    const link = `${APP_URL}/?restablecer=${token}`;
+    const rol = ROL_NOMBRE[user.role] || 'usuario';
+    try {
+        await mailer.sendMail({
+            from: MAIL_FROM,
+            to: user.email,
+            subject: 'Tu cuenta de PROJECTSIA',
+            text: `Hola ${user.name}:\n\n${creador} te creó una cuenta de ${rol} en PROJECTSIA. Para entrar, crea tu contraseña en este enlace:\n${link}\n\nEl enlace vence en 72 horas. Tu usuario es este correo: ${user.email}`,
+            html: `<p>Hola ${escapeHtml(user.name)}:</p><p>${escapeHtml(creador)} te creó una cuenta de ${rol} en PROJECTSIA. Para entrar, crea tu contraseña:</p><p><a href="${link}">Crear mi contraseña</a></p><p>El enlace vence en 72 horas. Tu usuario es este correo: ${escapeHtml(user.email)}</p>`,
+        });
+        return true;
+    } catch (error) {
+        logError('correo', 'No se pudo enviar la invitación de la cuenta', error?.message, user.id);
+        return false;
+    }
+};
+
+// Crea una cuenta activa con contraseña temporal (que debe cambiar al entrar). Devuelve { user, clave, emailSent } o { error }.
+const crearCuenta = async ({ name, email, role, teacherId = null, projectLimit = null }, creador) => {
+    const nombre = String(name || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+    const correo = String(email || '').trim().toLowerCase().slice(0, 160);
+    if (!nombre) return { error: 'Falta el nombre.' };
+    if (!EMAIL_RE.test(correo)) return { error: 'El correo no es válido.' };
+    if (!ROLES.includes(role) || role === 'admin') return { error: 'El rol no es válido.' };
+    if (db.prepare('SELECT 1 FROM users WHERE email = ?').get(correo)) return { error: 'Ya existe una cuenta con ese correo.' };
+    if (role === 'student' && teacherId) {
+        const prof = db.prepare("SELECT role FROM users WHERE id = ?").get(teacherId);
+        if (!prof || prof.role !== 'teacher') return { error: 'El profesor indicado no existe.' };
+    }
+    const clave = claveTemporal();
+    const cupo = projectLimit ?? (role === 'student' ? 0 : CUPO_AUTONOMO);
+    const info = db.prepare(`INSERT INTO users (email, name, password_hash, role, status, must_change_password, project_limit, teacher_id)
+                             VALUES (?, ?, ?, ?, 'active', 1, ?, ?)`).run(correo, nombre, hashPassword(clave), role, Math.min(MAX_PROJECTS, Math.max(0, cupo)), role === 'student' ? teacherId : null);
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(info.lastInsertRowid));
+    const emailSent = await sendInvite(user, creador);
+    return { user, clave, emailSent };
+};
+
+// Acceso nuevo para una cuenta: otra contraseña temporal (cierra sus sesiones) y, si hay correo, otro enlace.
+const renovarAcceso = async (target, creador) => {
+    const clave = claveTemporal();
+    db.prepare("UPDATE users SET password_hash = ?, must_change_password = 1, status = CASE WHEN status = 'pending' THEN 'active' ELSE status END WHERE id = ?").run(hashPassword(clave), target.id);
+    db.prepare('DELETE FROM sessions WHERE user_id = ?').run(target.id);
+    const emailSent = await sendInvite(target, creador);
+    return { clave, emailSent };
+};
+
+const crearLimit = rateLimit({ name: 'crear-cuenta', limit: 400, windowMs: 60 * 60 * 1000, key: (req) => String(req.user?.id || req.ip) });
+
+app.post('/api/admin/users', requireAdmin, crearLimit, async (req, res) => {
+    const r = await crearCuenta({ name: req.body?.name, email: req.body?.email, role: String(req.body?.role || 'student'), teacherId: Number(req.body?.teacherId) || null }, 'El administrador');
+    if (r.error) return res.status(400).json({ error: r.error });
+    const row = db.prepare(`${ADMIN_USERS_SQL} WHERE users.id = ? GROUP BY users.id`).get(r.user.id);
+    return res.status(201).json({ user: adminUserRow(row), clave: r.clave, emailSent: r.emailSent });
+});
+
+// Carga por lotes: hasta 300 cuentas. Cada fila se crea por separado y se informa cómo quedó.
+// `teacher` (opcional, para estudiantes) es el correo de su profesor, que puede venir en el mismo lote antes que él.
+app.post('/api/admin/users/batch', requireAdmin, crearLimit, async (req, res) => {
+    const filas = Array.isArray(req.body?.users) ? req.body.users.slice(0, 300) : [];
+    if (!filas.length) return res.status(400).json({ error: 'No hay filas para cargar.' });
+    const resultados = [];
+    for (const fila of filas) {
+        const email = String(fila?.email || '').trim().toLowerCase();
+        const role = String(fila?.role || 'student');
+        let teacherId = null;
+        const correoProfesor = String(fila?.teacher || '').trim().toLowerCase();
+        if (role === 'student' && correoProfesor) {
+            const prof = db.prepare("SELECT id FROM users WHERE email = ? AND role = 'teacher'").get(correoProfesor);
+            if (!prof) { resultados.push({ email, name: String(fila?.name || ''), ok: false, error: `No existe un profesor con el correo ${correoProfesor}.` }); continue; }
+            teacherId = prof.id;
+        }
+        // eslint-disable-next-line no-await-in-loop
+        const r = await crearCuenta({ name: fila?.name, email, role, teacherId }, 'El administrador');
+        resultados.push(r.error ? { email, name: String(fila?.name || ''), ok: false, error: r.error } : { email: r.user.email, name: r.user.name, role, ok: true, clave: r.clave, emailSent: r.emailSent });
+    }
+    return res.json({ resultados, creadas: resultados.filter((x) => x.ok).length, mail: Boolean(mailer) });
+});
+
+// Cambiar el rol (y el profesor a cargo, si es estudiante). Solo el administrador.
+app.post('/api/admin/users/:id/role', requireAdmin, (req, res) => {
+    const role = String(req.body?.role || '');
+    if (!ROLES.includes(role) || role === 'admin') return res.status(400).json({ error: 'Rol no válido.' });
+    const target = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(req.params.id));
+    if (!target) return res.status(404).json({ error: 'No se encontró el usuario.' });
+    if (target.role === 'admin') return res.status(400).json({ error: 'No se puede cambiar el rol de un administrador.' });
+    let teacherId = null;
+    if (role === 'student' && req.body?.teacherId) {
+        const prof = db.prepare("SELECT id FROM users WHERE id = ? AND role = 'teacher'").get(Number(req.body.teacherId));
+        if (!prof) return res.status(400).json({ error: 'El profesor indicado no existe.' });
+        teacherId = prof.id;
+    }
+    // Quien pasa a profesor o investigador recibe el cupo propio de ese rol si no tenía ninguno.
+    const cupo = role !== 'student' && !Number(target.project_limit) ? CUPO_AUTONOMO : Number(target.project_limit) || 0;
+    db.prepare('UPDATE users SET role = ?, teacher_id = ?, project_limit = ? WHERE id = ?').run(role, teacherId, cupo, target.id);
+    // Si deja de ser profesor, sus estudiantes quedan sin profesor a cargo (el administrador los reasigna).
+    if (target.role === 'teacher' && role !== 'teacher') db.prepare('UPDATE users SET teacher_id = NULL WHERE teacher_id = ?').run(target.id);
+    const row = db.prepare(`${ADMIN_USERS_SQL} WHERE users.id = ? GROUP BY users.id`).get(target.id);
+    return res.json({ user: adminUserRow(row) });
+});
+
+app.post('/api/admin/users/:id/access', requireAdmin, crearLimit, async (req, res) => {
+    const target = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(req.params.id));
+    if (!target) return res.status(404).json({ error: 'No se encontró el usuario.' });
+    if (target.role === 'admin') return res.status(400).json({ error: 'El administrador cambia su contraseña desde su cuenta.' });
+    return res.json(await renovarAcceso(target, 'El administrador'));
+});
+
+/* ---------- Profesor: sus estudiantes y los proyectos que supervisa ---------- */
+
+const requireTeacher = (req, res, next) => {
+    if (!req.user) return res.status(401).json({ error: 'Inicia sesión para continuar.' });
+    if (req.user.role !== 'teacher') return res.status(403).json({ error: 'Esta sección es de los profesores.' });
+    if (req.user.must_change_password) return res.status(403).json({ error: 'Cambia tu contraseña antes de continuar.', code: 'must_change_password' });
+    return next();
+};
+// El estudiante de la ruta, solo si está a cargo de este profesor.
+const miEstudiante = (req) => db.prepare("SELECT * FROM users WHERE id = ? AND role = 'student' AND teacher_id = ?").get(Number(req.params.id), req.user.id);
+const filaEstudiante = (row) => {
+    const projects = db.prepare('SELECT id, name, data, created_at, updated_at FROM projects WHERE user_id = ? ORDER BY updated_at DESC, id DESC').all(row.id);
+    return {
+        id: row.id, name: row.name, email: row.email, status: row.status,
+        projectLimit: Number(row.project_limit) || 0,
+        lastLoginAt: row.last_login_at, mustChangePassword: Boolean(row.must_change_password),
+        projects: projects.map((p) => ({ ...projectRow(p, false), ...resumenProyecto(p.data), coherencia: coherenciaDe(p.data) })),
+    };
+};
+
+app.get('/api/teacher/students', requireTeacher, (req, res) => {
+    const rows = db.prepare("SELECT * FROM users WHERE role = 'student' AND teacher_id = ? ORDER BY name COLLATE NOCASE").all(req.user.id);
+    res.json({ students: rows.map(filaEstudiante), mail: Boolean(mailer), cupoMaximo: CUPO_MAX_ESTUDIANTE });
+});
+
+app.post('/api/teacher/students', requireTeacher, crearLimit, async (req, res) => {
+    const total = db.prepare("SELECT COUNT(*) AS n FROM users WHERE teacher_id = ?").get(req.user.id).n;
+    if (total >= 300) return res.status(400).json({ error: 'Llegaste al máximo de 300 estudiantes a tu cargo.' });
+    const r = await crearCuenta({ name: req.body?.name, email: req.body?.email, role: 'student', teacherId: req.user.id, projectLimit: req.body?.permitir ? 1 : 0 }, `Tu profesor, ${req.user.name},`);
+    if (r.error) return res.status(400).json({ error: r.error });
+    return res.status(201).json({ student: filaEstudiante(r.user), clave: r.clave, emailSent: r.emailSent });
+});
+
+// Permitir (o no) que el estudiante cree proyectos: 0 = no puede; hasta CUPO_MAX_ESTUDIANTE.
+app.post('/api/teacher/students/:id/limit', requireTeacher, (req, res) => {
+    const limit = parseInt(req.body?.limit, 10);
+    if (!Number.isInteger(limit) || limit < 0 || limit > CUPO_MAX_ESTUDIANTE) return res.status(400).json({ error: `El cupo debe estar entre 0 y ${CUPO_MAX_ESTUDIANTE}.` });
+    const target = miEstudiante(req);
+    if (!target) return res.status(404).json({ error: 'Ese estudiante no está a tu cargo.' });
+    db.prepare('UPDATE users SET project_limit = ? WHERE id = ?').run(limit, target.id);
+    return res.json({ student: filaEstudiante({ ...target, project_limit: limit }) });
+});
+
+app.post('/api/teacher/students/:id/access', requireTeacher, crearLimit, async (req, res) => {
+    const target = miEstudiante(req);
+    if (!target) return res.status(404).json({ error: 'Ese estudiante no está a tu cargo.' });
+    return res.json(await renovarAcceso(target, `Tu profesor, ${req.user.name},`));
+});
+
+// Proyecto de un estudiante a cargo, solo para leerlo.
+app.get('/api/teacher/projects/:id', requireTeacher, (req, res) => {
+    const row = db.prepare('SELECT * FROM projects WHERE id = ?').get(Number(req.params.id));
+    const owner = row ? db.prepare("SELECT id, name, email FROM users WHERE id = ? AND role = 'student' AND teacher_id = ?").get(row.user_id, req.user.id) : null;
+    if (!row || !owner) return res.status(404).json({ error: 'Ese proyecto no es de un estudiante a tu cargo.' });
+    return res.json({ project: projectRow(row), owner });
 });
 
 /* ---------- Estado del sistema ---------- */

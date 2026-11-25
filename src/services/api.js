@@ -76,6 +76,19 @@ export const api = {
         setLimit: (id, limit) => request(`/admin/users/${id}/limit`, { method: 'POST', body: { limit } }),
         setStatus: (id, status) => request(`/admin/users/${id}/status`, { method: 'POST', body: { status } }),
         resend: (id) => request(`/admin/users/${id}/resend`, { method: 'POST' }),
+        // Cuentas: solo el administrador las crea (una a una o por lotes), asigna el rol y renueva el acceso.
+        createUser: (payload) => request('/admin/users', { method: 'POST', body: payload }),
+        createBatch: (users) => request('/admin/users/batch', { method: 'POST', body: { users } }),
+        setRole: (id, role, teacherId) => request(`/admin/users/${id}/role`, { method: 'POST', body: { role, teacherId } }),
+        newAccess: (id) => request(`/admin/users/${id}/access`, { method: 'POST' }),
+    },
+    // Profesor: los estudiantes a su cargo y sus proyectos (solo lectura).
+    teacher: {
+        students: () => request('/teacher/students'),
+        createStudent: (payload) => request('/teacher/students', { method: 'POST', body: payload }),
+        setLimit: (id, limit) => request(`/teacher/students/${id}/limit`, { method: 'POST', body: { limit } }),
+        newAccess: (id) => request(`/teacher/students/${id}/access`, { method: 'POST' }),
+        project: (id) => request(`/teacher/projects/${id}`),
     },
 };
 

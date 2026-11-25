@@ -1,6 +1,6 @@
 import Cargando from './components/Cargando';
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import { Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, Scale, Link, Compass, Library, PanelLeftClose, PanelLeftOpen, FolderOpen, UserRound, ShieldCheck, LogOut, CheckCircle2, ListOrdered, BarChart3, Flag, BookMarked, AlignLeft, FileSpreadsheet, Network, GitFork } from 'lucide-react';
+import { Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, Scale, Link, Compass, Library, PanelLeftClose, PanelLeftOpen, FolderOpen, UserRound, ShieldCheck, LogOut, CheckCircle2, ListOrdered, BarChart3, Flag, BookMarked, AlignLeft, FileSpreadsheet, Network, GitFork, GraduationCap } from 'lucide-react';
 import { useProject } from './context/ProjectContext';
 import { CAMPOS_SECCION, SECTIONS, buildDocument } from './services/projectDoc';
 import { api } from './services/api';
@@ -28,6 +28,7 @@ const EncuestaPublica = lazy(() => import('./components/EncuestaPublica'));
 const MiProyecto = lazy(() => import('./components/MiProyecto'));
 const Cuenta = lazy(() => import('./components/Cuenta'));
 const Admin = lazy(() => import('./components/Admin'));
+const Profesor = lazy(() => import('./components/Profesor'));
 
 const TAB_ALIAS = { instrumentos: 'metodologia', analisis: 'resultados', doi: 'referencias', poblacion: 'metodologia', 'plan-analisis': 'metodologia', cronograma: 'metodologia', presupuesto: 'metodologia' };
 
@@ -107,6 +108,7 @@ function App() {
         setPista({ texto, x: r.right + 10, y: r.top + r.height / 2 });
     };
     const isAdmin = user?.role === 'admin';
+    const isTeacher = user?.role === 'teacher';
     // Con la contraseña inicial solo se puede estar en la cuenta, la cambie o no la pestaña elegida.
     const activeTab = user?.mustChangePassword ? 'cuenta' : selectedTab;
 
@@ -228,6 +230,8 @@ function App() {
                 return <MiProyecto onNavigate={handleTabChange} />;
             case 'cuenta':
                 return <Cuenta onNavigate={handleTabChange} activation={activation} />;
+            case 'profesor':
+                return isTeacher && !user.mustChangePassword ? <Profesor /> : <Cuenta onNavigate={handleTabChange} activation={activation} />;
             case 'admin':
                 return isAdmin && !user.mustChangePassword ? <Admin /> : <Cuenta onNavigate={handleTabChange} activation={activation} />;
             default:
@@ -261,6 +265,7 @@ function App() {
             case 'proyecto': return 'Mi proyecto';
             case 'cuenta': return 'Mi cuenta';
             case 'admin': return 'Administración';
+            case 'profesor': return 'Mis estudiantes';
             default: return '';
         }
     };
@@ -284,14 +289,14 @@ function App() {
     }
 
     // Cuenta activa sin cupo: no puede crear proyectos hasta que el administrador lo autorice.
-    if (sinCupo && !isAdmin && !user.mustChangePassword) {
+    if (sinCupo && !isAdmin && !isTeacher && !user.mustChangePassword) {
         return (
             <div className="app-acceso">
                 <section className="app-espera" role="status">
                     <Layers size={30} color="#4f46e5" aria-hidden="true" />
                     <h1>Tu cuenta está activa</h1>
-                    <p><b>Falta un paso:</b> el administrador debe autorizarte para crear tu proyecto. Ya le avisamos que estás esperando.</p>
-                    <p>Cuando lo haga te llegará un correo a <b>{user.email}</b> y esta página se actualizará sola. Si un compañero te invita a su proyecto, también lo verás aquí.</p>
+                    <p><b>Falta un paso:</b> {user.role === 'student' ? 'tu profesor debe permitirte crear tu proyecto. Pídeselo: lo hace desde «Mis estudiantes».' : 'el administrador debe autorizarte para crear tu proyecto.'}</p>
+                    <p>Cuando lo haga, esta página se actualizará sola. Si un compañero te invita a su proyecto, también lo verás aquí.</p>
                     <div>
                         <button type="button" className="pro-btn pro-btn--primary" disabled={comprobando} onClick={async () => { setComprobando(true); try { await recheck(); } catch { /* se reintenta solo */ } finally { setComprobando(false); } }}>{comprobando ? 'Comprobando…' : 'Comprobar ahora'}</button>
                         <button type="button" className="pro-btn pro-btn--ghost" onClick={handleLogout} disabled={signingOut}>Cerrar sesión</button>
@@ -341,6 +346,16 @@ function App() {
                 </div>
 
                 <nav style={{ flex: 1, overflowY: 'auto', margin: '0.4rem -0.5rem', padding: '0 0.5rem' }}>
+                    {isTeacher && (
+                        <button
+                            className={`nav-button ${activeTab === 'profesor' ? 'active' : ''}`}
+                            onClick={() => handleTabChange('profesor')}
+                            title="Mis estudiantes"
+                        >
+                            <GraduationCap size={20} />
+                            <span>Mis estudiantes</span>
+                        </button>
+                    )}
                     {isAdmin && (
                         <button
                             className={`nav-button ${activeTab === 'admin' ? 'active' : ''}`}
@@ -583,7 +598,9 @@ function App() {
                                 : activeTab === 'cuenta'
                                     ? 'Guarda tu proyecto y continúalo desde cualquier equipo.'
                                     : activeTab === 'admin'
-                                        ? 'Consulta los usuarios registrados, sus proyectos y su estado.'
+                                        ? 'Crea las cuentas, asigna los roles y consulta los proyectos y su estado.'
+                                    : activeTab === 'profesor'
+                                        ? 'Crea a los estudiantes a tu cargo, permíteles crear su proyecto y revisa cómo van.'
                                     : activeTab === 'arbol'
                                         ? 'Separa el problema central de sus causas y sus efectos. La figura entra en el Planteamiento de tu documento.'
                                     : 'Explora las herramientas interactivas para definir y estructurar tu proyecto de investigación de manera efectiva.'}

@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Ban, CheckCircle2, FileText, Mail, RefreshCw, Search, UserCheck } from 'lucide-react';
+import { ArrowLeft, Ban, CheckCircle2, FileText, KeyRound, Mail, RefreshCw, Search, UserCheck } from 'lucide-react';
 import { api } from '../services/api';
 import { buildDocument } from '../services/projectDoc';
 import { DocumentPaper } from './ProjectDocument';
 import Coherencia from './Coherencia';
 import AdminEstado from './AdminEstado';
+import { CrearCuentas, Credenciales, ROLES, nombreRol } from './Cuentas';
 
 // Insignia con el porcentaje de coherencia entre secciones.
 const CoherenciaBadge = ({ value }) => (value
@@ -45,6 +46,24 @@ const Cupo = ({ user, onChange, busy }) => {
             <button type="button" disabled={busy || limit <= 0} onClick={() => onChange(user, limit - 1)} aria-label={`Quitar un proyecto a ${user.name}`}>−</button>
             <b title={limit === 0 ? 'Sin permiso para crear proyectos' : `Puede crear hasta ${limit}`}>{limit}</b>
             <button type="button" disabled={busy || limit >= 20} onClick={() => onChange(user, limit + 1)} aria-label={`Autorizar un proyecto más a ${user.name}`}>+</button>
+        </span>
+    );
+};
+
+// El rol lo asigna el administrador; al estudiante se le elige además el profesor a cargo.
+const Rol = ({ user, profesores, onChange, busy }) => {
+    if (user.role === 'admin') return <span className="adm-muted">Administrador</span>;
+    return (
+        <span className="adm-rol">
+            <select className="input-field" value={user.role} disabled={busy} aria-label={`Rol de ${user.name}`} onChange={(e) => onChange(user, e.target.value, e.target.value === 'student' ? user.teacherId : null)}>
+                {ROLES.filter((r) => r.id !== 'admin').map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+            </select>
+            {user.role === 'student' && (
+                <select className="input-field" value={user.teacherId || ''} disabled={busy} aria-label={`Profesor a cargo de ${user.name}`} onChange={(e) => onChange(user, 'student', e.target.value ? Number(e.target.value) : null)}>
+                    <option value="">Sin profesor</option>
+                    {profesores.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+            )}
         </span>
     );
 };
@@ -101,6 +120,8 @@ const Admin = () => {
 
     const [selected, setSelected] = useState(null); // { user, projects }
     const [openProject, setOpenProject] = useState(null); // { project, owner }
+    const [acceso, setAcceso] = useState(null); // contraseña temporal recién generada
+    const profesores = useMemo(() => users.filter((u) => u.role === 'teacher'), [users]);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -159,6 +180,38 @@ const Admin = () => {
             replaceUser(updated);
             const action = status === 'blocked' ? 'bloqueó' : user.status === 'pending' ? 'activó' : 'desbloqueó';
             setNotice(`Se ${action} la cuenta de ${updated.name}.`);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const changeRole = async (user, role, teacherId) => {
+        if (role !== user.role && !window.confirm(`¿Cambiar el rol de ${user.name} a ${nombreRol(role)}?`)) return;
+        setBusy(true);
+        setError('');
+        setNotice('');
+        try {
+            const { user: updated } = await api.admin.setRole(user.id, role, teacherId);
+            replaceUser(updated);
+            if (role !== user.role) load();
+            setNotice(role !== user.role ? `${updated.name} ahora es ${nombreRol(role).toLowerCase()}.` : `${updated.name} quedó ${updated.teacherName ? `a cargo de ${updated.teacherName}` : 'sin profesor a cargo'}.`);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const newAccess = async (user) => {
+        if (!window.confirm(`¿Dar una contraseña nueva a ${user.name}? La anterior deja de servir.`)) return;
+        setBusy(true);
+        setError('');
+        setNotice('');
+        try {
+            const r = await api.admin.newAccess(user.id);
+            setAcceso({ cuentas: [{ name: user.name, email: user.email, clave: r.clave, emailSent: r.emailSent }], mail: r.emailSent });
         } catch (err) {
             setError(err.message);
         } finally {
@@ -251,11 +304,15 @@ const Admin = () => {
                 <section className="pro-card adm-user">
                     <div>
                         <h2>{user.name}</h2>
-                        <p>{user.email} · <StatusBadge status={user.status} /></p>
+                        <p>{user.email} · {nombreRol(user.role)}{user.teacherName ? ` · Profesor: ${user.teacherName}` : ''} · <StatusBadge status={user.status} /></p>
                         <p className="adm-muted">Registro: {formatDate(user.createdAt)} · Último ingreso: {formatDate(user.lastLoginAt)}</p>
                     </div>
-                    <StatusActions user={user} onChange={changeStatus} onResend={resend} busy={busy} />
+                    <div className="adm-user-acciones">
+                        {user.role !== 'admin' && <button type="button" className="pro-btn pro-btn--ghost adm-sm" disabled={busy} onClick={() => newAccess(user)}><KeyRound size={15} /> Dar acceso nuevo</button>}
+                        <StatusActions user={user} onChange={changeStatus} onResend={resend} busy={busy} />
+                    </div>
                 </section>
+                {acceso && <Credenciales cuentas={acceso.cuentas} mail={acceso.mail} onCerrar={() => setAcceso(null)} />}
 
                 <section className="pro-card">
                     <h2>Proyectos ({projects.length})</h2>
@@ -284,12 +341,14 @@ const Admin = () => {
         <div className="pro-page">
             {!mailReady && (
                 <p className="pro-warn" role="status">
-                    El envío de correo no está configurado en el servidor: los estudiantes nuevos no reciben el enlace de activación. Puedes activarlos manualmente desde esta lista.
+                    El envío de correo no está configurado en el servidor: las cuentas nuevas no reciben el correo con su acceso. Entrega tú la contraseña temporal que aparece al crearlas.
                 </p>
             )}
             {messages}
 
             <AdminEstado />
+
+            <CrearCuentas profesores={profesores} onCreadas={load} />
 
             <section className="pro-card">
                 <div className="adm-toolbar">
@@ -321,6 +380,7 @@ const Admin = () => {
                         <thead>
                             <tr>
                                 <th scope="col">Usuario</th>
+                                <th scope="col">Rol</th>
                                 <th scope="col">Estado</th>
                                 <th scope="col" className="adm-num">Proyectos</th>
                                 <th scope="col" title="Cuántos proyectos puede crear. 0 = sin permiso todavía">Cupo</th>
@@ -332,10 +392,10 @@ const Admin = () => {
                         </thead>
                         <tbody>
                             {loading && users.length === 0 && (
-                                <tr><td colSpan={8} className="adm-empty">Cargando usuarios…</td></tr>
+                                <tr><td colSpan={9} className="adm-empty">Cargando usuarios…</td></tr>
                             )}
                             {!loading && visible.length === 0 && (
-                                <tr><td colSpan={8} className="adm-empty">{users.length === 0 ? 'Todavía no hay usuarios registrados.' : 'Ningún usuario coincide con el filtro.'}</td></tr>
+                                <tr><td colSpan={9} className="adm-empty">{users.length === 0 ? 'Todavía no hay usuarios registrados.' : 'Ningún usuario coincide con el filtro.'}</td></tr>
                             )}
                             {visible.map((user) => (
                                 <tr key={user.id}>
@@ -345,6 +405,7 @@ const Admin = () => {
                                             <small>{user.email}</small>
                                         </button>
                                     </td>
+                                    <td><Rol user={user} profesores={profesores} onChange={changeRole} busy={busy} /></td>
                                     <td><StatusBadge status={user.status} /></td>
                                     <td className="adm-num">{user.projectCount}</td>
                                     <td><Cupo user={user} onChange={changeLimit} busy={busy} /></td>

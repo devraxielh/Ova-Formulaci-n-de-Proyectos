@@ -36,14 +36,35 @@ const enlace = (tipo, correo) => {
 };
 const clave = () => `Clave-${Math.random().toString(36).slice(2)}-9A`;
 
-// Crea una cuenta activa y devuelve su cliente con sesión.
-const cuenta = async (nombre) => {
+// Sesión del administrador (entra una sola vez y cambia la contraseña inicial).
+const entrarAdmin = async () => {
+    if (adminApi) return adminApi;
+    const admin = cliente();
+    assert.equal((await admin('/auth/login', 'POST', { email: 'admin', password: 'inicial-de-prueba' })).status, 200);
+    assert.equal((await admin('/admin/estado')).status, 403); // primero debe cambiar la contraseña inicial
+    assert.equal((await admin('/auth/password', 'POST', { current: 'inicial-de-prueba', next: clave() })).status, 200);
+    adminApi = admin;
+    return admin;
+};
+
+// Entra con la contraseña temporal y la cambia: deja la cuenta lista para trabajar.
+const estrenar = async (email, temporal) => {
     const api = cliente();
-    const email = `${nombre}.${Date.now()}@example.test`;
     const password = clave();
-    assert.equal((await api('/auth/register', 'POST', { name: nombre, email, password })).status, 201);
-    assert.equal((await api('/auth/verify', 'POST', { token: enlace('activar', email) })).status, 200);
+    const entra = await api('/auth/login', 'POST', { email, password: temporal });
+    assert.equal(entra.status, 200);
+    assert.equal(entra.body.user.mustChangePassword, true);
+    assert.equal((await api('/auth/password', 'POST', { current: temporal, next: password })).status, 200);
     return { api, email, password };
+};
+
+// Nadie se registra solo: la cuenta la crea el administrador. Por defecto, investigador (puede crear proyectos).
+const cuenta = async (nombre, role = 'researcher') => {
+    const admin = await entrarAdmin();
+    const email = `${nombre}.${Date.now()}@example.test`;
+    const creada = await admin('/admin/users', 'POST', { name: nombre, email, role });
+    assert.equal(creada.status, 201);
+    return { ...(await estrenar(email, creada.body.clave)), id: creada.body.user.id };
 };
 
 before(async () => {
@@ -170,12 +191,7 @@ test('recuperar contraseña: el enlace sirve una vez, cambia la clave y cierra l
 });
 
 test('administrador: copia de seguridad descargable y registro de errores', async () => {
-    const admin = cliente();
-    assert.equal((await admin('/auth/login', 'POST', { email: 'admin', password: 'inicial-de-prueba' })).status, 200);
-    assert.equal((await admin('/admin/estado')).status, 403); // primero debe cambiar la contraseña inicial
-    assert.equal((await admin('/auth/password', 'POST', { current: 'inicial-de-prueba', next: clave() })).status, 200);
-
-    adminApi = admin;
+    const admin = await entrarAdmin();
 
     const copia = await admin('/admin/backups', 'POST');
     assert.equal(copia.status, 201);
@@ -292,31 +308,111 @@ test('cupo: sin autorización del administrador no se crean proyectos; con cupo,
     assert.equal((await adminApi(`/admin/users/${yo.id}/limit`, 'POST', { limit: -1 })).status, 400);
 });
 
-test('cupo por defecto: una base anterior conserva el acceso de quienes ya tenían proyectos', async () => {
-    // Servidor aparte con el valor de producción (0): la cuenta nueva no puede crear.
-    const { spawn: lanzar } = await import('node:child_process');
-    const puerto = PORT + 1;
-    const hijo = lanzar(process.execPath, ['index.js'], { cwd: path.join(root, 'server'), env: { ...process.env, PORT: String(puerto), DB_PATH: path.join(tmp, 'cero.db'), BACKUP_DIR: path.join(tmp, 'copias0'), NODE_ENV: 'test', DEFAULT_PROJECT_LIMIT: '', OPENALEX_API_KEY: '', SEMANTIC_SCHOLAR_API_KEY: '', SMTP_HOST: '', GROQ_API_KEY: '' } });
-    let salida = '';
-    hijo.stdout.on('data', (d) => { salida += d; });
-    try {
-        const base = `http://127.0.0.1:${puerto}/api`;
-        for (let i = 0; i < 50; i += 1) { try { if ((await fetch(`${base}/health`)).ok) break; } catch { /* arrancando */ } await new Promise((r) => setTimeout(r, 100)); }
-        let cookie = '';
-        const api = async (ruta, body) => {
-            const res = await fetch(base + ruta, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) });
-            const set = res.headers.get('set-cookie'); if (set) cookie = set.split(';')[0];
-            return { status: res.status, body: await res.json() };
-        };
-        const email = `nueva.${Date.now()}@example.test`;
-        await api('/auth/register', { name: 'Nueva', email, password: clave() });
-        const token = salida.split('\n').filter((l) => l.includes(email)).at(-1).match(/activar=([a-f0-9]+)/)[1];
-        const activa = await api('/auth/verify', { token });
-        assert.equal(activa.body.user.projectLimit, 0);
-        assert.equal((await api('/projects', { name: 'P', data: {} })).body.code, 'no_quota');
-    } finally {
-        hijo.kill();
-    }
+test('registro cerrado: nadie crea su propia cuenta', async () => {
+    const anon = cliente();
+    const r = await anon('/auth/register', 'POST', { name: 'Nueva', email: `nueva.${Date.now()}@example.test`, password: clave() });
+    assert.equal(r.status, 403);
+    assert.equal(r.body.code, 'registro_cerrado');
+    assert.equal((await anon('/auth/me')).body.user, null);
+});
+
+test('roles: el administrador crea y asigna; el profesor crea a sus estudiantes, les permite crear y los supervisa', async () => {
+    const admin = await entrarAdmin();
+    const profe = await cuenta('profe11', 'teacher');
+    const otroProfe = await cuenta('profe11b', 'teacher');
+    const invest = await cuenta('invest11');
+
+    // Solo el administrador crea cuentas con rol; no se crean administradores ni correos repetidos.
+    assert.equal((await profe.api('/admin/users', 'POST', { name: 'X', email: 'x11@example.test', role: 'teacher' })).status, 403);
+    assert.equal((await admin('/admin/users', 'POST', { name: 'X', email: 'x11@example.test', role: 'admin' })).status, 400);
+    assert.equal((await admin('/admin/users', 'POST', { name: 'X', email: profe.email, role: 'student' })).status, 400);
+
+    // Investigador y profesor crean proyectos; el investigador no entra a la sección del profesor.
+    assert.equal((await invest.api('/projects', 'POST', { name: 'Del investigador', data: {} })).status, 201);
+    assert.equal((await profe.api('/projects', 'POST', { name: 'Del profesor', data: {} })).status, 201);
+    assert.equal((await invest.api('/teacher/students')).status, 403);
+    assert.equal((await invest.api('/teacher/students', 'POST', { name: 'E', email: 'e11@example.test' })).status, 403);
+
+    // El profesor crea a su estudiante SIN permiso: entra con la temporal, la cambia y no puede crear.
+    const correo = `est11.${Date.now()}@example.test`;
+    const creado = await profe.api('/teacher/students', 'POST', { name: 'Estudiante Once', email: correo, permitir: false });
+    assert.equal(creado.status, 201);
+    assert.equal(creado.body.student.projectLimit, 0);
+    const est = await estrenar(correo, creado.body.clave);
+    const idEst = creado.body.student.id;
+    assert.equal((await est.api('/auth/me')).body.user.role, 'student');
+    const sin = await est.api('/projects', 'POST', { name: 'Mío', data: {} });
+    assert.equal(sin.status, 403);
+    assert.equal(sin.body.code, 'no_quota');
+    assert.match(sin.body.error, /profesor/);
+
+    // El profesor lo permite (hasta el tope) y entonces sí crea; otro profesor no puede tocarlo ni verlo.
+    assert.equal((await otroProfe.api(`/teacher/students/${idEst}/limit`, 'POST', { limit: 1 })).status, 404);
+    assert.equal((await profe.api(`/teacher/students/${idEst}/limit`, 'POST', { limit: 99 })).status, 400);
+    assert.equal((await profe.api(`/teacher/students/${idEst}/limit`, 'POST', { limit: 1 })).body.student.projectLimit, 1);
+    const p = (await est.api('/projects', 'POST', { name: 'Mío', data: { titulo: 'Título del estudiante' } })).body.project;
+    assert.ok(p.id);
+    assert.equal((await est.api('/projects', 'POST', { name: 'Otro', data: {} })).body.code, 'quota_full');
+
+    // Supervisión: el profesor ve a su estudiante con el proyecto y lo abre; el otro profesor y el investigador, no.
+    const lista = (await profe.api('/teacher/students')).body.students;
+    assert.equal(lista.length, 1);
+    assert.equal(lista[0].projects[0].id, p.id);
+    assert.equal((await profe.api(`/teacher/projects/${p.id}`)).body.project.data.titulo, 'Título del estudiante');
+    assert.equal((await otroProfe.api(`/teacher/projects/${p.id}`)).status, 404);
+    assert.equal((await otroProfe.api('/teacher/students')).body.students.length, 0);
+    // Supervisar es leer: el profesor no puede escribir en el proyecto del estudiante.
+    assert.equal((await profe.api(`/projects/${p.id}`, 'PUT', { patch: { titulo: 'Del profesor' } })).status, 404);
+
+    // Contraseña nueva: la anterior deja de servir y la sesión del estudiante se cierra.
+    const nueva = await profe.api(`/teacher/students/${idEst}/access`, 'POST');
+    assert.equal(nueva.status, 200);
+    assert.equal((await est.api('/auth/me')).body.user, null);
+    assert.equal((await cliente()('/auth/login', 'POST', { email: correo, password: est.password })).status, 401);
+    await estrenar(correo, nueva.body.clave);
+
+    // El administrador asigna roles: pasa al estudiante a otro profesor, y a un investigador lo vuelve profesor.
+    assert.equal((await profe.api(`/admin/users/${idEst}/role`, 'POST', { role: 'teacher' })).status, 403);
+    const movido = await admin(`/admin/users/${idEst}/role`, 'POST', { role: 'student', teacherId: otroProfe.id });
+    assert.equal(movido.body.user.teacherId, otroProfe.id);
+    assert.equal((await profe.api('/teacher/students')).body.students.length, 0);
+    assert.equal((await otroProfe.api('/teacher/students')).body.students.length, 1);
+    assert.equal((await admin(`/admin/users/${invest.id}/role`, 'POST', { role: 'teacher' })).body.user.role, 'teacher');
+    assert.equal((await invest.api('/teacher/students')).status, 200);
+    assert.equal((await admin(`/admin/users/${invest.id}/role`, 'POST', { role: 'admin' })).status, 400);
+    // Si el profesor deja de serlo, sus estudiantes quedan sin profesor a cargo.
+    assert.equal((await admin(`/admin/users/${otroProfe.id}/role`, 'POST', { role: 'researcher' })).status, 200);
+    assert.equal((await admin('/admin/users')).body.users.find((u) => u.id === idEst).teacherId, null);
+});
+
+test('carga por lotes: crea las filas buenas, explica las malas y enlaza cada estudiante con su profesor', async () => {
+    const admin = await entrarAdmin();
+    const t = Date.now();
+    const lote = [
+        { name: 'Profe Lote', email: `plote.${t}@example.test`, role: 'teacher' },
+        { name: 'Est Uno', email: `e1.${t}@example.test`, role: 'student', teacher: `PLOTE.${t}@example.test` },
+        { name: 'Inv Lote', email: `inv.${t}@example.test`, role: 'researcher' },
+        { name: 'Repetido', email: `e1.${t}@example.test`, role: 'student' },
+        { name: 'Mal correo', email: 'sin-arroba', role: 'student' },
+        { name: 'Sin profe', email: `e2.${t}@example.test`, role: 'student', teacher: 'nadie@example.test' },
+        { name: 'Quiere mandar', email: `adm.${t}@example.test`, role: 'admin' },
+    ];
+    assert.equal((await cliente()('/admin/users/batch', 'POST', { users: lote })).status, 401);
+    assert.equal((await admin('/admin/users/batch', 'POST', { users: [] })).status, 400);
+    const r = (await admin('/admin/users/batch', 'POST', { users: lote })).body;
+    assert.equal(r.creadas, 3);
+    assert.deepEqual(r.resultados.map((x) => x.ok), [true, true, true, false, false, false, false]);
+    assert.ok(r.resultados.slice(3).every((x) => x.error && !x.clave));
+    const usuarios = (await admin('/admin/users')).body.users;
+    const profe = usuarios.find((u) => u.email === lote[0].email);
+    const est = usuarios.find((u) => u.email === lote[1].email);
+    assert.equal(est.teacherId, profe.id);
+    assert.equal(est.projectLimit, 0);
+    assert.equal(est.mustChangePassword, true);
+    assert.ok(!usuarios.some((u) => u.email === lote[6].email));
+    // La contraseña temporal del lote sirve para entrar; no queda escrita en el registro del servidor.
+    await estrenar(lote[1].email, r.resultados[1].clave);
+    assert.ok(!log.includes(r.resultados[1].clave));
 });
 
 test('búsqueda de artículos: exige sesión y, sin clave en el servidor, avisa para que el navegador busque directo', async () => {

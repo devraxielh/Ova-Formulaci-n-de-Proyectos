@@ -316,7 +316,7 @@ const MiProyecto = ({ onNavigate }) => {
                             <button type="button" className="pro-tarjeta pro-tarjeta--nueva" disabled={propios >= cupo} onClick={() => run(() => createProject('Proyecto nuevo'))}>
                                 <Plus size={26} aria-hidden="true" />
                                 <b>Nuevo proyecto</b>
-                                <span className="pro-tarjeta-titulo">{propios >= cupo ? 'Llegaste al número de proyectos que te autorizó el administrador.' : 'Empieza otro proyecto desde cero.'}</span>
+                                <span className="pro-tarjeta-titulo">{propios >= cupo ? (user.role === 'student' ? 'Llegaste al número de proyectos que te permitió tu profesor.' : 'Llegaste al número de proyectos que te autorizó el administrador.') : 'Empieza otro proyecto desde cero.'}</span>
                             </button>
                         </li>
                     </ul>

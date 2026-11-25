@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ArrowRight, CheckCircle2, Download, FileText, FolderOpen, Layers, Lightbulb, LogOut, MailCheck, MonitorSmartphone, ShieldCheck } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 import { api } from '../services/api';
+import { nombreRol } from './Cuentas';
 import './Proyecto.css';
 
 const CambioClave = ({ forced }) => {
@@ -38,7 +39,7 @@ const CambioClave = ({ forced }) => {
         <form className="pro-form" onSubmit={submit} noValidate>
             {forced && (
                 <p className="pro-warn" role="alert">
-                    Estás usando la contraseña inicial. Cámbiala ahora para poder entrar a la administración.
+                    Estás usando la contraseña temporal que te entregaron. Cámbiala ahora por una tuya para poder continuar.
                 </p>
             )}
             <div className="input-group">
@@ -85,7 +86,7 @@ const BenefitsAside = () => (
     <>
         <div className="acc-aside-body">
             <h2>Formula tu proyecto de investigación paso a paso</h2>
-            <p>Crea una cuenta gratuita para guardar tu proyecto y no perder lo que construyes en cada clase.</p>
+            <p>Entra con tu cuenta para guardar tu proyecto y no perder lo que construyes en cada clase.</p>
             <ul className="acc-benefits">
                 {BENEFITS.map(({ icon: Icon, title, text }) => (
                     <li key={title}>
@@ -95,7 +96,7 @@ const BenefitsAside = () => (
                 ))}
             </ul>
         </div>
-        <p className="acc-aside-foot">Para usar las herramientas necesitas una cuenta: así tu proyecto queda guardado y tu docente puede acompañarlo.</p>
+        <p className="acc-aside-foot">Para usar las herramientas necesitas una cuenta, que te entrega tu profesor o el administrador: así tu proyecto queda guardado y tu docente puede acompañarlo.</p>
     </>
 );
 
@@ -221,7 +222,7 @@ const Cuenta = ({ onNavigate, activation, resetToken, onResetDone }) => {
                     <p>{isAdmin ? `Usuario: ${user.email}` : user.email}</p>
                     <dl className="acc-stats">
                         <div><dt>Proyectos</dt><dd>{projects.length}</dd></div>
-                        <div><dt>Rol</dt><dd>{isAdmin ? 'Administrador' : 'Estudiante'}</dd></div>
+                        <div><dt>Rol</dt><dd>{nombreRol(user.role)}</dd></div>
                     </dl>
                     {!user.mustChangePassword && (
                         <div className="acc-aside-actions">
@@ -326,10 +327,6 @@ const Cuenta = ({ onNavigate, activation, resetToken, onResetDone }) => {
                 {activation?.status === 'working' && <p className="pro-notice" role="status">Activando tu cuenta…</p>}
                 {activation?.status === 'error' && <p className="pro-alert" role="alert">{activation.message}</p>}
                 <h2>{isRegister ? 'Crea tu cuenta' : 'Inicia sesión'}</h2>
-                <div className="pro-modes" role="tablist" aria-label="Acceso">
-                    <button type="button" role="tab" aria-selected={!isRegister} onClick={() => { setMode('login'); setError(null); }}>Iniciar sesión</button>
-                    <button type="button" role="tab" aria-selected={isRegister} onClick={() => { setMode('register'); setError(null); }}>Crear cuenta</button>
-                </div>
 
                 <p className="acc-lead">
                     {isRegister
@@ -392,6 +389,11 @@ const Cuenta = ({ onNavigate, activation, resetToken, onResetDone }) => {
                     </button>
                 </form>
 
+                {!isRegister && (
+                    <p className="pro-fine">
+                        ¿No tienes cuenta? Aquí nadie se registra por su cuenta: la crea el administrador de la plataforma o tu profesor, y te llega un correo con el acceso.
+                    </p>
+                )}
                 {isRegister && (
                     <p className="pro-fine">
                         Guardamos tu nombre, tu correo y el contenido de tus proyectos para que puedas continuar tu trabajo. El administrador de la plataforma puede consultarlos. No se comparten con terceros.
