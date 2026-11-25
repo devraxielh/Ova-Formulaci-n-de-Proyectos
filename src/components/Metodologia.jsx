@@ -29,6 +29,7 @@ import './Justificacion.css';
 import './Marco.css';
 import './Alcances.css';
 import './Metodologia.css';
+import { confirmar } from './Avisos';
 
 /* Clase larga de 4 horas: el contenido de cada diapositiva está en data/metodologiaClase.js. */
 
@@ -1080,7 +1081,7 @@ const Constructor = ({ intro, onNavigate }) => {
                                     </div>
                                     {f.instrumentos.length > 1 && (
                                         <div className="mar-wide met-fila-pie">
-                                            <button type="button" className="met-quitar" onClick={() => { if (!window.confirm(`¿Quitar el instrumento «${clean(it.instrumento) || it.tecnica}»? Se pierden sus datos de validación.`)) return; touch(); update({ instrumentos: f.instrumentos.filter((_, k) => k !== i) }); }}><Trash2 size={15} aria-hidden="true" /> Quitar este instrumento</button>
+                                            <button type="button" className="met-quitar" onClick={async () => { if (!(await confirmar({ texto: `¿Quitar el instrumento «${clean(it.instrumento) || it.tecnica}»?`, detalle: 'Se pierden sus datos de validación.', aceptar: 'Quitar', peligro: true }))) return; touch(); update({ instrumentos: f.instrumentos.filter((_, k) => k !== i) }); }}><Trash2 size={15} aria-hidden="true" /> Quitar este instrumento</button>
                                         </div>
                                     )}
                                 </div>

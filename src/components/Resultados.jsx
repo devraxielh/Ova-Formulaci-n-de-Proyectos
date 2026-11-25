@@ -18,6 +18,7 @@ import { api } from '../services/api';
 import './Marco.css';
 import './Alcances.css';
 import './Fases.css';
+import { confirmar } from './Avisos';
 
 const SLIDE_KEY = 'projectsia:resultados:diapositiva';
 
@@ -140,7 +141,7 @@ const Constructor = ({ intro, onNavigate }) => {
     };
     const hayTexto = especificos.some((_, i) => Object.entries(f.porObjetivo?.[i] || {}).some(([k, v]) => !['relacion', 'apoyoTipo', 'sugerido'].includes(k) && clean(v))) || clean(f.limitaciones) || clean(f.futuras);
     const llenarTodo = async (preguntar = true) => {
-        if (preguntar && hayTexto && !window.confirm('Se reemplazará lo que escribiste en resultados y discusión por lo recomendado con tus datos. ¿Continuar?')) return;
+        if (preguntar && hayTexto && !(await confirmar({ texto: '¿Reemplazar lo que escribiste?', detalle: 'Los resultados y la discusión se cambian por lo recomendado con tus datos. Puedes recuperar lo anterior desde el historial de versiones.', aceptar: 'Reemplazar', peligro: true }))) return;
         setLlenando('pensando');
         try {
             const r = datos?.fuentes ? datos : await reunir();

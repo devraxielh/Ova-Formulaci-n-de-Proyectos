@@ -130,7 +130,7 @@ const Profesor = () => {
                             <header>
                                 <div>
                                     <b>{s.name}</b>
-                                    <small>{s.email} · Último ingreso: {formatDate(s.lastLoginAt)}{s.mustChangePassword ? ' · aún no cambia su contraseña temporal' : ''}{s.status === 'blocked' ? ' · cuenta bloqueada' : ''}</small>
+                                    <small>{s.email}{s.grupo ? ` · ${s.grupo}` : ''} · Último ingreso: {formatDate(s.lastLoginAt)}{s.mustChangePassword ? ' · aún no cambia su contraseña temporal' : ''}{s.status === 'blocked' ? ' · cuenta bloqueada' : ''}</small>
                                 </div>
                                 <button type="button" className="pro-btn pro-btn--ghost adm-sm" disabled={busy} onClick={() => nuevoAcceso(s)}><KeyRound size={15} /> Contraseña nueva</button>
                             </header>

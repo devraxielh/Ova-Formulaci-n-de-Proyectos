@@ -14,6 +14,7 @@ import './Objetivos.css';
 import './Justificacion.css';
 import './Marco.css';
 import './Fases.css';
+import { confirmar } from './Avisos';
 
 const SLIDE_KEY = 'projectsia:conclusiones:diapositiva';
 
@@ -89,7 +90,7 @@ const Constructor = ({ intro, onNavigate }) => {
     const hayTexto = Object.values(f.especificas || {}).some((v) => clean(v)) || clean(f.general) || f.recomendaciones.some((r) => clean(r.accion));
     const llenarTodo = async (preguntar = true) => {
         if (!conResultados) return;
-        if (preguntar && hayTexto && !window.confirm('Se reemplazarán tus conclusiones y recomendaciones por las redactadas con tus resultados. ¿Continuar?')) return;
+        if (preguntar && hayTexto && !(await confirmar({ texto: '¿Reemplazar tus conclusiones?', detalle: 'Las conclusiones y recomendaciones se cambian por las redactadas con tus resultados. Puedes recuperar lo anterior desde el historial de versiones.', aceptar: 'Reemplazar', peligro: true }))) return;
         setLlenando('pensando');
         try {
             const res = await recomendarConclusiones({ data, especificos, resultados: resultadosForm });

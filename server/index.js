@@ -925,6 +925,11 @@ const sendFile = (res, projectId, fileId) => {
 app.get('/api/projects/:id/files/:fid', requireUser, (req, res) => {
     // El administrador puede ver las figuras de cualquier proyecto (solo lectura).
     if (req.user.role === 'admin') return sendFile(res, Number(req.params.id), req.params.fid);
+    // El profesor ve las figuras de los proyectos de los estudiantes a su cargo (los supervisa en solo lectura).
+    if (req.user.role === 'teacher') {
+        const suyo = db.prepare("SELECT 1 FROM projects p JOIN users u ON u.id = p.user_id WHERE p.id = ? AND u.role = 'student' AND u.teacher_id = ?").get(Number(req.params.id), req.user.id);
+        if (suyo) return sendFile(res, Number(req.params.id), req.params.fid);
+    }
     const found = loadProject(req);
     if (!found) return res.status(404).json({ error: 'No se encontró el proyecto.' });
     return sendFile(res, found.row.id, req.params.fid);
@@ -1618,7 +1623,7 @@ const miEstudiante = (req) => db.prepare("SELECT * FROM users WHERE id = ? AND r
 const filaEstudiante = (row) => {
     const projects = db.prepare('SELECT id, name, data, created_at, updated_at FROM projects WHERE user_id = ? ORDER BY updated_at DESC, id DESC').all(row.id);
     return {
-        id: row.id, name: row.name, email: row.email, status: row.status,
+        id: row.id, name: row.name, email: row.email, status: row.status, grupo: row.grupo || '',
         projectLimit: Number(row.project_limit) || 0,
         lastLoginAt: row.last_login_at, mustChangePassword: Boolean(row.must_change_password),
         projects: projects.map((p) => ({ ...projectRow(p, false), ...resumenProyecto(p.data), coherencia: coherenciaDe(p.data) })),

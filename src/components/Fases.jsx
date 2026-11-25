@@ -19,6 +19,7 @@ import './Objetivos.css';
 import './Justificacion.css';
 import './Marco.css';
 import './Fases.css';
+import { confirmar } from './Avisos';
 
 const SLIDE_KEY = 'projectsia:fases:diapositiva';
 
@@ -320,7 +321,7 @@ const Constructor = ({ intro, onNavigate }) => {
     const [recomendando, setRecomendando] = useState(''); // '' | 'todas' | 'una' | 'fallo'
     const sinTrabajar = (x) => !clean(x.descripcion) && !clean(x.tecnicas) && !clean(x.responsable);
     const recomendarTodas = async (preguntar = true) => {
-        if (preguntar && fases.length && !fases.every(sinTrabajar) && !window.confirm('Se reemplazarán tus fases actuales por las recomendadas. ¿Continuar?')) return;
+        if (preguntar && fases.length && !fases.every(sinTrabajar) && !(await confirmar({ texto: '¿Reemplazar tus fases?', detalle: 'Las fases actuales se cambian por las recomendadas. Puedes recuperar lo anterior desde el historial de versiones.', aceptar: 'Reemplazar', peligro: true }))) return;
         setRecomendando('todas');
         try {
             const nuevas = await recomendarFases({ data, especificos, unidad: f.unidad });

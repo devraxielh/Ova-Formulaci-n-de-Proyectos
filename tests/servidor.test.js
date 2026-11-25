@@ -368,6 +368,12 @@ test('roles: el administrador crea y asigna; el profesor crea a sus estudiantes,
     assert.equal(fila.ownerRole, 'student');
     assert.equal(fila.ownerEmail, correo);
     assert.equal((await profe.api('/admin/projects')).status, 403);
+    // El profesor también ve las figuras del proyecto que supervisa; el otro profesor, no.
+    const png18 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+    const fig = (await est.api(`/projects/${p.id}/files`, 'POST', { mime: 'image/png', data: png18.toString('base64') })).body.file;
+    assert.equal((await profe.api(`/projects/${p.id}/files/${fig.id}`)).status, 200);
+    assert.equal((await otroProfe.api(`/projects/${p.id}/files/${fig.id}`)).status, 404);
+    assert.equal((await profe.api(`/projects/${p.id}/files`, 'POST', { mime: 'image/png', data: png18.toString('base64') })).status, 404);
     // Supervisar es leer: el profesor no puede escribir en el proyecto del estudiante.
     assert.equal((await profe.api(`/projects/${p.id}`, 'PUT', { patch: { titulo: 'Del profesor' } })).status, 404);
 
