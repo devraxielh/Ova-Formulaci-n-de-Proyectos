@@ -61,3 +61,8 @@
 /* El título del instrumento armado se lee como una sola frase: icono, nombre y número de preguntas seguidos. */
 .met-armar > span { display: block; line-height: 1.5; }
 .met-armar > span > svg { display: inline-block; vertical-align: -3px; margin-right: 0.3rem; }
+
+/* Aviso de que el cronograma o el presupuesto dejó de coincidir con el resto del proyecto */
+.met-desfase { display: grid; gap: 0.5rem; justify-items: start; padding: 0.75rem 0.9rem; border-radius: 0.6rem; background: #fffbeb; border: 1px solid #fde68a; color: #78350f; font-size: 0.88rem; }
+.met-desfase b { display: flex; align-items: center; gap: 0.4rem; }
+.met-desfase ul { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.2rem; }

@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { api } from '../services/api';
+import { api, fijarEstiloIA } from '../services/api';
 
 /*
  * Proyecto activo compartido por todas las herramientas.
@@ -91,6 +91,8 @@ export const ProjectProvider = ({ children }) => {
     const syncedRef = useRef(data); // lo que el servidor tiene, según este navegador
     const versionRef = useRef(0);
     dataRef.current = data;
+    // El vocabulario y estilo del proyecto abierto acompaña a toda solicitud a la IA.
+    useEffect(() => { fijarEstiloIA(data?.estilo); }, [data?.estilo]);
     projectRef.current = project;
 
     const flush = useCallback(async () => {

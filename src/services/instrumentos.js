@@ -39,7 +39,7 @@ export const preguntasDe = (ins) => (Array.isArray(ins?.preguntas) ? ins.pregunt
 export const definicionEncuesta = (ins) => ({
     titulo: texto(ins.titulo) || 'Encuesta',
     intro: texto(ins.intro),
-    preguntas: preguntasDe(ins).map((q) => ({ id: q.id, texto: q.texto, tipo: q.tipo, opciones: q.opciones, obligatoria: q.obligatoria !== false })),
+    preguntas: preguntasDe(ins).map((q) => ({ id: q.id, texto: q.texto, tipo: q.tipo, opciones: q.opciones, obligatoria: q.obligatoria !== false, objetivo: Number(q.objetivo) || 0, ...(texto(q.variable) ? { variable: texto(q.variable) } : {}), ...(texto(q.dimension) ? { dimension: texto(q.dimension) } : {}), ...(texto(q.indicador) ? { indicador: texto(q.indicador) } : {}) })),
 });
 
 // Bloques del instrumento para el anexo del documento.

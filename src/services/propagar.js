@@ -105,3 +105,47 @@ export const seccionesAfectadas = (data, reemplazos, omitir = []) => {
         return { id, label: SECTIONS.find((s) => s.id === id)?.label || id, campos, valores: Object.fromEntries(campos.map((k) => [k, nuevos[k]])), trozos: compararTextos(a, b), cambiaTexto: a !== b, veces };
     }).filter(Boolean);
 };
+
+/* ---------- Cambios de fondo: reescritura propuesta por la IA ---------- */
+
+// Secciones que puede reescribir la IA cuando cambia el sentido del título o la pregunta (no solo un término).
+export const REESCRIBIBLES = DEPENDIENTES.filter((id) => !ORIGENES.some((o) => o.id === id));
+
+// Frases con las que está armada una sección: los textos de su formulario (o, si no tiene, los párrafos de su texto).
+// Cada una lleva una clave corta para que la IA diga cuál cambia sin tener que repetirla.
+export const hojasDeSeccion = (data, id, maximo = 24) => {
+    const hojas = [];
+    const vistas = new Set();
+    const tomar = (texto) => {
+        const limpio = t(texto);
+        if (limpio.length < 25 || limpio.length > 700 || vistas.has(plano(limpio))) return;
+        vistas.add(plano(limpio));
+        hojas.push(limpio);
+    };
+    const andar = (v, clave = '') => {
+        if (SIN_TOCAR.has(clave)) return;
+        if (typeof v === 'string') { if (/\n/.test(v)) v.split(/\n+/).forEach((p) => tomar(p.replace(/^[-#*\d.\s]+/, ''))); else tomar(v); }
+        else if (Array.isArray(v)) v.forEach((x) => andar(x, clave));
+        else if (v && typeof v === 'object') Object.entries(v).forEach(([k, x]) => andar(x, k));
+    };
+    const campos = CAMPOS_SECCION[id] || [];
+    // Primero los formularios (son las piezas con las que el módulo arma el texto); si no dieron nada, el texto mismo.
+    campos.filter((k) => data?.[k] && typeof data[k] === 'object').forEach((k) => andar(data[k], k));
+    if (!hojas.length) campos.filter((k) => typeof data?.[k] === 'string').forEach((k) => andar(data[k], k));
+    return hojas.slice(0, maximo).map((texto, i) => ({ id: `h${i + 1}`, texto }));
+};
+
+// Lo que responde la IA → reemplazos seguros: solo frases que se le dieron, con un texto nuevo de tamaño parecido.
+export const paresDeReescritura = (hojas, cambios) => {
+    const porId = Object.fromEntries((hojas || []).map((h) => [h.id, h.texto]));
+    const pares = [];
+    (Array.isArray(cambios) ? cambios : []).forEach((c) => {
+        const antes = porId[t(c?.id).toLowerCase()];
+        const despues = t(c?.texto);
+        if (!antes || !despues || plano(antes) === plano(despues)) return;
+        if (despues.length < antes.length * 0.4 || despues.length > antes.length * 2.5 + 80) return;
+        if (pares.some((p) => p.antes === antes)) return;
+        pares.push({ antes: antes.replace(/[\s.]+$/, ''), despues: despues.replace(/[\s.]+$/, '') });
+    });
+    return pares;
+};

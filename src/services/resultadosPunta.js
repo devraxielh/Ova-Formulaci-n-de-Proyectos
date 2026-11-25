@@ -4,6 +4,8 @@
 // resumen con las cifras para que la IA redacte sin inventar nada. Todo el cálculo se hace aquí, no en la IA.
 import { analizar, correlacion, cruzar, descriptivos, fmt, fmtP, fuerza, tablaDe } from './estadistica.js';
 import { tablaRespuestas } from './instrumentos.js';
+import { cronbach, nivelAlfa } from '../data/validacion.js';
+import { resumenCategorias, tablaCategorias } from './cualitativo.js';
 
 const t = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
 const corto = (v, n = 70) => { const s = t(v).replace(/[¿?]/g, '').replace(/[.:\s]+$/, ''); return s.length > n ? `${s.slice(0, n - 1).trim()}…` : s; };
@@ -23,7 +25,8 @@ const variablesDe = (encuesta) => {
         const opciones = lista(q.opciones);
         // En una escala, la respuesta se convierte en su posición (1 = primera opción) para promediar y correlacionar.
         const puntos = q.tipo === 'likert' && opciones.length ? valores.map((x) => { const k = opciones.indexOf(String(x)); return k >= 0 ? k + 1 : NaN; }) : null;
-        return { ...v, id: q.id, tipo: q.tipo, objetivo: Number(encuesta.objetivoDe?.[q.id]) || 0, valores, puntos, opciones };
+        const meta = encuesta.meta?.[q.id] || {};
+        return { ...v, id: q.id, tipo: q.tipo, objetivo: Number(meta.objetivo ?? encuesta.objetivoDe?.[q.id]) || 0, variable: t(meta.variable), dimension: t(meta.dimension), indicador: t(meta.indicador), valores, puntos, opciones };
     });
 };
 
@@ -50,13 +53,25 @@ export const objetivoDeFila = (texto, especificos) => {
 // A qué objetivo responde cada pregunta de la encuesta publicada. Se busca primero por el identificador de la
 // pregunta en su instrumento y, si el instrumento se editó después de publicarlo, por el texto de la pregunta
 // en cualquiera de los instrumentos armados.
-export const objetivosDePreguntas = (definition, instrumentoId, armados) => {
+// Qué mide cada pregunta: { objetivo, variable, dimension, indicador }. Se toma, en este orden, de lo que la propia
+// encuesta guardó al publicarse, del instrumento armado (por identificador o por texto) y de la matriz de
+// operacionalización (por el indicador o por el texto del ítem).
+export const metaDePreguntas = (definition, instrumentoId, armados, matriz) => {
     const propio = lista(armados).find((a) => a?.id === instrumentoId);
-    const porId = Object.fromEntries(lista(propio?.preguntas).map((q) => [q.id, Number(q.objetivo) || 0]));
+    const porId = Object.fromEntries(lista(propio?.preguntas).map((q) => [q.id, q]));
     const porTexto = new Map();
-    [...lista(armados).filter((a) => a !== propio), propio].filter(Boolean).forEach((a) => lista(a.preguntas).forEach((q) => { if (plano(q?.texto)) porTexto.set(plano(q.texto), Number(q.objetivo) || 0); }));
-    return Object.fromEntries(lista(definition?.preguntas).map((q) => [q.id, porId[q.id] !== undefined ? porId[q.id] : (porTexto.get(plano(q.texto)) || 0)]));
+    [...lista(armados).filter((a) => a !== propio), propio].filter(Boolean).forEach((a) => lista(a.preguntas).forEach((q) => { if (plano(q?.texto)) porTexto.set(plano(q.texto), q); }));
+    const filas = lista(matriz);
+    return Object.fromEntries(lista(definition?.preguntas).map((q) => {
+        const armada = porId[q.id] || porTexto.get(plano(q.texto)) || {};
+        const propia = Number.isFinite(Number(q.objetivo)) && q.objetivo !== undefined ? q : null;
+        const base = { objetivo: Number((propia || armada).objetivo) || 0, variable: t(q.variable || armada.variable), dimension: t(q.dimension || armada.dimension), indicador: t(q.indicador || armada.indicador) };
+        const fila = filas.find((f) => (base.indicador && plano(f?.indicador) === plano(base.indicador)) || (plano(f?.item) && plano(f.item) === plano(q.texto)));
+        if (fila) { base.variable = base.variable || t(fila.variable); base.dimension = base.dimension || t(fila.dimension); base.indicador = base.indicador || t(fila.indicador); if (!base.objetivo) base.objetivo = Number(fila.objetivo) || 0; }
+        return [q.id, base];
+    }));
 };
+export const objetivosDePreguntas = (definition, instrumentoId, armados) => Object.fromEntries(Object.entries(metaDePreguntas(definition, instrumentoId, armados, [])).map(([id, m]) => [id, m.objetivo]));
 
 /*
  * encuestas: [{ titulo, definition, responses, objetivoDe: { [idPregunta]: n } }]
@@ -70,8 +85,10 @@ export const analizarPorObjetivo = ({ encuestas, especificos, plan }) => {
     const porObjetivo = {};
     const todas = lista(encuestas).filter((e) => lista(e.responses).length > 0).flatMap(variablesDe);
     const n = Math.max(0, ...lista(encuestas).map((e) => lista(e.responses).length));
-    const nota = `Elaboración propia con datos del estudio (n = ${n}).`;
-    if (!todas.length) return { n: 0, tablas, figuras, porObjetivo, resumen: '' };
+    // Con varios instrumentos respondidos por distinto número de personas, la nota no puede dar un solo n.
+    const enes = [...new Set(lista(encuestas).map((e) => lista(e.responses).length).filter((x) => x > 0))].sort((x, y) => x - y);
+    const nota = enes.length > 1 ? `Elaboración propia con datos del estudio (n entre ${enes[0]} y ${enes[enes.length - 1]}, según el instrumento).` : `Elaboración propia con datos del estudio (n = ${n}).`;
+    if (!todas.length) return { n: 0, tablas, figuras, porObjetivo, resumen: '', confiabilidad: [], dimensiones: [] };
 
     // Caracterización de los participantes: una sola tabla con las preguntas que no miden un objetivo.
     const caract = todas.filter((v) => v.objetivo === 0 && v.clase === 'categorica' && v.frec?.items?.length && !v.multiple).slice(0, 4);
@@ -150,8 +167,42 @@ export const analizarPorObjetivo = ({ encuestas, especificos, plan }) => {
         porObjetivo[k] = { lineas, titulos, tecnica };
     });
 
+    // Confiabilidad de cada escala con las respuestas reales (alfa de Cronbach, con quienes respondieron todos sus ítems).
+    const alfaDe = (items) => {
+        const filas = (items[0]?.puntos || []).map((_, r) => items.map((v) => v.puntos[r])).filter((f) => f.every(Number.isFinite));
+        if (items.length < 2 || filas.length < 3) return null;
+        const c = cronbach(filas.map((f) => f.join('\t')).join('\n'));
+        return c && !c.error && Number.isFinite(c.alfa) ? { alfa: c.alfa, k: c.k, n: c.n } : null;
+    };
+    const confiabilidad = [];
+    const escalasPorVariable = new Map();
+    todas.filter((v) => v.puntos && v.variable).forEach((v) => escalasPorVariable.set(v.variable, [...(escalasPorVariable.get(v.variable) || []), v]));
+    const grupos = escalasPorVariable.size
+        ? [...escalasPorVariable.entries()].map(([nombre, items]) => ({ nombre, items }))
+        : especificos.map((_, i) => ({ nombre: `Escala del objetivo específico ${i + 1}`, items: escalasDe(i + 1) }));
+    grupos.forEach((g) => { const a = alfaDe(g.items); if (a) confiabilidad.push({ escala: g.nombre, ...a, nivel: nivelAlfa(a.alfa) }); });
+    if (confiabilidad.length) {
+        tablas.push({ objetivo: 0, titulo: 'Confiabilidad de las escalas', nota: `${nota} Alfa de Cronbach calculado con los participantes que respondieron todos los ítems de cada escala.`, head: ['Escala', 'Ítems', 'n', 'Alfa de Cronbach', 'Nivel'], rows: confiabilidad.map((c) => [c.escala, String(c.k), String(c.n), fmt(c.alfa, 2), c.nivel]) });
+    }
+
+    // Puntaje por variable y dimensión, cuando las preguntas vienen de la operacionalización.
+    const dimensiones = [];
+    escalasPorVariable.forEach((items, variable) => {
+        const porDimension = new Map();
+        items.forEach((v) => porDimension.set(v.dimension || '—', [...(porDimension.get(v.dimension || '—') || []), v]));
+        porDimension.forEach((suyos, dimension) => { const d = descriptivos(compuesto(suyos).filter(Number.isFinite)); if (d.n) dimensiones.push({ variable, dimension, items: suyos.length, n: d.n, media: d.media, de: d.de, objetivo: suyos[0].objetivo }); });
+        if (porDimension.size > 1) { const d = descriptivos(compuesto(items).filter(Number.isFinite)); if (d.n) dimensiones.push({ variable, dimension: 'Total de la variable', items: items.length, n: d.n, media: d.media, de: d.de, objetivo: items[0].objetivo, total: true }); }
+    });
+    if (dimensiones.length) {
+        let anterior = '';
+        tablas.push({ objetivo: 0, titulo: 'Puntaje por variable y dimensión', nota: `${nota} Promedio de los ítems de cada dimensión por participante.`, head: ['Variable', 'Dimensión', 'Ítems', 'n', 'Media', 'Desviación estándar'], rows: dimensiones.map((d) => { const fila = [d.variable === anterior ? '' : d.variable, d.dimension, String(d.items), String(d.n), fmt(d.media, 2), fmt(d.de, 2)]; anterior = d.variable; return fila; }) });
+        dimensiones.forEach((d) => { const r = porObjetivo[d.objetivo]; if (r && !r.sinDatos) r.lineas.push(`${d.total ? `Variable «${d.variable}» (total)` : `Dimensión «${d.dimension}» de «${d.variable}»`}: media ${fmt(d.media, 2)}, DE ${fmt(d.de, 2)}, n = ${d.n}.`); });
+        especificos.forEach((_, i) => { const r = porObjetivo[i + 1]; if (r && !r.sinDatos && dimensiones.some((d) => d.objetivo === i + 1)) r.titulos.push('Puntaje por variable y dimensión'); });
+    }
+
     const resumen = [
         `Participantes: ${n}.`,
+        confiabilidad.length ? `CONFIABILIDAD (tabla «Confiabilidad de las escalas»)\n${confiabilidad.map((c) => `- ${c.escala}: alfa de Cronbach = ${fmt(c.alfa, 2)} (${c.nivel}), ${c.k} ítems, n = ${c.n}.`).join('\n')}` : '',
         lineasCaract.length ? `CARACTERIZACIÓN${tablas.some((x) => x.objetivo === 0) ? ' (tabla «Caracterización de los participantes»)' : ''}\n${lineasCaract.map((l) => `- ${l}`).join('\n')}` : '',
         ...especificos.map((o, i) => {
             const r = porObjetivo[i + 1];
@@ -159,5 +210,31 @@ export const analizarPorObjetivo = ({ encuestas, especificos, plan }) => {
             return `OBJETIVO ${i + 1}: ${o}${r.tecnica ? `\nTécnica del plan de análisis: ${r.tecnica}` : ''}\n${r.lineas.map((l) => `- ${l}`).join('\n')}${r.titulos.length ? `\nTablas disponibles para apoyar: ${r.titulos.map((x) => `«${x}»`).join('; ')}` : ''}`;
         }),
     ].filter(Boolean).join('\n\n');
-    return { n, tablas, figuras, porObjetivo, resumen };
+    return { n, tablas, figuras, porObjetivo, resumen, confiabilidad, dimensiones };
+};
+
+/*
+ * Entrevistas ya codificadas (data.cualitativo): categorías con sus fragmentos.
+ * Devuelve la tabla de categorías, la figura de cuántos fragmentos tiene cada una y un resumen con las citas
+ * textuales, que son lo único que la IA puede citar entre comillas.
+ */
+export const analizarCualitativo = (cualitativo) => {
+    const categorias = resumenCategorias(cualitativo).filter((c) => c.n > 0);
+    const fuentes = lista(cualitativo?.fuentes);
+    const total = categorias.reduce((s, c) => s + c.n, 0);
+    if (!categorias.length || !total) return { n: 0, fragmentos: 0, tablas: [], figuras: [], resumen: '' };
+    const nombreFuente = (id) => t(fuentes.find((f) => f.id === id)?.nombre) || 'Entrevista';
+    const nota = `Elaboración propia a partir de ${fuentes.length === 1 ? 'una entrevista' : `${fuentes.length} entrevistas`} (${total} fragmentos codificados).`;
+    const tabla = tablaCategorias(cualitativo);
+    const tablas = [{ objetivo: 0, titulo: 'Categorías de análisis de las entrevistas', nota, head: tabla.head, rows: tabla.rows }];
+    // Figura: qué parte de los fragmentos corresponde a cada categoría (misma forma que usa el gráfico de barras).
+    const figuras = categorias.length >= 2 ? [{ objetivo: 0, titulo: 'Fragmentos codificados por categoría', nota, variable: { nombre: 'Fragmentos por categoría', clase: 'categorica', frec: { total, items: categorias.map((c) => ({ valor: c.nombre, n: c.n, pct: (c.n / total) * 100 })) } } }] : [];
+    const resumen = [
+        `ENTREVISTAS: ${fuentes.length} ${fuentes.length === 1 ? 'fuente' : 'fuentes'}, ${total} fragmentos codificados en ${categorias.length} ${categorias.length === 1 ? 'categoría' : 'categorías'} (tabla «Categorías de análisis de las entrevistas»).`,
+        ...categorias.map((c) => {
+            const citas = [...c.citas].sort((a, b) => Math.abs(a.texto.length - 180) - Math.abs(b.texto.length - 180)).slice(0, 4);
+            return `CATEGORÍA «${t(c.nombre)}»${t(c.definicion) ? ` — ${t(c.definicion)}` : ''}\n- ${c.n} ${c.n === 1 ? 'fragmento' : 'fragmentos'} (${fmt((c.n / total) * 100)} % del total), en ${c.enFuentes} de ${fuentes.length} ${fuentes.length === 1 ? 'fuente' : 'fuentes'}.\n${citas.map((q) => `- Cita textual (${nombreFuente(q.fuenteId)}): «${corto(q.texto, 300)}»`).join('\n')}`;
+        }),
+    ].join('\n\n');
+    return { n: fuentes.length, fragmentos: total, tablas, figuras, resumen };
 };

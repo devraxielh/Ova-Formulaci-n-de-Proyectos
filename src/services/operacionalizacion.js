@@ -71,6 +71,7 @@ export const preguntasDesdeMatriz = (filas, tipoInstrumento = 'encuesta') => fil
         objetivo: f.objetivo || 0,
         indicador: t(f.indicador),
         variable: t(f.variable),
+        dimension: t(f.dimension),
     }));
 
 // Qué indicadores de la matriz no tienen todavía una pregunta en el instrumento (para avisar al estudiante).

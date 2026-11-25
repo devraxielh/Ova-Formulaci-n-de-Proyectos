@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, CheckCircle2, GitCompareArrows, RefreshCw } from 'lucide-react';
+import { ArrowRight, CheckCircle2, GitCompareArrows, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
-import { api } from '../services/api';
-import { cambiosDetectados, fotoActual, reemplazosDe, seccionesAfectadas } from '../services/propagar';
+import { api, groq } from '../services/api';
+import { SECTIONS } from '../services/projectDoc';
+import { REESCRIBIBLES, cambiosDetectados, fotoActual, hojasDeSeccion, paresDeReescritura, reemplazosDe, seccionesAfectadas } from '../services/propagar';
 import { avisar } from './Avisos';
 
 /*
@@ -11,11 +12,29 @@ import { avisar } from './Avisos';
  * actualizar. Antes de aplicar se guarda una copia en el historial.
  */
 
+// Reescritura de una sección cuando cambia el sentido del título o la pregunta: la IA dice qué frases cambian y cómo.
+const reescribir = async ({ cambios, data, seccion, hojas }) => {
+    const r = await groq.chat.completions.create({
+        messages: [
+            { role: 'system', content: 'Eres asesor de investigación. El estudiante cambió el título o la pregunta de su proyecto y una sección quedó escrita para la versión anterior. Tu tarea es decir qué frases de esa sección dejaron de ser coherentes y cómo deben quedar. Reglas: (1) cambia SOLO las frases que contradicen o ignoran el cambio (otro alcance o verbo, otra variable, otra población, otro lugar o periodo); si una frase sigue siendo válida, no la incluyas. (2) conserva el estilo, la persona gramatical y una extensión parecida. (3) no inventes cifras, autores, citas ni datos nuevos; no quites los que ya están. (4) si el cambio pide algo que la frase no puede decir sin información nueva, déjala igual. (5) si nada debe cambiar, devuelve la lista vacía. Respondes solo JSON válido en español.' },
+            { role: 'user', content: `CAMBIO\n${cambios.map((c) => `${c.nombre.replace(/^(el|la) /, '')} — antes: ${c.antes}\n${c.nombre.replace(/^(el|la) /, '')} — ahora: ${c.ahora}`).join('\n')}\n\nPROYECTO (versión actual)\nTítulo: ${String(data.titulo || '').trim()}\nPregunta: ${String(data.pregunta || '').split('\n')[0]}\nObjetivo general: ${String(data.objetivoGeneral || '').trim() || '(sin definir)'}\n\nSECCIÓN: ${seccion}\nFRASES\n${hojas.map((h) => `[${h.id}] ${h.texto}`).join('\n')}\n\nDevuelve {"cambios":[{"id":"h3","texto":"la frase como debe quedar"}]}` },
+        ],
+        temperature: 0.2,
+        max_tokens: 2400,
+        response_format: { type: 'json_object' },
+    });
+    const content = r.choices?.[0]?.message?.content || '';
+    const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+    return paresDeReescritura(hojas, json.cambios);
+};
+
 const Propagar = () => {
     const { user, project, data, setField, flush } = useProject();
     const cambios = useMemo(() => cambiosDetectados(data), [data]);
     const [pares, setPares] = useState(null); // reemplazos editables; null = se toman los detectados
     const [busy, setBusy] = useState(false);
+    const [fondo, setFondo] = useState([]); // reescrituras propuestas por la IA (frase anterior → frase nueva)
+    const [pensando, setPensando] = useState(''); // sección que la IA está revisando
 
     // La primera vez (o tras un proyecto recién creado) se toma una foto del título y la pregunta: a partir de ahí
     // se nota cuándo cambian.
@@ -23,10 +42,10 @@ const Propagar = () => {
     useEffect(() => { if (user && project.id && sinFoto) setField('propagado', fotoActual(data)); }, [user, project.id, sinFoto]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const firma = cambios.map((c) => `${c.id}:${c.ahora}`).join('|');
-    useEffect(() => { setPares(null); }, [firma]);
+    useEffect(() => { setPares(null); setFondo([]); }, [firma]);
     const detectados = useMemo(() => cambios.flatMap((c) => reemplazosDe(c.antes, c.ahora)).filter((p, i, todos) => todos.findIndex((x) => x.antes.toLowerCase() === p.antes.toLowerCase()) === i).map((p) => ({ ...p, usar: true })), [firma]); // eslint-disable-line react-hooks/exhaustive-deps
     const lista = pares || detectados;
-    const activos = lista.filter((p) => p.usar && p.antes.trim() && p.despues.trim());
+    const activos = [...lista.filter((p) => p.usar && p.antes.trim() && p.despues.trim()), ...fondo];
     const afectadas = useMemo(() => seccionesAfectadas(data, activos, cambios.map((c) => c.id)), [data, JSON.stringify(activos), firma]); // eslint-disable-line react-hooks/exhaustive-deps
 
     if (!user || !project.id || cambios.length === 0) return null;
@@ -47,6 +66,36 @@ const Propagar = () => {
             setBusy(false);
         }
     };
+    // Cambios de fondo: la IA revisa sección por sección, sobre el proyecto con los términos ya llevados.
+    const proponerFondo = async () => {
+        const terminos = lista.filter((p) => p.usar && p.antes.trim() && p.despues.trim());
+        const nuevas = [];
+        let fallos = 0;
+        for (const id of REESCRIBIBLES) {
+            const hojas = hojasDeSeccion(data, id);
+            if (!hojas.length) continue;
+            const nombre = SECTIONS.find((s) => s.id === id)?.label || id;
+            setPensando(nombre);
+            // Son varias solicitudes seguidas y el servicio de IA limita cuántas caben por minuto: si una falla,
+            // se espera y se intenta una vez más antes de darla por perdida.
+            let propuestas = null;
+            for (let intento = 0; intento < 2 && !propuestas; intento += 1) {
+                try {
+                    // eslint-disable-next-line no-await-in-loop
+                    if (intento) await new Promise((r) => { setTimeout(r, 8000); });
+                    // eslint-disable-next-line no-await-in-loop
+                    propuestas = await reescribir({ cambios, data, seccion: nombre, hojas });
+                } catch { /* se reintenta */ }
+            }
+            if (propuestas) propuestas.forEach((p) => { if (!nuevas.some((x) => x.antes === p.antes)) nuevas.push(p); });
+            else fallos += 1;
+        }
+        setPensando('');
+        setFondo(nuevas);
+        void terminos;
+        if (!nuevas.length) avisar(fallos ? 'No se pudo revisar con la IA. Inténtalo de nuevo.' : 'La IA no encontró frases que deban reescribirse por este cambio.', fallos ? 'error' : 'ok');
+        else avisar(`La IA propone reescribir ${nuevas.length} ${nuevas.length === 1 ? 'frase' : 'frases'}. Revisa cada sección antes de actualizarla.${fallos ? ` ${fallos === 1 ? 'No se pudo revisar una sección' : `No se pudieron revisar ${fallos} secciones`}: vuelve a revisar en un minuto.` : ''}`);
+    };
     const editar = (i, patch) => setPares(lista.map((p, k) => (k === i ? { ...p, ...patch } : p)));
 
     return (
@@ -59,11 +108,18 @@ const Propagar = () => {
                 <p key={c.id} className="prg-cambio"><span>{c.antes}</span><ArrowRight size={15} aria-hidden="true" /><b>{c.ahora}</b></p>
             ))}
 
-            {lista.length === 0 ? (
-                <p className="adm-muted">No se reemplazó un término por otro (solo se agregó o se quitó texto), así que no hay nada que llevar automáticamente a las demás secciones. Revísalas con la coherencia de abajo y, cuando estén bien, marca el proyecto como al día.</p>
+            <div className="prg-fondo">
+                <button type="button" className="pro-btn pro-btn--ghost" disabled={busy || Boolean(pensando)} onClick={proponerFondo}>
+                    {pensando ? <Loader2 size={15} className="prg-gira" /> : <Sparkles size={15} />} {pensando ? `Revisando ${pensando}…` : fondo.length ? 'Volver a revisar con IA' : 'Revisar el fondo con IA'}
+                </button>
+                <span>{fondo.length ? <><b>{fondo.length} {fondo.length === 1 ? 'frase' : 'frases'} por reescribir</b> propuestas por la IA. <button type="button" className="pro-link" onClick={() => setFondo([])}>Descartarlas</button></> : 'Si cambió el sentido (otro alcance, otra variable, otra población), la IA lee cada sección y propone qué frases reescribir. Nada se aplica sin que lo veas.'}</span>
+            </div>
+
+            {lista.length === 0 && fondo.length === 0 ? (
+                <p className="adm-muted">No se reemplazó un término por otro (solo se agregó o se quitó texto), así que no hay nada que llevar automáticamente a las demás secciones. Usa «Revisar el fondo con IA» o revísalas con la coherencia de abajo; cuando estén bien, marca el proyecto como al día.</p>
             ) : (
                 <>
-                    <p className="adm-muted">Estos términos cambiaron. Las demás secciones todavía usan los anteriores; elige cuáles llevar al resto del proyecto (puedes corregirlos).</p>
+                    {lista.length > 0 && <p className="adm-muted">Estos términos cambiaron. Las demás secciones todavía usan los anteriores; elige cuáles llevar al resto del proyecto (puedes corregirlos).</p>}
                     <ul className="prg-pares">
                         {lista.map((p, i) => (
                             <li key={i}>

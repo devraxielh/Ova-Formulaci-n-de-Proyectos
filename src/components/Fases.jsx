@@ -6,6 +6,7 @@ import { ESTILOS_FASES, datosFases, fasesDataUrl, fasesPng } from '../services/f
 import SlideDeck from './deck/SlideDeck';
 import { Generica } from './deck/Contenido';
 import { useProject, useProjectField } from '../context/ProjectContext';
+import { cronogramaDesdeFases } from '../services/derivados';
 import { useAutoGuardar } from '../hooks/useAutoGuardar';
 import { partesObjetivos } from '../services/coherencia';
 import { groq } from '../services/api';
@@ -377,14 +378,7 @@ const Constructor = ({ intro, onNavigate }) => {
     useAutoGuardar(texto, save);
     // Pasa las actividades al cronograma de la Metodología, una tras otra según la duración de cada fase.
     const alCronograma = () => {
-        let inicio = 1;
-        const filas = [];
-        fases.filter((x) => clean(x.nombre)).forEach((x, i) => {
-            const dur = Math.max(1, Number(x.duracion) || 1);
-            const fin = inicio + dur - 1;
-            x.actividades.filter((a) => clean(a)).forEach((a) => filas.push({ id: uid(), fase: `Fase ${i + 1}. ${capital(clean(x.nombre))}`.slice(0, 60), actividad: capital(clean(a)), inicio, fin }));
-            inicio = fin + 1;
-        });
+        const filas = cronogramaDesdeFases({ ...f, fases }).filas.map((x) => ({ id: uid(), ...x }));
         setMetForm({ ...(metForm || {}), cronograma: filas });
         setCronoItems(filas.map(({ fase: nombre, actividad, inicio: a, fin: b }) => ({ fase: nombre, actividad, inicio: a, fin: b })));
         setUnidadGantt(f.unidad === 'meses' ? 'mensual' : 'semanal');

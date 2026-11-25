@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, History, LogOut, Paperclip, Plus, RotateCcw, Trash2, UserPlus, Users } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, History, Languages, LogOut, Paperclip, Plus, RotateCcw, Trash2, UserPlus, Users } from 'lucide-react';
 import { useProject, useProjectField } from '../context/ProjectContext';
 import { api } from '../services/api';
 import EditorRico from './EditorRico';
@@ -7,6 +7,8 @@ import { CAMPOS_SECCION, SECTIONS, buildDocument, documentText, matrizConsistenc
 import { Aviso } from './Avisos';
 import Selector from './Selector';
 import { compararTextos, contarCambios } from '../services/diff';
+import { ESTILO_VACIO, PERSONAS, TIEMPOS, normalizarEstilo, revisarProyecto } from '../services/estilo';
+import { avisar, confirmar } from './Avisos';
 
 /* Paneles de Mi proyecto: Equipo, Historial de versiones y Anexos. */
 
@@ -259,10 +261,76 @@ export const Anexos = () => {
     );
 };
 
+/* ---------- Vocabulario y estilo ---------- */
+
+export const Estilo = () => {
+    const { user, project, data, setField, flush } = useProject();
+    const [guardado, setGuardado] = useProjectField('estilo', ESTILO_VACIO);
+    const e = { ...ESTILO_VACIO, ...(guardado || {}) };
+    const terminos = Array.isArray(e.terminos) ? e.terminos : [];
+    const cambiar = (patch) => setGuardado({ ...e, ...patch });
+    const cambiarTermino = (i, patch) => cambiar({ terminos: terminos.map((x, k) => (k === i ? { ...x, ...patch } : x)) });
+    const revision = useMemo(() => revisarProyecto(data, e), [data]); // eslint-disable-line react-hooks/exhaustive-deps
+    const reemplazables = revision.hallazgos.filter((h) => h.usar);
+    const total = reemplazables.reduce((s, h) => s + h.veces, 0);
+
+    const reemplazar = async () => {
+        if (!(await confirmar({ texto: `¿Corregir ${total} ${total === 1 ? 'aparición' : 'apariciones'} en todo el proyecto?`, detalle: `${reemplazables.map((h) => `«${h.termino}» → «${h.usar}» (${h.veces})`).join('; ')}. No se tocan las referencias ni los títulos de tus fuentes. Lo anterior queda en el historial.`, aceptar: 'Corregir' }))) return;
+        try {
+            if (user && project.id) { await flush(); await api.saveVersion(project.id); }
+            Object.entries(revision.cambios).forEach(([k, v]) => setField(k, v));
+            avisar(`Vocabulario corregido en ${Object.keys(revision.cambios).length} ${Object.keys(revision.cambios).length === 1 ? 'campo' : 'campos'} del proyecto.`);
+        } catch (err) {
+            avisar(err.message || 'No se pudo corregir.', 'error');
+        }
+    };
+
+    return (
+        <div className="pro-panel-body est">
+            <p className="pro-panel-hint">Define cómo se escribe este proyecto. La IA lo respeta en todo lo que redacte de aquí en adelante (sugerencias, redacción, resultados, conclusiones) y los términos que pidas cambiar se corrigen aunque vengan así en una fuente.</p>
+            <div className="est-fila">
+                <label><span>Persona gramatical</span>
+                    <select className="input-field" value={e.persona || ''} onChange={(ev) => cambiar({ persona: ev.target.value })}>{PERSONAS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}</select>
+                </label>
+                <label><span>Tiempo verbal</span>
+                    <select className="input-field" value={e.tiempo || ''} onChange={(ev) => cambiar({ tiempo: ev.target.value })}>{TIEMPOS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}</select>
+                </label>
+            </div>
+            <div className="est-terminos">
+                <b>Términos del proyecto</b>
+                {terminos.length === 0 && <p className="pro-panel-hint">Ejemplo: usar «inasistencia» en lugar de «no-show»; «pacientes» en lugar de «usuarios».</p>}
+                {terminos.map((x, i) => (
+                    <div key={i} className="est-termino">
+                        <label><span>Usar</span><input className="input-field" value={x.usar || ''} maxLength={80} onChange={(ev) => cambiarTermino(i, { usar: ev.target.value })} placeholder="inasistencia" /></label>
+                        <label><span>en lugar de</span><input className="input-field" value={x.enLugarDe || ''} maxLength={80} onChange={(ev) => cambiarTermino(i, { enLugarDe: ev.target.value })} placeholder="no-show" /></label>
+                        <button type="button" onClick={() => cambiar({ terminos: terminos.filter((_, k) => k !== i) })} aria-label={`Quitar el término ${x.usar || i + 1}`}><Trash2 size={15} /></button>
+                    </div>
+                ))}
+                <button type="button" className="pro-btn pro-btn--ghost" onClick={() => cambiar({ terminos: [...terminos, { usar: '', enLugarDe: '' }] })}><Plus size={15} /> Agregar término</button>
+            </div>
+            <label className="est-campo"><span>Palabras o expresiones que no deben aparecer (separadas por coma)</span>
+                <input className="input-field" value={(Array.isArray(e.evitar) ? e.evitar : []).join(', ')} onChange={(ev) => cambiar({ evitar: ev.target.value.split(',').map((v) => v.trimStart()) })} placeholder="en la actualidad, hoy en día, etc." />
+            </label>
+            <label className="est-campo"><span>Otra indicación de estilo (opcional)</span>
+                <input className="input-field" value={e.notas || ''} maxLength={400} onChange={(ev) => cambiar({ notas: ev.target.value })} placeholder="Ej: frases cortas; evita los gerundios; escribe los números del uno al nueve en letras." />
+            </label>
+            {revision.hallazgos.length > 0 && (
+                <div className="est-hallazgos" role="status">
+                    <b><AlertTriangle size={15} aria-hidden="true" /> En lo que ya está escrito</b>
+                    <ul>{revision.hallazgos.map((h) => <li key={h.termino}>«{h.termino}» aparece {h.veces} {h.veces === 1 ? 'vez' : 'veces'}{h.usar ? <> — debería decir «{h.usar}»</> : ' — pediste evitarla; cámbiala a mano donde aparezca'}</li>)}</ul>
+                    {total > 0 && <button type="button" className="pro-btn pro-btn--primary" onClick={reemplazar}>Corregir {total} {total === 1 ? 'aparición' : 'apariciones'} en todo el proyecto</button>}
+                </div>
+            )}
+            {revision.hallazgos.length === 0 && normalizarEstilo(e).terminos.length + normalizarEstilo(e).evitar.length > 0 && <p className="pro-panel-hint"><CheckCircle2 size={14} style={{ verticalAlign: '-2px' }} /> Lo que ya está escrito respeta tu vocabulario.</p>}
+        </div>
+    );
+};
+
 const PANELES = [
     { id: 'equipo', label: 'Equipo', icon: Users, Comp: Equipo },
     { id: 'historial', label: 'Historial de versiones', icon: History, Comp: Historial },
     { id: 'anexos', label: 'Anexos', icon: Paperclip, Comp: Anexos },
+    { id: 'estilo', label: 'Vocabulario y estilo', icon: Languages, Comp: Estilo },
 ];
 
 // `extra`: acciones del proyecto que van en la misma fila, al final (p. ej. «Eliminar proyecto»).

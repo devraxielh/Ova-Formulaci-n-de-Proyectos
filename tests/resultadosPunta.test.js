@@ -1,7 +1,7 @@
 // Resultados de punta a punta: de las respuestas de la encuesta al análisis por objetivo.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { analizarPorObjetivo, objetivoDeFila, objetivoDeTexto, objetivosDePreguntas } from '../src/services/resultadosPunta.js';
+import { analizarCualitativo, analizarPorObjetivo, metaDePreguntas, objetivoDeFila, objetivoDeTexto, objetivosDePreguntas } from '../src/services/resultadosPunta.js';
 
 const LIKERT = ['Totalmente en desacuerdo', 'En desacuerdo', 'Ni de acuerdo ni en desacuerdo', 'De acuerdo', 'Totalmente de acuerdo'];
 const definition = { titulo: 'Asistencia', preguntas: [
@@ -82,4 +82,77 @@ test('sin respuestas no hay análisis; sin escalas, el plan relacional usa ji-cu
     assert.deepEqual(chi.head, ['n', 'Ji-cuadrado', 'gl', 'p', 'V de Cramér']);
     assert.equal(chi.rows[0][2], '2');
     assert.match(r.porObjetivo[1].lineas.join(' '), /ji-cuadrado = .*V de Cramér/);
+});
+
+test('qué mide cada pregunta: manda lo que guardó la encuesta; si falta, el instrumento y la operacionalización', () => {
+    const def = { preguntas: [
+        { id: 'a', texto: 'Recibo recordatorios', objetivo: 1, variable: 'Recordatorios', dimension: 'Frecuencia', indicador: 'Recibe avisos' },
+        { id: 'b', texto: 'Asisto a todas mis citas' },                 // encuesta antigua: sin metadatos
+        { id: 'c', texto: 'Llego puntual a mis citas' },                // solo está en la matriz, por el texto del ítem
+    ] };
+    const armados = [{ id: 'ins', preguntas: [{ id: 'b', texto: 'Asisto a todas mis citas', objetivo: 2, indicador: 'Asistencia efectiva' }] }];
+    const matriz = [
+        { variable: 'Asistencia', dimension: 'Cumplimiento', indicador: 'Asistencia efectiva', item: 'otro texto', objetivo: 2 },
+        { variable: 'Asistencia', dimension: 'Puntualidad', indicador: 'Llega a tiempo', item: 'Llego puntual a mis citas', objetivo: 2 },
+    ];
+    const m = metaDePreguntas(def, 'ins', armados, matriz);
+    assert.deepEqual(m.a, { objetivo: 1, variable: 'Recordatorios', dimension: 'Frecuencia', indicador: 'Recibe avisos' });
+    assert.deepEqual(m.b, { objetivo: 2, variable: 'Asistencia', dimension: 'Cumplimiento', indicador: 'Asistencia efectiva' });
+    assert.deepEqual(m.c, { objetivo: 2, variable: 'Asistencia', dimension: 'Puntualidad', indicador: 'Llega a tiempo' });
+});
+
+test('confiabilidad y dimensiones: alfa de Cronbach con las respuestas y puntaje por variable y dimensión', () => {
+    const meta = {
+        sexo: { objetivo: 0 },
+        r1: { objetivo: 1, variable: 'Recordatorios', dimension: 'Frecuencia' }, r2: { objetivo: 1, variable: 'Recordatorios', dimension: 'Oportunidad' },
+        a1: { objetivo: 2, variable: 'Asistencia', dimension: 'Cumplimiento' }, a2: { objetivo: 2, variable: 'Asistencia', dimension: 'Cumplimiento' },
+        causa: { objetivo: 3 },
+    };
+    const r = analizarPorObjetivo({ encuestas: [{ definition, responses, meta }], especificos, plan });
+    // Alfa por variable: dos escalas de dos ítems, con todos los participantes.
+    assert.deepEqual(r.confiabilidad.map((c) => [c.escala, c.k, c.n]), [['Recordatorios', 2, 12], ['Asistencia', 2, 12]]);
+    assert.ok(r.confiabilidad.every((c) => c.alfa > 0.7 && c.alfa <= 1 && ['aceptable', 'buena', 'excelente'].includes(c.nivel)));
+    const conf = r.tablas.find((x) => x.titulo === 'Confiabilidad de las escalas');
+    assert.deepEqual(conf.head, ['Escala', 'Ítems', 'n', 'Alfa de Cronbach', 'Nivel']);
+    // Dimensiones: Recordatorios tiene dos (más su total); Asistencia, una sola.
+    const dim = r.tablas.find((x) => x.titulo === 'Puntaje por variable y dimensión');
+    assert.deepEqual(dim.rows.map((x) => [x[0], x[1], x[2]]), [['Recordatorios', 'Frecuencia', '1'], ['', 'Oportunidad', '1'], ['', 'Total de la variable', '2'], ['Asistencia', 'Cumplimiento', '2']]);
+    assert.match(r.resumen, /CONFIABILIDAD \(tabla «Confiabilidad de las escalas»\)\n- Recordatorios: alfa de Cronbach = 0,\d\d/);
+    assert.match(r.porObjetivo[1].lineas.join(' '), /Dimensión «Frecuencia» de «Recordatorios»: media/);
+    assert.ok(r.porObjetivo[1].titulos.includes('Puntaje por variable y dimensión'));
+    // Sin metadatos de variable, el alfa se calcula por la escala de cada objetivo.
+    const sin = analizarPorObjetivo({ encuestas: [{ definition, responses, objetivoDe }], especificos, plan });
+    assert.deepEqual(sin.confiabilidad.map((c) => c.escala), ['Escala del objetivo específico 1', 'Escala del objetivo específico 2']);
+    assert.equal(sin.dimensiones.length, 0);
+});
+
+test('entrevistas codificadas: tabla de categorías, figura y citas textuales para redactar', () => {
+    const cualitativo = {
+        fuentes: [{ id: 'f1', nombre: 'Entrevista 1', texto: '…' }, { id: 'f2', nombre: 'Entrevista 2', texto: '…' }],
+        categorias: [{ id: 'c1', nombre: 'Olvido', definicion: 'No recordar la fecha' }, { id: 'c2', nombre: 'Transporte' }, { id: 'c3', nombre: 'Sin fragmentos' }],
+        citas: [
+            { id: 'q1', fuenteId: 'f1', categoriaId: 'c1', texto: 'Se me pasó la fecha porque nadie me avisó con tiempo.' },
+            { id: 'q2', fuenteId: 'f2', categoriaId: 'c1', texto: 'A veces ni me acuerdo de que tenía la cita.' },
+            { id: 'q3', fuenteId: 'f2', categoriaId: 'c1', texto: 'Uno anda ocupado y se le olvida.' },
+            { id: 'q4', fuenteId: 'f1', categoriaId: 'c2', texto: 'El bus no pasa temprano por mi vereda.' },
+        ],
+    };
+    const r = analizarCualitativo(cualitativo);
+    assert.deepEqual([r.n, r.fragmentos], [2, 4]);
+    assert.equal(r.tablas[0].titulo, 'Categorías de análisis de las entrevistas');
+    assert.equal(r.tablas[0].rows.length, 2); // la categoría sin fragmentos no entra
+    assert.deepEqual(r.figuras[0].variable.frec.items.map((x) => [x.valor, x.n, x.pct]), [['Olvido', 3, 75], ['Transporte', 1, 25]]);
+    assert.match(r.resumen, /ENTREVISTAS: 2 fuentes, 4 fragmentos codificados en 2 categorías/);
+    assert.match(r.resumen, /CATEGORÍA «Olvido» — No recordar la fecha\n- 3 fragmentos \(75,0 % del total\), en 2 de 2 fuentes\./);
+    assert.match(r.resumen, /- Cita textual \(Entrevista 1\): «El bus no pasa temprano por mi vereda»/);
+    assert.deepEqual(analizarCualitativo({}), { n: 0, fragmentos: 0, tablas: [], figuras: [], resumen: '' });
+    assert.deepEqual(analizarCualitativo({ fuentes: [], categorias: [{ id: 'c', nombre: 'x' }], citas: [] }).tablas, []);
+});
+
+test('con dos encuestas de distinto tamaño, la nota no afirma un solo n', () => {
+    const una = (id, k) => ({ definition: { preguntas: [{ id, texto: `Pregunta ${id}`, tipo: 'opcion', opciones: ['Sí', 'No'] }] }, responses: Array.from({ length: k }, (_, i) => ({ answers: { [id]: i % 2 ? 'Sí' : 'No' } })), meta: { [id]: { objetivo: 0 } } });
+    const dos = analizarPorObjetivo({ encuestas: [una('a', 6), una('b', 4)], especificos: ['Uno'], plan: [] });
+    assert.match(dos.tablas[0].nota, /n entre 4 y 6, según el instrumento/);
+    const sola = analizarPorObjetivo({ encuestas: [una('a', 6)], especificos: ['Uno'], plan: [] });
+    assert.match(sola.tablas[0].nota, /\(n = 6\)/);
 });

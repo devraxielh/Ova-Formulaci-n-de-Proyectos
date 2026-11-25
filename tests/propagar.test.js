@@ -1,7 +1,7 @@
 // Propagar los cambios del título y la pregunta al resto del proyecto.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cambiosDetectados, fotoActual, reemplazarEnTexto, reemplazarEnValor, reemplazosDe, seccionesAfectadas } from '../src/services/propagar.js';
+import { REESCRIBIBLES, hojasDeSeccion, paresDeReescritura, cambiosDetectados, fotoActual, reemplazarEnTexto, reemplazarEnValor, reemplazosDe, seccionesAfectadas } from '../src/services/propagar.js';
 
 const proyecto = {
     titulo: 'Análisis de los recordatorios y la inasistencia a citas médicas en pacientes hipertensos de Sincelejo',
@@ -57,4 +57,34 @@ test('secciones afectadas: las que usan los términos anteriores, con su antes y
     assert.ok(j.trozos.some((x) => x.tipo === '-' && /adultos/.test(x.texto)) && j.trozos.some((x) => x.tipo === '+' && /hipertensos/.test(x.texto)));
     assert.ok(!s.some((x) => x.id === 'marco' || x.id === 'conclusiones'));
     assert.deepEqual(seccionesAfectadas(proyecto, [], []), []);
+});
+
+test('cambios de fondo: las frases de una sección y lo que la IA puede cambiar de ellas', () => {
+    const data = {
+        justificacionForm: { conveniencia: 'Sirve para describir cuántos pacientes faltan a sus citas en el hospital.', beneficiarios: 'Los pacientes y el personal de consulta externa del hospital.', corto: 'muy corto', id: 'Sirve para describir cuántos pacientes faltan a sus citas en el hospital.' },
+        justificacion: 'Texto ya redactado que no se usa si hay formulario con contenido suficiente.',
+        resumen: 'Este estudio describe la inasistencia a citas médicas en un hospital.\n\nSe aplicó una encuesta a los pacientes de consulta externa.',
+    };
+    assert.ok(!REESCRIBIBLES.includes('titulo') && !REESCRIBIBLES.includes('pregunta') && REESCRIBIBLES.includes('justificacion'));
+    const h = hojasDeSeccion(data, 'justificacion');
+    assert.deepEqual(h.map((x) => x.id), ['h1', 'h2']); // sin el texto corto ni el identificador
+    assert.match(h[0].texto, /^Sirve para describir/);
+    // Sin formulario, se usan los párrafos del texto.
+    assert.equal(hojasDeSeccion(data, 'resumen').length, 2);
+    assert.deepEqual(hojasDeSeccion({}, 'justificacion'), []);
+
+    const pares = paresDeReescritura(h, [
+        { id: 'H1', texto: 'Sirve para determinar la relación entre los recordatorios y la inasistencia a las citas en el hospital.' },
+        { id: 'h2', texto: 'Los pacientes y el personal de consulta externa del hospital.' },   // igual: no es un cambio
+        { id: 'h9', texto: 'Frase que la IA inventó para una clave que no existe en la sección.' },
+        { id: 'h2', texto: 'Sí.' },                                                              // demasiado corta
+    ]);
+    assert.equal(pares.length, 1);
+    assert.match(pares[0].antes, /^Sirve para describir cuántos pacientes faltan a sus citas en el hospital$/);
+    // El reemplazo llega al formulario de la sección, con su antes y después.
+    const s = seccionesAfectadas(data, pares, []);
+    assert.deepEqual(s.map((x) => x.id), ['justificacion']);
+    assert.match(s[0].valores.justificacionForm.conveniencia, /^Sirve para determinar la relación/);
+    assert.equal(s[0].valores.justificacionForm.id, data.justificacionForm.id); // los identificadores no se tocan
+    assert.deepEqual(paresDeReescritura(h, null), []);
 });

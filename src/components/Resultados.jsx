@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import EditorRico from './EditorRico';
 import { AlertTriangle, BarChart3, CheckCircle2, Loader2, MessageSquareText, Sparkles, Workflow } from 'lucide-react';
 import { recomendarConclusiones, recomendarResultados, reunirResultados } from '../services/resultadosIA';
-import { analizarPorObjetivo, objetivosDePreguntas } from '../services/resultadosPunta';
+import { analizarCualitativo, analizarPorObjetivo, metaDePreguntas } from '../services/resultadosPunta';
 import SlideDeck from './deck/SlideDeck';
 import { Generica } from './deck/Contenido';
 import { useProject, useProjectField } from '../context/ProjectContext';
@@ -195,6 +195,7 @@ const Constructor = ({ intro, onNavigate }) => {
     const { setField } = useProject();
     const [, setElementos] = useProjectField('elementos', []);
     const [punta, setPunta] = useState(''); // paso en curso ('' = no está corriendo)
+    const fragmentos = (Array.isArray(data.cualitativo?.citas) ? data.cualitativo.citas : []).filter((c) => c?.categoriaId).length; // entrevistas ya codificadas
     const guardarTras = useRef(false);
     useEffect(() => {
         if (guardarTras.current && (textos.resultados || textos.discusion)) { guardarTras.current = false; save(); }
@@ -202,7 +203,7 @@ const Constructor = ({ intro, onNavigate }) => {
     }, [JSON.stringify(textos)]);
     const dePuntaAPunta = async () => {
         if (!project?.id) return;
-        if (hayTexto && !(await confirmar({ texto: '¿Rehacer resultados, discusión y conclusiones con los datos de la encuesta?', detalle: 'Se reemplaza lo que tienes escrito en esas secciones y las tablas y figuras que se generaron antes de esta forma. Las que agregaste tú se conservan. Lo anterior queda en el historial de versiones.', aceptar: 'Rehacer con mis datos', peligro: true }))) return;
+        if (hayTexto && !(await confirmar({ texto: `¿Rehacer resultados, discusión y conclusiones con ${conRespuestas > 0 ? (fragmentos > 0 ? 'los datos de la encuesta y las entrevistas' : 'los datos de la encuesta') : 'tus entrevistas codificadas'}?`, detalle: 'Se reemplaza lo que tienes escrito en esas secciones y las tablas y figuras que se generaron antes de esta forma. Las que agregaste tú se conservan. Lo anterior queda en el historial de versiones.', aceptar: 'Rehacer con mis datos', peligro: true }))) return;
         try {
             setPunta('Leyendo las respuestas de la encuesta…');
             const { surveys } = await api.surveys(project.id);
@@ -211,14 +212,19 @@ const Constructor = ({ intro, onNavigate }) => {
             for (const s of (surveys || []).filter((x) => x.count > 0)) {
                 // eslint-disable-next-line no-await-in-loop
                 const r = await api.surveyResponses(project.id, s.instrumentId);
-                encuestas.push({ titulo: r.definition?.titulo, definition: r.definition, responses: r.responses, objetivoDe: objetivosDePreguntas(r.definition, s.instrumentId, armados) });
+                encuestas.push({ titulo: r.definition?.titulo, definition: r.definition, responses: r.responses, meta: metaDePreguntas(r.definition, s.instrumentId, armados, data.operacionalizacion) });
             }
-            if (!encuestas.length) { setPunta(''); avisar('Tu encuesta todavía no tiene respuestas. Publícala desde Metodología › Instrumentos y vuelve cuando haya datos.', 'error'); return; }
+            // Entrevistas ya codificadas en el análisis cualitativo.
+            const cual = analizarCualitativo(data.cualitativo);
+            if (!encuestas.length && !cual.fragmentos) { setPunta(''); avisar('Todavía no hay datos: tu encuesta no tiene respuestas y no hay entrevistas codificadas. Publica la encuesta o codifica tus entrevistas en «Analiza tus datos».', 'error'); return; }
 
             setPunta('Corriendo el análisis de tu plan…');
-            const an = analizarPorObjetivo({ encuestas, especificos, plan: data.metodologiaForm?.analisis });
-            if (!an.tablas.length) { setPunta(''); avisar('No se pudo analizar: las preguntas de la encuesta no tienen respuestas que se puedan contar.', 'error'); return; }
-            const sinMedir = especificos.map((_, i) => i + 1).filter((k) => an.porObjetivo[k]?.sinDatos);
+            const enc = analizarPorObjetivo({ encuestas, especificos, plan: data.metodologiaForm?.analisis });
+            // Encuestas y entrevistas se juntan: tablas y figuras de las dos, y un solo resumen para redactar.
+            const an = { ...enc, n: enc.n, tablas: [...enc.tablas, ...cual.tablas], figuras: [...enc.figuras, ...cual.figuras], resumen: [enc.resumen, cual.resumen].filter(Boolean).join('\n\n') };
+            if (!an.tablas.length) { setPunta(''); avisar('No se pudo analizar: no hay respuestas que se puedan contar ni fragmentos codificados.', 'error'); return; }
+            // Con entrevistas, cualquier objetivo puede tener evidencia: solo se avisa de objetivos sin datos si no las hay.
+            const sinMedir = cual.fragmentos ? [] : especificos.map((_, i) => i + 1).filter((k) => an.porObjetivo[k]?.sinDatos);
 
             setPunta('Armando tablas y figuras…');
             const uid = () => Math.random().toString(36).slice(2, 9);
@@ -239,7 +245,7 @@ const Constructor = ({ intro, onNavigate }) => {
             setPunta('Redactando resultados y discusión…');
             const otros = await reunirResultados(project.id, { ...data, elementos: propios }).catch(() => ({ texto: '' }));
             const res = await recomendarResultados({
-                data, especificos, datos: `ANÁLISIS POR OBJETIVO (calculado con las respuestas de la encuesta)\n${an.resumen}${otros.texto ? `\n\nDETALLE DE LAS PREGUNTAS Y OTRAS FUENTES\n${otros.texto}` : ''}`,
+                data, especificos, datos: `ANÁLISIS (calculado por la aplicación con ${[encuestas.length ? 'las respuestas de la encuesta' : '', cual.fragmentos ? 'las entrevistas codificadas' : ''].filter(Boolean).join(' y ')}). Las citas textuales de las entrevistas se pueden transcribir entre comillas; no inventes otras.\n${an.resumen}${otros.texto ? `\n\nDETALLE DE LAS PREGUNTAS Y OTRAS FUENTES\n${otros.texto}` : ''}`,
                 antecedentes: antecedentes.map((a) => ({ ...a, cita: citaDe(a) })),
                 teorias: teorias.map((x) => ({ ...x, nombre: clean(x.nombre) })),
                 tablas: [...propios.filter((e) => e.seccion === 'resultados' && clean(e.titulo)).map((e) => clean(e.titulo)), ...an.tablas.map((x) => x.titulo)],
@@ -263,7 +269,7 @@ const Constructor = ({ intro, onNavigate }) => {
             reunir().catch(() => {});
             setPunta('');
             const nFig = nuevos.length - an.tablas.length;
-            avisar(`Listo con ${an.n} respuestas: ${an.tablas.length} ${an.tablas.length === 1 ? 'tabla' : 'tablas'}${nFig ? ` y ${nFig} ${nFig === 1 ? 'figura' : 'figuras'}` : ''} en Resultados, resultados y discusión redactados${conConclusiones ? ' y conclusiones escritas' : ''}.${sinMedir.length ? ` Sin datos para ${sinMedir.length === 1 ? `el objetivo ${sinMedir[0]}` : `los objetivos ${sinMedir.join(', ')}`}: ninguna pregunta de la encuesta ${sinMedir.length === 1 ? 'lo mide' : 'los mide'}.` : ''} Revisa cada cifra contra sus tablas.`);
+            avisar(`Listo con ${[an.n ? `${an.n} respuestas` : '', cual.fragmentos ? `${cual.fragmentos} fragmentos de ${cual.n} ${cual.n === 1 ? 'entrevista' : 'entrevistas'}` : ''].filter(Boolean).join(' y ')}: ${an.tablas.length} ${an.tablas.length === 1 ? 'tabla' : 'tablas'}${nFig ? ` y ${nFig} ${nFig === 1 ? 'figura' : 'figuras'}` : ''} en Resultados, resultados y discusión redactados${conConclusiones ? ' y conclusiones escritas' : ''}.${sinMedir.length ? ` Sin datos para ${sinMedir.length === 1 ? `el objetivo ${sinMedir[0]}` : `los objetivos ${sinMedir.join(', ')}`}: ninguna pregunta de la encuesta ${sinMedir.length === 1 ? 'lo mide' : 'los mide'}.` : ''} Revisa cada cifra contra sus tablas.`);
         } catch (err) {
             setPunta('');
             avisar(err?.message && !/JSON/.test(err.message) ? `No se pudo completar: ${err.message}` : 'No se pudo completar la redacción. Las tablas que ya se armaron quedan en Resultados; inténtalo de nuevo.', 'error');
@@ -296,12 +302,12 @@ const Constructor = ({ intro, onNavigate }) => {
 
             <div className="pla-builder">
                 <div className="obj-form">
-                    {conRespuestas > 0 && (
+                    {(conRespuestas > 0 || fragmentos > 0) && (
                         <div className="res-llenar res-punta">
                             <button type="button" className="ide-btn ide-btn--primary" disabled={Boolean(punta) || llenando === 'pensando'} onClick={dePuntaAPunta}>
-                                {punta ? <Loader2 size={16} className="fas-gira" /> : <Workflow size={16} />} {punta || 'De la encuesta al documento'}
+                                {punta ? <Loader2 size={16} className="fas-gira" /> : <Workflow size={16} />} {punta || (conRespuestas > 0 ? (fragmentos > 0 ? 'De la encuesta y las entrevistas al documento' : 'De la encuesta al documento') : 'De las entrevistas al documento')}
                             </button>
-                            <span>{punta ? 'Puede tardar un minuto. No cierres esta página.' : `Con las ${conRespuestas} respuestas de tu encuesta: corre el análisis de tu plan para cada objetivo, inserta las tablas y figuras, y redacta resultados, discusión y conclusiones. Las cifras las calcula la app, no la IA.`}</span>
+                            <span>{punta ? 'Puede tardar un minuto. No cierres esta página.' : `Con ${[conRespuestas > 0 ? `las ${conRespuestas} respuestas de tu encuesta` : '', fragmentos > 0 ? `los ${fragmentos} fragmentos que codificaste en tus entrevistas` : ''].filter(Boolean).join(' y ')}: ${conRespuestas > 0 ? 'corre el análisis de tu plan para cada objetivo, ' : 'arma la tabla de categorías con sus citas, '}inserta las tablas y figuras, y redacta resultados, discusión y conclusiones. ${conRespuestas > 0 ? 'Las cifras las calcula la app, no la IA.' : 'Solo se citan fragmentos reales de tus entrevistas.'}`}</span>
                         </div>
                     )}
                     <div className="res-llenar">

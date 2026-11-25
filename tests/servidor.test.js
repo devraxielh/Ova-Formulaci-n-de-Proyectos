@@ -239,6 +239,7 @@ test('encuesta en línea: se publica, cualquiera responde sin cuenta y solo el e
 
     const anon = cliente();
     const ver = (await anon(`/encuestas/${pub.token}`)).body;
+    assert.deepEqual(Object.keys(ver.survey.preguntas[0]).sort(), ['id', 'obligatoria', 'opciones', 'texto', 'tipo']); // al participante no le llega qué mide cada pregunta
     assert.equal(ver.open, true);
     assert.equal(ver.survey.preguntas.length, 5);
     assert.equal((await anon('/encuestas/noexiste')).status, 404);

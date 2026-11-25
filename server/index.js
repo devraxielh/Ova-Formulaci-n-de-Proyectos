@@ -980,6 +980,12 @@ const cleanSurvey = (raw) => {
         tipo: TIPOS_PREGUNTA.has(q?.tipo) ? q.tipo : 'abierta',
         opciones: (Array.isArray(q?.opciones) ? q.opciones : []).map((o) => corto(o, 120)).filter(Boolean).slice(0, 12),
         obligatoria: q?.obligatoria !== false,
+        // Qué mide la pregunta (objetivo específico y, si viene de la operacionalización, su variable, dimensión e indicador):
+        // queda guardado con la encuesta para que el análisis no dependa de que el instrumento siga igual.
+        objetivo: Math.min(20, Math.max(0, parseInt(q?.objetivo, 10) || 0)),
+        ...(corto(q?.variable, 120) ? { variable: corto(q.variable, 120) } : {}),
+        ...(corto(q?.dimension, 120) ? { dimension: corto(q.dimension, 120) } : {}),
+        ...(corto(q?.indicador, 200) ? { indicador: corto(q.indicador, 200) } : {}),
     })).filter((q) => q.id && q.texto);
     if (!preguntas.length) return null;
     return { titulo: corto(raw.titulo, 200) || 'Encuesta', intro: corto(raw.intro, 2000), preguntas };
@@ -1037,7 +1043,10 @@ app.get('/api/encuestas/:token', rateLimit({ name: 'enc-ver', limit: 300, window
     const survey = publicSurvey(req.params.token);
     if (!survey) return res.status(404).json({ error: 'Esta encuesta no existe o el enlace está incompleto.' });
     const count = db.prepare('SELECT COUNT(*) AS n FROM survey_responses WHERE survey_id = ?').get(survey.id).n;
-    return res.json({ survey: JSON.parse(survey.definition), open: Boolean(survey.open) && count < MAX_RESPONSES });
+    // Al participante solo le llega lo que necesita para responder, no qué mide cada pregunta.
+    const def = JSON.parse(survey.definition);
+    const publica = { ...def, preguntas: (def.preguntas || []).map(({ id, texto, tipo, opciones, obligatoria }) => ({ id, texto, tipo, opciones, obligatoria })) };
+    return res.json({ survey: publica, open: Boolean(survey.open) && count < MAX_RESPONSES });
 });
 
 app.post('/api/encuestas/:token', rateLimit({ name: 'enc-resp', limit: 120, windowMs: 60 * 60 * 1000 }), (req, res) => {

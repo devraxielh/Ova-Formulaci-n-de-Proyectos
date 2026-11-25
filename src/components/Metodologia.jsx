@@ -31,7 +31,8 @@ import './Justificacion.css';
 import './Marco.css';
 import './Alcances.css';
 import './Metodologia.css';
-import { confirmar } from './Avisos';
+import { avisar, confirmar } from './Avisos';
+import { basePresupuesto, cronogramaDesdeFases, desfaseCronograma, desfasePresupuesto } from '../services/derivados';
 
 /* Clase larga de 4 horas: el contenido de cada diapositiva está en data/metodologiaClase.js. */
 
@@ -679,14 +680,36 @@ const Constructor = ({ intro, onNavigate }) => {
     const partes = redactarTodo(s);
     // Presupuesto sugerido: llena el presupuesto vacío o agrega los rubros que falten (los que ya están no se tocan).
     const [sugPres, setSugPres] = useState('');
-    const sugerirPres = async () => {
+    // Con qué se calcula el presupuesto: participantes, instrumentos, duración y equipo. Se guarda al sugerirlo para
+    // avisar después si alguno cambió.
+    const [basePres, setBasePres] = useProjectField('presupuestoBase', null);
+    const [equipoN, setEquipoN] = useState(0);
+    const contarEquipo = () => (estado.project?.id ? api.members(estado.project.id).then((x) => (Array.isArray(x?.members) ? x.members.length : Array.isArray(x) ? x.length : 0)).catch(() => 0) : Promise.resolve(0));
+    useEffect(() => {
+        if (tab !== 'presupuesto') return undefined;
+        let vivo = true;
+        contarEquipo().then((n) => { if (vivo) setEquipoN(n); });
+        return () => { vivo = false; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tab, estado.project?.id]);
+    const participantes = () => {
+        const mue = MUESTREOS.find((m) => m.id === f.poblacion.muestreo);
+        const hayCalculo = !calc.finita || calc.definida;
+        // Sin muestreo elegido, vale la muestra de la calculadora si ya hay población escrita.
+        return mue?.id.startsWith('censo') && calc.definida ? `${calc.N} (censo)` : mue && !mue.probabilistico ? (clean(f.poblacion.muestraTexto) || 'sin definir') : hayCalculo ? `${tamanoMuestra(calc)} (muestra calculada)` : 'sin definir';
+    };
+    const baseDe = (integrantes) => basePresupuesto({ n: participantes(), instrumentos: f.instrumentos.map((it) => [clean(it.tecnica), clean(it.instrumento)].filter(Boolean).join(': ')), periodos, unidad, integrantes });
+    const cambiosPres = presupuesto.some((x) => x.sugerido) ? desfasePresupuesto(basePres, baseDe(equipoN)) : [];
+    // Un presupuesto sugerido antes de existir este aviso no tiene base: se toma la de hoy para avisar de aquí en adelante.
+    useEffect(() => {
+        if (tab === 'presupuesto' && !basePres && presupuesto.some((x) => x.sugerido)) setBasePres(baseDe(equipoN));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tab, basePres, presupuesto.length, equipoN]);
+    const sugerirPres = async ({ reemplazar = false } = {}) => {
         setSugPres('pensando');
         try {
-            const mue = MUESTREOS.find((m) => m.id === f.poblacion.muestreo);
-            const hayCalculo = !calc.finita || calc.definida;
-            // Sin muestreo elegido, vale la muestra de la calculadora si ya hay población escrita.
-            const n = mue?.id.startsWith('censo') && calc.definida ? `${calc.N} (censo)` : mue && !mue.probabilistico ? (clean(f.poblacion.muestraTexto) || 'sin definir') : hayCalculo ? `${tamanoMuestra(calc)} (muestra calculada)` : 'sin definir';
-            const equipo = await api.members(estado.project?.id).then((x) => (Array.isArray(x?.members) ? x.members.length : Array.isArray(x) ? x.length : 0)).catch(() => 0);
+            const n = participantes();
+            const equipo = await contarEquipo();
             const rubros = await sugerirPresupuesto({
                 data: estado.data, enfoque, diseno, poblacion: f.poblacion.descripcion, n,
                 instrumentos: f.instrumentos.map((it) => { const armado = s.armados.find((a) => a && it.id && a.filaId === it.id); return [clean(it.tecnica), clean(it.instrumento), armado ? `${preguntasDe(armado).length} preguntas` : ''].filter(Boolean).join(', '); }).filter(Boolean).join('; '),
@@ -694,14 +717,35 @@ const Constructor = ({ intro, onNavigate }) => {
                 meses: `${periodos} ${unidad === 'semanal' ? 'semanas' : 'meses'}`,
                 integrantes: Math.max(1, equipo), // la lista del equipo ya incluye al dueño del proyecto
             });
-            const ya = new Set(presupuesto.map((x) => clean(x.descripcion).toLowerCase()));
+            // Al recalcular se cambian solo los rubros sugeridos que el estudiante no ajustó; los suyos y los ajustados quedan.
+            const quedan = presupuesto.filter((x) => (clean(x.descripcion) || Number(x.costo) > 0) && !(reemplazar && x.sugerido && !x.ajustado));
+            const ya = new Set(quedan.map((x) => clean(x.descripcion).toLowerCase()));
             const nuevos = rubros.filter((x) => !ya.has(x.descripcion.toLowerCase())).map((x, i) => ({ id: Date.now() + i, ...x, sugerido: true }));
             touch();
-            setPresupuesto([...presupuesto.filter((x) => clean(x.descripcion) || Number(x.costo) > 0), ...nuevos]);
+            setPresupuesto([...quedan, ...nuevos]);
+            setEquipoN(equipo);
+            setBasePres(baseDe(Math.max(1, equipo)));
             setSugPres(nuevos.length ? 'listo' : 'nada');
         } catch {
             setSugPres('fallo');
         }
+    };
+    const recalcularPres = async () => {
+        const fijos = presupuesto.filter((x) => !x.sugerido || x.ajustado).length;
+        if (!(await confirmar({ texto: '¿Recalcular los rubros sugeridos?', detalle: `Se vuelven a calcular con los datos actuales del proyecto. ${fijos ? `${fijos === 1 ? 'El rubro que agregaste o ajustaste no se toca' : `Los ${fijos} rubros que agregaste o ajustaste no se tocan`}.` : 'Los rubros que agregues o ajustes a mano no se tocan.'}`, aceptar: 'Recalcular' }))) return;
+        await sugerirPres({ reemplazar: true });
+    };
+    // Cronograma: qué dejó de coincidir con las fases, y armarlo de nuevo desde ellas.
+    const avisosCrono = desfaseCronograma({ fasesForm: estado.data.fasesForm, cronogramaItems: f.cronograma, ganttUnidad: unidad, ganttPeriodos: periodos });
+    const cronoDesdeFases = async () => {
+        const d = cronogramaDesdeFases(estado.data.fasesForm);
+        const propias = f.cronograma.filter((x) => clean(x.actividad) && !/^Fase \d+\./.test(String(x.fase || '')));
+        if (f.cronograma.some((x) => clean(x.actividad)) && !(await confirmar({ texto: '¿Armar el cronograma desde tus fases?', detalle: `Quedan ${d.filas.length} actividades en ${d.periodos} ${d.unidad === 'semanal' ? 'semanas' : 'meses'}, con las fechas de cada fase.${propias.length ? ` ${propias.length === 1 ? 'La actividad que agregaste a mano se conserva' : `Las ${propias.length} actividades que agregaste a mano se conservan`} al final.` : ''}`, aceptar: 'Armar' }))) return;
+        touch();
+        update({ cronograma: [...d.filas.map((x) => ({ id: uid(), ...x })), ...propias] });
+        setUnidad(d.unidad);
+        setPeriodos(Math.min(52, Math.max(d.periodos, ...propias.map((x) => Number(x.fin) || 0))));
+        avisar('Cronograma armado desde tus fases.');
     };
     const yaSugirioPres = useRef(false);
     useEffect(() => {
@@ -1109,9 +1153,18 @@ const Constructor = ({ intro, onNavigate }) => {
                                     <input className="input-field" type="number" min="1" max="24" value={periodos} onChange={(e) => { touch(); setPeriodos(Math.max(1, Math.min(24, Number(e.target.value) || 1))); }} />
                                 </label>
                             </div>
+                            {avisosCrono.length > 0 && (
+                                <div className="met-desfase" role="status">
+                                    <b><AlertTriangle size={15} aria-hidden="true" /> El cronograma ya no coincide con tus fases</b>
+                                    <ul>{avisosCrono.map((a) => <li key={a}>{a}</li>)}</ul>
+                                    <button type="button" className="ide-btn ide-btn--primary" onClick={cronoDesdeFases}><CalendarDays size={15} /> Armar el cronograma desde mis fases</button>
+                                </div>
+                            )}
                             {f.cronograma.map((x, i) => (
                                 <div className="met-crono-row" key={x.id || i}>
                                     <select className="input-field" aria-label="Fase" value={x.fase} onChange={(e) => setFila('cronograma', f.cronograma, i, { fase: e.target.value })}>
+                                        {/* Las filas que vienen de «Desarrollo de las fases» traen el nombre de su fase («Fase 1. …»). */}
+                                        {x.fase && !FASES.includes(x.fase) && <option>{x.fase}</option>}
                                         {FASES.map((fase) => <option key={fase}>{fase}</option>)}
                                     </select>
                                     <input className="input-field" aria-label="Actividad" value={x.actividad} onChange={(e) => setFila('cronograma', f.cronograma, i, { actividad: e.target.value })} placeholder="Actividad" />
@@ -1133,17 +1186,24 @@ const Constructor = ({ intro, onNavigate }) => {
                                 </button>
                                 <span>{sugPres === 'fallo' ? 'No se pudo sugerir: inténtalo de nuevo.' : sugPres === 'nada' ? 'No se sugirieron rubros nuevos: tu presupuesto ya los tiene.' : 'Según tu muestra, tus instrumentos, tu software, la duración y tu equipo. No cambia los rubros que ya tienes.'}</span>
                             </div>
+                            {cambiosPres.length > 0 && (
+                                <div className="met-desfase" role="status">
+                                    <b><AlertTriangle size={15} aria-hidden="true" /> El proyecto cambió después de calcular el presupuesto</b>
+                                    <ul>{cambiosPres.map((a) => <li key={a}>{a}</li>)}</ul>
+                                    <button type="button" className="ide-btn ide-btn--primary" onClick={recalcularPres} disabled={sugPres === 'pensando'}><Sparkles size={15} /> Recalcular los rubros sugeridos</button>
+                                </div>
+                            )}
                             {presupuesto.some((x) => x.sugerido) && <p className="obj-warn"><AlertTriangle size={14} aria-hidden="true" /> Los valores sugeridos son estimaciones, no cotizaciones: revisa cada cuenta y ajústala con precios reales de tu ciudad antes de entregar.</p>}
                             {presupuesto.map((it, i) => (
                                 <div className="met-pres-row" key={it.id || i}>
                                     <select className="input-field" aria-label="Rubro" value={it.categoria} onChange={(e) => { touch(); setPresupuesto(presupuesto.map((x, k) => (k === i ? { ...x, categoria: e.target.value } : x))); }}>
                                         {[...new Set([...CATEGORIAS, it.categoria].filter(Boolean))].map((c) => <option key={c}>{c}</option>)}
                                     </select>
-                                    <input className="input-field" aria-label="Descripción" value={it.descripcion} onChange={(e) => { touch(); setPresupuesto(presupuesto.map((x, k) => (k === i ? { ...x, descripcion: e.target.value } : x))); }} placeholder="Descripción" />
+                                    <input className="input-field" aria-label="Descripción" value={it.descripcion} onChange={(e) => { touch(); setPresupuesto(presupuesto.map((x, k) => (k === i ? { ...x, descripcion: e.target.value, ajustado: true } : x))); }} placeholder="Descripción" />
                                     <select className="input-field" aria-label="Fuente" value={it.fuente} onChange={(e) => { touch(); setPresupuesto(presupuesto.map((x, k) => (k === i ? { ...x, fuente: e.target.value } : x))); }}>
                                         {[...new Set([...FUENTES, it.fuente].filter(Boolean))].map((c) => <option key={c}>{c}</option>)}
                                     </select>
-                                    <input className="input-field" aria-label="Costo en pesos" type="number" min="0" step="1000" value={it.costo} onChange={(e) => { touch(); setPresupuesto(presupuesto.map((x, k) => (k === i ? { ...x, costo: Number(e.target.value) } : x))); }} />
+                                    <input className="input-field" aria-label="Costo en pesos" type="number" min="0" step="1000" value={it.costo} onChange={(e) => { touch(); setPresupuesto(presupuesto.map((x, k) => (k === i ? { ...x, costo: Number(e.target.value), ajustado: true } : x))); }} />
                                     <button type="button" className="obj-remove" onClick={() => { touch(); setPresupuesto(presupuesto.filter((_, k) => k !== i)); }} aria-label={`Quitar ${it.descripcion || 'rubro'}`}><Trash2 size={16} /></button>
                                     {it.sugerido && it.justificacion && <p className="met-pres-cuenta"><Sparkles size={12} aria-hidden="true" /> Cuenta estimada: {it.justificacion} = {money(it.costo)}</p>}
                                 </div>

@@ -1,3 +1,4 @@
+import { aplicarEstilo, estiloVacio, textoEstilo } from './estilo.js';
 // Cliente del API propio (/api). La sesión viaja en una cookie httpOnly.
 
 export class ApiError extends Error {
@@ -113,11 +114,27 @@ export const api = {
 
 // Misma forma que el SDK de Groq (groq.chat.completions.create), pero la llamada
 // pasa por nuestro servidor, que es el único que conoce la clave.
+// Además aplica el vocabulario y estilo del proyecto abierto (fijarEstiloIA lo actualiza el contexto del proyecto):
+// va como instrucción en el mensaje de sistema y los términos pedidos se corrigen en la respuesta.
+let estiloIA = null;
+export const fijarEstiloIA = (estilo) => { estiloIA = estilo && !estiloVacio(estilo) ? estilo : null; };
+const conEstilo = (messages) => {
+    const regla = estiloIA ? textoEstilo(estiloIA) : '';
+    if (!regla || !Array.isArray(messages)) return messages;
+    const i = messages.findIndex((m) => m?.role === 'system');
+    return i >= 0
+        ? messages.map((m, k) => (k === i ? { ...m, content: `${m.content}\n\n${regla}` } : m))
+        : [{ role: 'system', content: regla }, ...messages];
+};
 export const groq = {
     chat: {
         completions: {
-            create: ({ messages, temperature, max_tokens, response_format }) =>
-                api.chat({ messages, temperature, max_tokens, response_format }),
+            create: async ({ messages, temperature, max_tokens, response_format }) => {
+                const r = await api.chat({ messages: conEstilo(messages), temperature, max_tokens, response_format });
+                const content = r?.choices?.[0]?.message?.content;
+                if (estiloIA && typeof content === 'string') r.choices[0].message.content = aplicarEstilo(content, estiloIA);
+                return r;
+            },
         },
     },
 };
