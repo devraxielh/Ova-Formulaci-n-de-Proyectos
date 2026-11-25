@@ -354,12 +354,12 @@ const Admin = () => {
         });
     };
     const quitarGrupo = async (g) => {
-        if (!(await confirmar({ texto: `¿Quitar el grupo «${g.nombre}»?`, detalle: `Sus ${g.n} ${g.n === 1 ? 'cuenta queda' : 'cuentas quedan'} sin grupo. No se borra ninguna cuenta ni proyecto.`, aceptar: 'Quitar grupo', peligro: true }))) return undefined;
+        if (!(await confirmar({ texto: `¿Borrar el grupo «${g.nombre}»?`, detalle: `Sus ${g.n} ${g.n === 1 ? 'cuenta queda' : 'cuentas quedan'} sin grupo. No se borra ninguna cuenta ni proyecto.`, aceptar: 'Borrar grupo', peligro: true }))) return undefined;
         return accion(async () => {
             const r = await api.admin.renameGroup(g.clave, '');
             if (fGrupo === g.clave) setFGrupo('');
             await load();
-            setNotice(`Se quitó el grupo «${g.nombre}»; ${r.cuentas} ${r.cuentas === 1 ? 'cuenta quedó' : 'cuentas quedaron'} sin grupo.`);
+            setNotice(`Se borró el grupo «${g.nombre}»; ${r.cuentas} ${r.cuentas === 1 ? 'cuenta quedó' : 'cuentas quedaron'} sin grupo.`);
         });
     };
     const resend = (user) => accion(async () => {
@@ -801,7 +801,7 @@ const Admin = () => {
                     <section className="pro-card adm-panel">
                         <div className="adm-bitacora-cabeza">
                             <h2>Por grupo</h2>
-                            <p className="adm-muted">Un grupo es un curso o cohorte. Se pone al crear las cuentas (también en la carga por lotes) o seleccionando varias en Usuarios. Presiona un grupo para ver sus cuentas; con el lápiz le cambias el nombre (si pones el de otro grupo, se unen).</p>
+                            <p className="adm-muted">Un grupo es un curso o cohorte. Se pone al crear las cuentas (también en la carga por lotes) o seleccionando varias en Usuarios. Presiona un grupo para ver sus cuentas; con «Renombrar» le cambias el nombre (si pones el de otro grupo, se unen) y con «Borrar» desaparece el grupo y sus cuentas quedan sin grupo.</p>
                         </div>
                         <div className="adm-table-wrap">
                             <table className="adm-table adm-table--grupos">
@@ -829,8 +829,8 @@ const Admin = () => {
                                             <td>
                                                 {g.clave !== SIN_GRUPO && grupoEditado?.de !== g.clave && (
                                                     <span className="adm-grupo-acciones">
-                                                        <button type="button" className="adm-icono" disabled={busy} onClick={() => setGrupoEditado({ de: g.clave, a: g.nombre })} aria-label={`Cambiar el nombre de ${g.nombre}`} title="Cambiar el nombre"><Pencil size={15} /></button>
-                                                        <button type="button" className="adm-icono adm-danger" disabled={busy} onClick={() => quitarGrupo(g)} aria-label={`Quitar el grupo ${g.nombre}`} title="Quitar el grupo (las cuentas se conservan)"><Trash2 size={15} /></button>
+                                                        <button type="button" className="pro-btn pro-btn--ghost adm-sm" disabled={busy} onClick={() => setGrupoEditado({ de: g.clave, a: g.nombre })} aria-label={`Cambiar el nombre de ${g.nombre}`}><Pencil size={14} /> Renombrar</button>
+                                                        <button type="button" className="pro-btn pro-btn--ghost adm-sm adm-danger" disabled={busy} onClick={() => quitarGrupo(g)} aria-label={`Borrar el grupo ${g.nombre}`} title="Sus cuentas quedan sin grupo; no se borra ninguna"><Trash2 size={14} /> Borrar</button>
                                                     </span>
                                                 )}
                                             </td>

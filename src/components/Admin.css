@@ -234,3 +234,4 @@
 .adm-icono.adm-danger:hover:not(:disabled) { background: #fef2f2; color: #b91c1c; }
 .adm-icono:disabled { opacity: 0.4; cursor: not-allowed; }
 .adm-table--grupos td:first-child { min-width: 13rem; }
+.adm-grupo-acciones { gap: 0.35rem; flex-wrap: nowrap; }
