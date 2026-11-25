@@ -246,8 +246,10 @@ const publicUser = (user) => ({
     projectLimit: user.role === 'admin' ? MAX_PROJECTS : Number(user.project_limit) || 0,
 });
 
-const ROLES = ['admin', 'teacher', 'student', 'researcher'];
-const ROL_NOMBRE = { admin: 'administrador', teacher: 'profesor', student: 'estudiante', researcher: 'investigador' };
+const ROLES = ['admin', 'teacher', 'student', 'researcher', 'guest'];
+const ROL_NOMBRE = { admin: 'administrador', teacher: 'profesor', student: 'estudiante', researcher: 'investigador', guest: 'invitado' };
+// Cupo con que queda una cuenta al tomar un rol: el invitado nunca crea proyectos; el estudiante espera a su profesor.
+const cupoAlCambiar = (rol, actual) => (rol === 'guest' ? 0 : rol !== 'student' && !Number(actual) ? CUPO_AUTONOMO : Number(actual) || 0);
 // Cupo de proyectos con que nace una cuenta de profesor o investigador (el administrador lo puede cambiar).
 const CUPO_AUTONOMO = 10;
 // Cuántos proyectos puede permitirle un profesor a un estudiante.
@@ -539,6 +541,13 @@ app.use((req, _res, next) => {
 });
 
 const requireUser = (req, res, next) => (req.user ? next() : res.status(401).json({ error: 'Inicia sesión para continuar.' }));
+
+// Invitado: solo ve las presentaciones de cada módulo. No tiene proyectos (ni propios ni compartidos), IA ni búsquedas.
+app.use(['/api/projects', '/api/ai', '/api/buscar'], (req, res, next) => {
+    if (req.user?.role !== 'guest') return next();
+    if (req.method === 'GET' && req.baseUrl === '/api/projects' && req.path === '/') return res.json({ projects: [] });
+    return res.status(403).json({ error: 'Tu cuenta es de invitado: solo puedes ver las presentaciones.', code: 'guest' });
+});
 
 const requireAdmin = (req, res, next) => {
     if (!req.user) return res.status(401).json({ error: 'Inicia sesión para continuar.' });
@@ -1180,6 +1189,7 @@ app.post('/api/admin/users/bulk', requireAdmin, async (req, res) => {
     } else if (action === 'limit') {
         const limit = parseInt(value, 10);
         if (!Number.isInteger(limit) || limit < 0 || limit > MAX_PROJECTS) return res.status(400).json({ error: `El cupo debe estar entre 0 y ${MAX_PROJECTS}.` });
+        aplica = cuentas.filter((u) => u.role !== 'guest'); // un invitado no crea proyectos
         const upd = db.prepare('UPDATE users SET project_limit = ? WHERE id = ?');
         hacer = (u) => upd.run(limit, u.id);
         texto = `Puso el cupo en ${limit}`;
@@ -1197,7 +1207,7 @@ app.post('/api/admin/users/bulk', requireAdmin, async (req, res) => {
         const upd = db.prepare('UPDATE users SET role = ?, teacher_id = ?, project_limit = ? WHERE id = ?');
         const soltar = db.prepare('UPDATE users SET teacher_id = NULL WHERE teacher_id = ?');
         hacer = (u) => {
-            const cupo = value !== 'student' && !Number(u.project_limit) ? CUPO_AUTONOMO : Number(u.project_limit) || 0;
+            const cupo = cupoAlCambiar(value, u.project_limit);
             upd.run(value, value === 'student' ? u.teacher_id : null, cupo, u.id);
             if (u.role === 'teacher') soltar.run(u.id);
         };
@@ -1416,6 +1426,7 @@ app.post('/api/admin/users/:id/limit', requireAdmin, async (req, res) => {
     const target = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(req.params.id));
     if (!target) return res.status(404).json({ error: 'No se encontró el usuario.' });
     if (target.role === 'admin') return res.status(400).json({ error: 'El administrador no tiene cupo.' });
+    if (target.role === 'guest') return res.status(400).json({ error: 'Un invitado solo ve las presentaciones: no crea proyectos. Cámbiale el rol primero.' });
     db.prepare('UPDATE users SET project_limit = ? WHERE id = ?').run(limit, target.id);
     bitacora(req, 'Cambió un cupo', `${target.name} (${target.email}): ${limit}`);
     // Primera autorización: se le avisa al estudiante que ya puede empezar.
@@ -1483,7 +1494,7 @@ const crearCuenta = async ({ name, email, role, teacherId = null, projectLimit =
         if (!prof || prof.role !== 'teacher') return { error: 'El profesor indicado no existe.' };
     }
     const clave = claveTemporal();
-    const cupo = projectLimit ?? (role === 'student' ? 0 : CUPO_AUTONOMO);
+    const cupo = role === 'guest' ? 0 : projectLimit ?? (role === 'student' ? 0 : CUPO_AUTONOMO);
     const info = db.prepare(`INSERT INTO users (email, name, password_hash, role, status, must_change_password, project_limit, teacher_id, grupo)
                              VALUES (?, ?, ?, ?, 'active', 1, ?, ?, ?)`).run(correo, nombre, hashPassword(clave), role, Math.min(MAX_PROJECTS, Math.max(0, cupo)), role === 'student' ? teacherId : null, grupoLimpio(grupo));
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(info.lastInsertRowid));
@@ -1541,7 +1552,7 @@ app.post('/api/admin/users/batch', requireAdmin, crearLimit, async (req, res) =>
             if (grupo !== (existente.grupo || '')) cambios.push('grupo');
             if (rolNuevo !== existente.role) cambios.push('rol');
             if (cambios.length) {
-                const cupo = rolNuevo !== 'student' && !Number(existente.project_limit) ? CUPO_AUTONOMO : Number(existente.project_limit) || 0;
+                const cupo = cupoAlCambiar(rolNuevo, existente.project_limit);
                 db.prepare('UPDATE users SET role = ?, teacher_id = ?, grupo = ?, project_limit = ? WHERE id = ?').run(rolNuevo, profesorId, grupo, cupo, existente.id);
                 if (existente.role === 'teacher' && rolNuevo !== 'teacher') db.prepare('UPDATE users SET teacher_id = NULL WHERE teacher_id = ?').run(existente.id);
             }
@@ -1577,7 +1588,7 @@ app.post('/api/admin/users/:id/role', requireAdmin, (req, res) => {
         teacherId = prof.id;
     }
     // Quien pasa a profesor o investigador recibe el cupo propio de ese rol si no tenía ninguno.
-    const cupo = role !== 'student' && !Number(target.project_limit) ? CUPO_AUTONOMO : Number(target.project_limit) || 0;
+    const cupo = cupoAlCambiar(role, target.project_limit);
     db.prepare('UPDATE users SET role = ?, teacher_id = ?, project_limit = ? WHERE id = ?').run(role, teacherId, cupo, target.id);
     bitacora(req, role !== target.role ? 'Cambió un rol' : 'Cambió el profesor a cargo', `${target.name} (${target.email}): ${ROL_NOMBRE[role] || role}${teacherId ? `, profesor #${teacherId}` : ''}`);
     // Si deja de ser profesor, sus estudiantes quedan sin profesor a cargo (el administrador los reasigna).

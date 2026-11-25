@@ -322,3 +322,5 @@ span.adm-user-link { cursor: default; }
   .adm-grafica-lienzo { margin-bottom: 0.6rem; }
   .adm-mover-campos .sel, .adm-mover-campos .input-field { min-width: 0; width: 100%; }
 }
+
+.adm-rolb[data-rol='guest'] { background: #fef3c7; color: #92400e; }

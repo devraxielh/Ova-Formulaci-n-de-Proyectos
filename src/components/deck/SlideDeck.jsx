@@ -5,6 +5,7 @@ import Citar from './Citar';
 import RevisarIA from './RevisarIA';
 import Redactar from './Redactar';
 import { campoDe, fijarValor, placeholderDe, valorDe } from './campo';
+import { useProject } from '../../context/ProjectContext';
 import '../Ideacion.css';
 
 /* Piezas compartidas por las clases en diapositivas (Ideación, Título…). */
@@ -161,7 +162,7 @@ const fillExample = (event) => {
  * - la «Presentación», en una ventana grande: la teoría de la clase (Apertura … Cierre).
  * `onFuera(seccion)` avisa cuando se pide una sección que está en el otro mazo.
  */
-const Mazo = ({ sections, slides, label, renderSlide, finish, enModal = false, activo = true, seccionInicial, salto, pantallaRef, onPresentacion, onFuera, onCerrar, totalClase, minutosDe }) => {
+const Mazo = ({ sections, slides, label, renderSlide, finish, soloVer = false, enModal = false, activo = true, seccionInicial, salto, pantallaRef, onPresentacion, onFuera, onCerrar, totalClase, minutosDe }) => {
     // Abre siempre en su primera diapositiva (o en la sección pedida): no se recuerda dónde quedó la vez anterior.
     const [index, setIndex] = useState(() => Math.max(0, slides.findIndex((item) => item.section === seccionInicial)));
     const [direction, setDirection] = useState(1);
@@ -266,9 +267,9 @@ const Mazo = ({ sections, slides, label, renderSlide, finish, enModal = false, a
                         )}
                     </div>
                     <div className="ide-tools">
-                        {!enModal && <RevisarIA etiqueta={label} />}
-                        {!enModal && <Redactar stageRef={stageRef} />}
-                        {!enModal && <Citar stageRef={stageRef} />}
+                        {!enModal && !soloVer && <RevisarIA etiqueta={label} />}
+                        {!enModal && !soloVer && <Redactar stageRef={stageRef} />}
+                        {!enModal && !soloVer && <Citar stageRef={stageRef} />}
                         {/* En la página no hay tiempo ni pantalla completa: eso es de la presentación. */}
                         {!sinPasos && <Temporizador key={slide.id} minutes={slide.min} />}
                         {!sinPasos && canFullscreen && (
@@ -375,7 +376,7 @@ const Mazo = ({ sections, slides, label, renderSlide, finish, enModal = false, a
                 )}
             </section>
 
-            {!enModal && (
+            {!enModal && !soloVer && (
                 <p className="ide-keys">
                     {slides.length > 1 && !sinPasos && <>Avanza con las teclas <kbd>←</kbd> y <kbd>→</kbd>. </>}En un campo vacío, <kbd>Tab</kbd> escribe el ejemplo.{onPresentacion ? ` La presentación de la clase dura ${totalClase - slides.reduce((sum, item) => sum + item.min, 0)} minutos.` : ''}
                 </p>
@@ -389,6 +390,8 @@ const DE_TRABAJO = new Set(['construccion', 'sintesis', 'revision']);
 
 // `storageKey` se sigue aceptando para no cambiar las clases, pero ya no se usa.
 const SlideDeck = ({ sections, slides, label, renderSlide, finish }) => {
+    const { user } = useProject();
+    const invitado = user?.role === 'guest'; // solo ve la presentación: sin construcción, revisión ni herramientas de escritura
     const [presentacion, setPresentacion] = useState(null); // null = cerrada; { seccion } = abierta (en esa sección)
     const [irA, setIrA] = useState(null); // { seccion }: sección de trabajo pedida desde la presentación
     const dialog = useRef(null);
@@ -421,6 +424,16 @@ const SlideDeck = ({ sections, slides, label, renderSlide, finish }) => {
         pantalla.current?.requestFullscreen?.().catch(() => {});
         setPresentacion({ seccion });
     };
+
+    if (invitado) {
+        if (teoria.length === 0) return <p className="ide-invitado-nota">Este módulo no tiene presentación: es solo de trabajo sobre el proyecto.</p>;
+        return (
+            <>
+                <p className="ide-invitado-nota">Estás viendo la presentación de este módulo como invitado. La construcción del proyecto y el asistente de IA son para las cuentas de estudiantes, profesores e investigadores.</p>
+                <Mazo {...comunes} soloVer totalClase={teoria.reduce((sum, item) => sum + item.min, 0)} sections={sections.filter((item) => !DE_TRABAJO.has(item.id))} slides={teoria} />
+            </>
+        );
+    }
 
     // Una clase sin secciones de trabajo (o sin teoría) se muestra como un solo mazo.
     if (trabajo.length === 0 || teoria.length === 0) return <Mazo {...comunes} sections={sections} slides={slides} finish={finish} />;

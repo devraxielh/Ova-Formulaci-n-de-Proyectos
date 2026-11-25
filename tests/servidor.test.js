@@ -778,6 +778,46 @@ test('restaurar una copia de seguridad: pide RESTAURAR y la contraseña, guarda 
     }
 });
 
+test('invitado: entra y no puede nada más que mirar (sin proyectos, IA ni búsquedas), ni siquiera si lo invitan a un proyecto', async () => {
+    const admin = await entrarAdmin();
+    const inv = await cuenta('invitado18', 'guest');
+    const yo = (await inv.api('/auth/me')).body.user;
+    assert.equal(yo.role, 'guest');
+    assert.equal(yo.projectLimit, 0);
+
+    // No tiene proyectos y no puede crear; la IA y las búsquedas le responden que es invitado.
+    assert.deepEqual((await inv.api('/projects')).body.projects, []);
+    const crear = await inv.api('/projects', 'POST', { name: 'Mío', data: {} });
+    assert.equal(crear.status, 403);
+    assert.equal(crear.body.code, 'guest');
+    assert.equal((await inv.api('/ai/chat', 'POST', { messages: [{ role: 'user', content: 'hola' }] })).body.code, 'guest');
+    assert.equal((await inv.api('/buscar/articulos?q=citas%20medicas')).body.code, 'guest');
+    assert.equal((await inv.api('/buscar/normas?q=ley%20de%20salud')).status, 403);
+    assert.equal((await inv.api('/admin/users')).status, 403);
+    assert.equal((await inv.api('/teacher/students')).status, 403);
+
+    // Aunque un compañero lo invite a su proyecto, no lo abre ni lo edita.
+    const ana = await cuenta('ana18');
+    const p = (await ana.api('/projects', 'POST', { name: 'De Ana', data: { titulo: 'Privado' } })).body.project;
+    await ana.api(`/projects/${p.id}/members`, 'POST', { email: inv.email });
+    assert.equal((await inv.api(`/projects/${p.id}`)).status, 403);
+    assert.equal((await inv.api(`/projects/${p.id}`, 'PUT', { patch: { titulo: 'x' } })).status, 403);
+    assert.equal((await ana.api(`/projects/${p.id}`)).body.project.data.titulo, 'Privado');
+
+    // El administrador no le puede dar cupo, ni uno a uno ni por lote; sí cambiarle el rol.
+    assert.equal((await admin(`/admin/users/${inv.id}/limit`, 'POST', { limit: 2 })).status, 400);
+    assert.deepEqual((await admin('/admin/users/bulk', 'POST', { ids: [inv.id], action: 'limit', value: 1 })).body, { hechas: 0, omitidas: 1 });
+    // Un investigador con proyecto que pasa a invitado queda sin cupo y deja de ver su proyecto; al volver, lo recupera.
+    assert.equal((await admin(`/admin/users/${ana.id}/role`, 'POST', { role: 'guest' })).body.user.projectLimit, 0);
+    assert.deepEqual((await ana.api('/projects')).body.projects, []);
+    assert.equal((await admin(`/admin/users/${ana.id}/role`, 'POST', { role: 'researcher' })).body.user.projectLimit, 10);
+    assert.equal((await ana.api('/projects')).body.projects.length, 1);
+    // Por lote también se crean invitados.
+    const lote = (await admin('/admin/users/batch', 'POST', { users: [{ name: 'Oyente', email: `oyente.${Date.now()}@example.test`, role: 'guest' }] })).body;
+    assert.equal(lote.creadas, 1);
+    assert.equal((await admin('/admin/users')).body.users.find((u) => u.email === lote.resultados[0].email).projectLimit, 0);
+});
+
 test('carga por lotes: crea las filas buenas, explica las malas y enlaza cada estudiante con su profesor', async () => {
     const admin = await entrarAdmin();
     const t = Date.now();

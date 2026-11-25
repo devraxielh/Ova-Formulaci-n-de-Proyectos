@@ -87,6 +87,7 @@ const Avance = ({ value }) => (
 // Cuántos proyectos puede crear la cuenta. 0 = todavía sin permiso.
 const Cupo = ({ user, onChange, busy }) => {
     if (user.role === 'admin') return <span className="adm-muted">—</span>;
+    if (user.role === 'guest') return <span className="adm-muted" title="Un invitado solo ve las presentaciones">No crea</span>;
     const limit = user.projectLimit || 0;
     return (
         <span className="adm-cupo" data-cero={limit === 0}>

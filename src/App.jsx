@@ -110,8 +110,10 @@ function App() {
     };
     const isAdmin = user?.role === 'admin';
     const isTeacher = user?.role === 'teacher';
+    // Invitado: solo las presentaciones de los módulos. No tiene «Mi proyecto» ni «Referencias».
+    const isGuest = user?.role === 'guest';
     // Con la contraseña inicial solo se puede estar en la cuenta, la cambie o no la pestaña elegida.
-    const activeTab = user?.mustChangePassword ? 'cuenta' : selectedTab;
+    const activeTab = user?.mustChangePassword ? 'cuenta' : isGuest && ['proyecto', 'referencias', 'admin', 'profesor'].includes(selectedTab) ? 'ideacion' : selectedTab;
 
     // Enlace para restablecer la contraseña: /?restablecer=TOKEN
     useEffect(() => {
@@ -290,7 +292,7 @@ function App() {
     }
 
     // Cuenta activa sin cupo: no puede crear proyectos hasta que el administrador lo autorice.
-    if (sinCupo && !isAdmin && !isTeacher && !user.mustChangePassword) {
+    if (sinCupo && !isAdmin && !isTeacher && !isGuest && !user.mustChangePassword) {
         return (
             <div className="app-acceso">
                 <section className="app-espera" role="status">
@@ -369,6 +371,7 @@ function App() {
                         </button>
                     )}
 
+                    {!isGuest && (
                     <button
                         className={`nav-button ${activeTab === 'proyecto' ? 'active' : ''}`}
                         onClick={() => handleTabChange('proyecto')}
@@ -377,6 +380,7 @@ function App() {
                         <FolderOpen size={20} />
                         <span>Mi proyecto</span>
                     </button>
+                    )}
 
                     <button
                         className={`nav-button ${activeTab === 'ideacion' ? 'active' : ''} ${doneTabs.has('ideacion') ? 'nav-button--done' : ''}`}
@@ -538,6 +542,7 @@ function App() {
                         {doneTabs.has('resumen') && <CheckCircle2 size={16} className="nav-done-check" aria-label="completado" />}
                     </button>
 
+                    {!isGuest && (
                     <button
                         className={`nav-button ${activeTab === 'referencias' ? 'active' : ''} ${doneTabs.has('referencias') ? 'nav-button--done' : ''}`}
                         onClick={() => handleTabChange('referencias')}
@@ -547,6 +552,7 @@ function App() {
                         <span>Referencias</span>
                         {doneTabs.has('referencias') && <CheckCircle2 size={16} className="nav-done-check" aria-label="completado" />}
                     </button>
+                    )}
 
 
                 </nav>
@@ -573,9 +579,9 @@ function App() {
                 )}
 
                 <div className="sidebar-footer" style={{ marginTop: 'auto', paddingTop: '0.6rem', borderTop: '1px solid #e2e8f0' }}>
-                    <button type="button" className="sidebar-account" onClick={() => handleTabChange(user ? 'proyecto' : 'cuenta')}>
-                        <b>{user ? project.name : 'Iniciar sesión'}</b>
-                        <small data-state={saveState}>{user ? SAVE_LABEL[saveState] : 'Guarda tu proyecto en tu cuenta'}</small>
+                    <button type="button" className="sidebar-account" onClick={() => handleTabChange(isGuest ? 'cuenta' : user ? 'proyecto' : 'cuenta')}>
+                        <b>{isGuest ? 'Invitado' : user ? project.name : 'Iniciar sesión'}</b>
+                        <small data-state={isGuest ? undefined : saveState}>{isGuest ? 'Solo presentaciones' : user ? SAVE_LABEL[saveState] : 'Guarda tu proyecto en tu cuenta'}</small>
                     </button>
                     {user && (
                         <button type="button" className="sidebar-logout" onClick={handleLogout} disabled={signingOut}>

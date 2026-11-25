@@ -15,6 +15,7 @@ export const ROLES = [
     { id: 'student', nombre: 'Estudiante', nota: 'Crea proyectos solo si su profesor lo permite.' },
     { id: 'teacher', nombre: 'Profesor', nota: 'Crea a sus estudiantes, supervisa sus proyectos y crea los suyos.' },
     { id: 'researcher', nombre: 'Investigador', nota: 'Crea sus propios proyectos.' },
+    { id: 'guest', nombre: 'Invitado', nota: 'Solo ve las presentaciones de cada módulo. No tiene proyectos ni usa la IA.' },
 ];
 export const nombreRol = (id) => (id === 'admin' ? 'Administrador' : ROLES.find((r) => r.id === id)?.nombre || id);
 
@@ -24,6 +25,7 @@ const rolDesdeTexto = (texto) => {
     if (!t || /^(estudiante|alumn|student)/.test(t)) return 'student';
     if (/^(profesor|docente|teacher|maestr)/.test(t)) return 'teacher';
     if (/^(investigador|researcher)/.test(t)) return 'researcher';
+    if (/^(invitad|guest|visitante|oyente)/.test(t)) return 'guest';
     return '';
 };
 
@@ -197,7 +199,7 @@ export const CrearCuentas = ({ profesores, grupos = [], onCreadas }) => {
 
             {modo === 'lote' && (
                 <div className="cue-lote">
-                    <p>Pega la lista o sube un archivo CSV (también sirve copiar y pegar desde Excel). Una persona por fila, en este orden: <b>nombre, correo, rol, correo del profesor, grupo</b>. El rol puede ser estudiante, profesor o investigador (vacío = estudiante). El correo del profesor es opcional y solo aplica a estudiantes; el grupo también es opcional. Máximo 300 filas.</p>
+                    <p>Pega la lista o sube un archivo CSV (también sirve copiar y pegar desde Excel). Una persona por fila, en este orden: <b>nombre, correo, rol, correo del profesor, grupo</b>. El rol puede ser estudiante, profesor, investigador o invitado (vacío = estudiante). El correo del profesor es opcional y solo aplica a estudiantes; el grupo también es opcional. Máximo 300 filas.</p>
                     <div className="cue-acciones">
                         <label className="pro-btn pro-btn--ghost cue-archivo"><Upload size={15} /> Subir archivo CSV<input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={leerArchivo} /></label>
                         <button type="button" className="pro-link" onClick={() => descargar('plantilla-usuarios.csv', csv([['nombre', 'correo', 'rol', 'correo del profesor', 'grupo'], ['Carlos Ruiz', 'carlos.ruiz@correo.edu.co', 'profesor', ''], ['Ana Pérez', 'ana.perez@correo.edu.co', 'estudiante', 'carlos.ruiz@correo.edu.co'], ['Luisa Díaz', 'luisa.diaz@correo.edu.co', 'investigador', '']]))}>Descargar plantilla</button>

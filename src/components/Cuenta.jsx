@@ -226,8 +226,8 @@ const Cuenta = ({ onNavigate, activation, resetToken, onResetDone }) => {
                     </dl>
                     {!user.mustChangePassword && (
                         <div className="acc-aside-actions">
-                            <button type="button" className="pro-btn acc-btn-light" onClick={() => onNavigate(isAdmin ? 'admin' : 'proyecto')}>
-                                {isAdmin ? <><ShieldCheck size={16} /> Ir a la administración</> : <><FileText size={16} /> Ir a mi proyecto</>} <ArrowRight size={16} />
+                            <button type="button" className="pro-btn acc-btn-light" onClick={() => onNavigate(isAdmin ? 'admin' : user.role === 'guest' ? 'ideacion' : 'proyecto')}>
+                                {isAdmin ? <><ShieldCheck size={16} /> Ir a la administración</> : user.role === 'guest' ? <><FileText size={16} /> Ver las presentaciones</> : <><FileText size={16} /> Ir a mi proyecto</>} <ArrowRight size={16} />
                             </button>
                         </div>
                     )}
