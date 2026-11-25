@@ -497,6 +497,24 @@ test('muchas cuentas: grupos, cambios masivos en una llamada y registro de lo qu
     assert.equal((await admin('/admin/users/bulk', 'POST', { ids: ids.slice(20), action: 'delete' })).body.hechas, 20);
     assert.equal((await lista()).length, 20);
 
+    // Grupos: cambiar el nombre, unir con otro que ya existe y quitar (las cuentas se conservan).
+    const enGrupo = async (g) => (await lista()).filter((u) => u.grupo === g).length;
+    const antesA = await enGrupo('Grupo A');
+    const antesC = await enGrupo('Grupo C');
+    assert.ok(antesA > 0 && antesC > 0);
+    assert.equal((await profe.api('/admin/groups/rename', 'POST', { from: 'Grupo A', to: 'X' })).status, 403);
+    assert.equal((await admin('/admin/groups/rename', 'POST', { from: '', to: 'X' })).status, 400);
+    assert.equal((await admin('/admin/groups/rename', 'POST', { from: 'Grupo A', to: ' Grupo  A ' })).status, 400);
+    assert.equal((await admin('/admin/groups/rename', 'POST', { from: 'No existe', to: 'X' })).status, 404);
+    assert.deepEqual((await admin('/admin/groups/rename', 'POST', { from: 'Grupo A', to: ' Cohorte  2026 ' })).body, { cuentas: antesA, unido: false, grupo: 'Cohorte 2026' });
+    assert.equal(await enGrupo('Grupo A'), 0);
+    assert.equal((await admin('/admin/groups/rename', 'POST', { from: 'Grupo C', to: 'Cohorte 2026' })).body.unido, true);
+    assert.equal(await enGrupo('Cohorte 2026'), antesA + antesC);
+    const total = (await lista()).length;
+    assert.equal((await admin('/admin/groups/rename', 'POST', { from: 'Cohorte 2026', to: '' })).body.cuentas, antesA + antesC);
+    assert.equal(await enGrupo('Cohorte 2026'), 0);
+    assert.equal((await lista()).length, total);
+
     // Todo quedó en el registro, con quién lo hizo; solo el administrador lo lee.
     const log = (await admin('/admin/log')).body.log;
     assert.ok(log.some((l) => l.action.startsWith('Eliminó') && l.action.includes('20 cuentas') && l.actor === 'Administrador'));

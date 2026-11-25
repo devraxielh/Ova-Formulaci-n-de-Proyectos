@@ -166,6 +166,7 @@ const Admin = () => {
     const [porPagina, setPorPagina] = useState(TAMANOS[0]);
     const [grupoNuevo, setGrupoNuevo] = useState(null); // texto mientras se escribe un grupo nuevo para la selección
     const [bitacora, setBitacora] = useState(null); // registro de cambios (pestaña Sistema)
+    const [grupoEditado, setGrupoEditado] = useState(null); // { de, a } mientras se cambia el nombre de un grupo
 
     // Lista de proyectos.
     const [pQuery, setPQuery] = useState('');
@@ -334,6 +335,31 @@ const Admin = () => {
             setProjects(null);
             await load();
             setNotice(`Se eliminó la cuenta de ${user.name}.`);
+        });
+    };
+    // Grupos: cambiar el nombre (si ya existe otro con ese nombre, se unen) o quitar el grupo sin tocar las cuentas.
+    const renombrarGrupo = async (event) => {
+        event.preventDefault();
+        const de = grupoEditado.de;
+        const a = grupoEditado.a.trim().replace(/\s+/g, ' ');
+        if (!a || a === de) { setGrupoEditado(null); return undefined; }
+        const existe = grupos.includes(a);
+        if (existe && !(await confirmar({ texto: `Ya existe el grupo «${a}». ¿Unirlos?`, detalle: `Las cuentas de «${de}» pasan a «${a}» y «${de}» desaparece.`, aceptar: 'Unir grupos' }))) return undefined;
+        return accion(async () => {
+            const r = await api.admin.renameGroup(de, a);
+            setGrupoEditado(null);
+            if (fGrupo === de) setFGrupo(a);
+            await load();
+            setNotice(r.unido ? `«${de}» se unió a «${a}»: ${r.cuentas} ${r.cuentas === 1 ? 'cuenta pasó' : 'cuentas pasaron'}.` : `El grupo ahora se llama «${a}» (${r.cuentas} ${r.cuentas === 1 ? 'cuenta' : 'cuentas'}).`);
+        });
+    };
+    const quitarGrupo = async (g) => {
+        if (!(await confirmar({ texto: `¿Quitar el grupo «${g.nombre}»?`, detalle: `Sus ${g.n} ${g.n === 1 ? 'cuenta queda' : 'cuentas quedan'} sin grupo. No se borra ninguna cuenta ni proyecto.`, aceptar: 'Quitar grupo', peligro: true }))) return undefined;
+        return accion(async () => {
+            const r = await api.admin.renameGroup(g.clave, '');
+            if (fGrupo === g.clave) setFGrupo('');
+            await load();
+            setNotice(`Se quitó el grupo «${g.nombre}»; ${r.cuentas} ${r.cuentas === 1 ? 'cuenta quedó' : 'cuentas quedaron'} sin grupo.`);
         });
     };
     const resend = (user) => accion(async () => {
@@ -778,16 +804,24 @@ const Admin = () => {
                     <section className="pro-card adm-panel">
                         <div className="adm-bitacora-cabeza">
                             <h2>Por grupo</h2>
-                            <p className="adm-muted">Un grupo es un curso o cohorte. Se pone al crear las cuentas (también en la carga por lotes) o seleccionando varias en Usuarios. Presiona un grupo para ver sus cuentas.</p>
+                            <p className="adm-muted">Un grupo es un curso o cohorte. Se pone al crear las cuentas (también en la carga por lotes) o seleccionando varias en Usuarios. Presiona un grupo para ver sus cuentas; con el lápiz le cambias el nombre (si pones el de otro grupo, se unen).</p>
                         </div>
                         <div className="adm-table-wrap">
                             <table className="adm-table adm-table--grupos">
-                                <thead><tr><th scope="col">Grupo</th><th scope="col" className="adm-num">Cuentas</th><th scope="col">Profesores</th><th scope="col" className="adm-num">Proyectos</th><th scope="col" className="adm-num" title="Estudiantes que aún no pueden crear su proyecto">Sin permiso</th><th scope="col" className="adm-num" title="Aún no entran con su contraseña temporal">Sin estrenar</th><th scope="col" className="adm-num" title="Sin actividad en más de 30 días">Inactivos</th><th scope="col" title="Promedio de la coherencia de sus proyectos">Coherencia</th></tr></thead>
+                                <thead><tr><th scope="col">Grupo</th><th scope="col" className="adm-num">Cuentas</th><th scope="col">Profesores</th><th scope="col" className="adm-num">Proyectos</th><th scope="col" className="adm-num" title="Estudiantes que aún no pueden crear su proyecto">Sin permiso</th><th scope="col" className="adm-num" title="Aún no entran con su contraseña temporal">Sin estrenar</th><th scope="col" className="adm-num" title="Sin actividad en más de 30 días">Inactivos</th><th scope="col" title="Promedio de la coherencia de sus proyectos">Coherencia</th><th scope="col"><span className="adm-sr">Acciones</span></th></tr></thead>
                                 <tbody>
-                                    {tablaGrupos.length === 0 && <tr><td colSpan={8} className="adm-empty"><b>Todavía no hay grupos</b><span>En Usuarios, marca varias cuentas y usa «Poner en grupo…», o indica el grupo al crear las cuentas.</span><button type="button" className="pro-btn pro-btn--ghost" onClick={() => setVista('usuarios')}>Ir a Usuarios</button></td></tr>}
+                                    {tablaGrupos.length === 0 && <tr><td colSpan={9} className="adm-empty"><b>Todavía no hay grupos</b><span>En Usuarios, marca varias cuentas y usa «Poner en grupo…», o indica el grupo al crear las cuentas.</span><button type="button" className="pro-btn pro-btn--ghost" onClick={() => setVista('usuarios')}>Ir a Usuarios</button></td></tr>}
                                     {tablaGrupos.map((g) => (
                                         <tr key={g.clave}>
-                                            <td><button type="button" className="adm-user-link" onClick={() => verUsuarios({ grupo: g.clave })}><b>{g.nombre}</b></button></td>
+                                            <td>
+                                                {grupoEditado?.de === g.clave ? (
+                                                    <form className="adm-grupo-editar" onSubmit={renombrarGrupo}>
+                                                        <input className="input-field" value={grupoEditado.a} onChange={(e) => setGrupoEditado({ ...grupoEditado, a: e.target.value })} maxLength={60} aria-label={`Nombre nuevo para ${g.nombre}`} autoFocus onKeyDown={(e) => { if (e.key === 'Escape') setGrupoEditado(null); }} />
+                                                        <button type="submit" className="pro-btn pro-btn--primary adm-sm" disabled={busy || !grupoEditado.a.trim()}>Guardar</button>
+                                                        <button type="button" className="pro-btn pro-btn--ghost adm-sm" onClick={() => setGrupoEditado(null)}>Cancelar</button>
+                                                    </form>
+                                                ) : <button type="button" className="adm-user-link" onClick={() => verUsuarios({ grupo: g.clave })}><b>{g.nombre}</b></button>}
+                                            </td>
                                             <td className="adm-num">{g.n}</td>
                                             <td>{g.profesores.slice(0, 3).join(', ') || '—'}{g.profesores.length > 3 ? ` y ${g.profesores.length - 3} más` : ''}</td>
                                             <td className="adm-num">{g.proyectos}</td>
@@ -795,6 +829,14 @@ const Admin = () => {
                                             <td className="adm-num" data-alerta={g.sinEstrenar > 0 || undefined}>{g.sinEstrenar}</td>
                                             <td className="adm-num">{g.inactivos}</td>
                                             <td><CoherenciaBadge value={g.coherencia} /></td>
+                                            <td>
+                                                {g.clave !== SIN_GRUPO && grupoEditado?.de !== g.clave && (
+                                                    <span className="adm-grupo-acciones">
+                                                        <button type="button" className="adm-icono" disabled={busy} onClick={() => setGrupoEditado({ de: g.clave, a: g.nombre })} aria-label={`Cambiar el nombre de ${g.nombre}`} title="Cambiar el nombre"><Pencil size={15} /></button>
+                                                        <button type="button" className="adm-icono adm-danger" disabled={busy} onClick={() => quitarGrupo(g)} aria-label={`Quitar el grupo ${g.nombre}`} title="Quitar el grupo (las cuentas se conservan)"><Trash2 size={15} /></button>
+                                                    </span>
+                                                )}
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>

@@ -1150,6 +1150,20 @@ app.post('/api/admin/users/bulk', requireAdmin, async (req, res) => {
     return res.json({ hechas: aplica.length, omitidas: ids.length - aplica.length, ...(action === 'access' ? { cuentas: credenciales, mail: Boolean(mailer) } : {}) });
 });
 
+// Cambiar el nombre de un grupo (a todas sus cuentas), unirlo con otro que ya exista o quitarlo (to vacío).
+app.post('/api/admin/groups/rename', requireAdmin, (req, res) => {
+    const from = grupoLimpio(req.body?.from);
+    const to = grupoLimpio(req.body?.to);
+    if (!from) return res.status(400).json({ error: 'Falta el grupo que se va a cambiar.' });
+    if (from === to) return res.status(400).json({ error: 'El nombre nuevo es igual al actual.' });
+    const n = db.prepare('SELECT COUNT(*) AS n FROM users WHERE grupo = ?').get(from).n;
+    if (!n) return res.status(404).json({ error: 'No hay cuentas en ese grupo.' });
+    const unido = to ? db.prepare('SELECT COUNT(*) AS n FROM users WHERE grupo = ?').get(to).n > 0 : false;
+    db.prepare('UPDATE users SET grupo = ? WHERE grupo = ?').run(to, from);
+    bitacora(req, !to ? 'Quitó un grupo' : unido ? 'Unió dos grupos' : 'Cambió el nombre de un grupo', `«${from}»${to ? ` → «${to}»` : ''}, ${n} ${n === 1 ? 'cuenta' : 'cuentas'}`);
+    return res.json({ cuentas: n, unido, grupo: to });
+});
+
 // Últimos cambios hechos a las cuentas (para la pestaña «Sistema»).
 app.get('/api/admin/log', requireAdmin, (_req, res) => {
     const rows = db.prepare('SELECT id, created_at, actor, action, detail FROM admin_log ORDER BY id DESC LIMIT 300').all();

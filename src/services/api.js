@@ -87,6 +87,7 @@ export const api = {
         // El mismo cambio a muchas cuentas en una sola llamada, y el registro de lo que se ha hecho.
         bulk: (ids, action, value) => request('/admin/users/bulk', { method: 'POST', body: { ids, action, value } }),
         log: () => request('/admin/log'),
+        renameGroup: (from, to) => request('/admin/groups/rename', { method: 'POST', body: { from, to } }),
     },
     // Profesor: los estudiantes a su cargo y sus proyectos (solo lectura).
     teacher: {

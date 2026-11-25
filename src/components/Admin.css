@@ -224,3 +224,13 @@
 }
 .adm-panel, .adm-ficha { grid-template-columns: minmax(0, 1fr); }
 .adm-panel > *, .adm > * { min-width: 0; }
+
+/* Grupos: cambiar el nombre o quitar */
+.adm-grupo-editar { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.adm-grupo-editar .input-field { width: 15rem; max-width: 100%; padding: 0.35rem 0.6rem; height: auto; font-size: 0.9rem; }
+.adm-grupo-acciones { display: inline-flex; gap: 0.15rem; justify-content: flex-end; width: 100%; }
+.adm-icono { display: grid; place-items: center; width: 2rem; height: 2rem; border: 0; border-radius: 0.5rem; background: none; color: #64748b; cursor: pointer; transition: background-color 0.18s, color 0.18s; }
+.adm-icono:hover:not(:disabled) { background: #f1f5f9; color: var(--pro-ink); }
+.adm-icono.adm-danger:hover:not(:disabled) { background: #fef2f2; color: #b91c1c; }
+.adm-icono:disabled { opacity: 0.4; cursor: not-allowed; }
+.adm-table--grupos td:first-child { min-width: 13rem; }
