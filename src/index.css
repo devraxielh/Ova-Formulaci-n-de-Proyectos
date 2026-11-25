@@ -549,3 +549,5 @@ select:not([multiple]) {
 :where(select:not([multiple])):hover:not(:disabled) { border-color: #94a3b8; }
 :where(select:not([multiple])):focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; border-color: #4f46e5; }
 :where(select:not([multiple])):disabled { opacity: 0.55; cursor: not-allowed; }
+/* El pie del ingreso va debajo del contenido, nunca encima (en celular la tarjeta es más alta que la pantalla). */
+.app-acceso > * { flex-shrink: 0; }

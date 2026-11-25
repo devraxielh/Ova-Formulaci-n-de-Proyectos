@@ -1396,3 +1396,38 @@
 .pro-dif--menos { background: #fee2e2; color: #991b1b; text-decoration: line-through; text-decoration-color: rgb(153 27 27 / 0.45); }
 .pro-dif--mas { background: #d1fae5; color: #065f46; }
 @media (max-width: 760px) { .pro-lados { grid-template-columns: minmax(0, 1fr); } }
+
+/* Ingreso: la lista de todo lo que hace la app (12 puntos, en dos columnas). En pantallas medianas, solo los títulos.
+   Todo debe caber sin desplazar la página en un portátil. */
+.acc-benefits { margin-top: 1.5rem; gap: 0.7rem; }
+.acc-benefits li { font-size: 0.84rem; line-height: 1.4; gap: 0.65rem; }
+.acc-benefits b { font-size: 0.92rem; margin-bottom: 0.05rem; }
+.acc-benefits .acc-icon { width: 1.9rem; height: 1.9rem; border-radius: 0.5rem; }
+@media (min-width: 960px) {
+  .acc-aside { gap: 1.25rem; padding: clamp(1.5rem, 3vw, 2.75rem); }
+  .acc-aside-body h2 { max-width: 24ch; font-size: clamp(1.5rem, 1rem + 1.3vw, 2.1rem); margin-bottom: 0.6rem; }
+  .acc-aside-body > p { font-size: 0.98rem; line-height: 1.5; }
+  .acc-benefits { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem 1.25rem; }
+}
+@media (min-width: 1280px) { .acc-benefits { gap: 1rem 1.75rem; } }
+@media (min-width: 960px) and (max-width: 1279px) {
+  .acc-benefits li { align-items: center; }
+  .acc-benefits li > span:last-child { font-size: 0; }
+  .acc-benefits b { font-size: 0.88rem; margin: 0; }
+}
+/* Portátiles de poca altura: también solo los títulos, para que el ingreso quepa sin desplazar. */
+@media (min-width: 1280px) and (max-height: 820px) {
+  .acc-benefits { gap: 0.7rem 1.5rem; }
+  .acc-benefits li { align-items: center; }
+  .acc-benefits li > span:last-child { font-size: 0; }
+  .acc-benefits b { font-size: 0.9rem; margin: 0; }
+}
+/* Celular: primero el ingreso y debajo lo que hace la app, solo los títulos en dos columnas. */
+@media (max-width: 959px) {
+  .acc-layout:has(.acc-benefits) .acc-main { order: -1; } /* solo en el ingreso; en «Mi cuenta» el saludo sigue arriba */
+  .acc-benefits { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem 0.9rem; margin-top: 1.1rem; }
+  .acc-benefits li { align-items: center; gap: 0.5rem; }
+  .acc-benefits li > span:last-child { font-size: 0; }
+  .acc-benefits b { font-size: 0.82rem; margin: 0; line-height: 1.3; }
+  .acc-benefits .acc-icon { width: 1.7rem; height: 1.7rem; }
+}

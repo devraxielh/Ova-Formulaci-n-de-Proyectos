@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, CheckCircle2, Download, FileText, FolderOpen, Layers, Lightbulb, LogOut, MonitorSmartphone, Presentation, ShieldCheck } from 'lucide-react';
+import { ArrowRight, BarChart3, CheckCircle2, ClipboardList, Compass, Download, FileText, FolderOpen, GraduationCap, History, Layers, Link2, LogOut, Presentation, Search, ShieldCheck, Sparkles, Users } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 import { api } from '../services/api';
 import { nombreRol } from './Cuentas';
@@ -64,11 +64,20 @@ const CambioClave = ({ forced }) => {
     );
 };
 
+// Todo lo que hace la app, para quien llega al ingreso sin conocerla.
 const BENEFITS = [
-    { icon: FolderOpen, title: 'Tu avance se guarda solo', text: 'Cada herramienta guarda lo que escribes y lo que genera la IA.' },
-    { icon: Lightbulb, title: 'De la idea al documento', text: 'Tu idea pasa al título, la pregunta y las demás secciones.' },
-    { icon: Download, title: 'Descárgalo en Word', text: 'El proyecto completo, listo para revisar con tu asesor.' },
-    { icon: MonitorSmartphone, title: 'Desde cualquier equipo', text: 'Continúa en casa o en la universidad con tu cuenta.' },
+    { icon: Presentation, title: '16 clases guiadas', text: 'De la idea al resumen, sección por sección.' },
+    { icon: Sparkles, title: 'Asistente de IA', text: 'Sugiere, redacta y revisa con el contexto de tu proyecto.' },
+    { icon: Link2, title: 'Coherencia entre secciones', text: 'Detecta lo que no encaja y propone el arreglo.' },
+    { icon: Search, title: 'Fuentes reales', text: 'Artículos, teorías y normas, citados en APA 7.' },
+    { icon: Compass, title: 'Metodología completa', text: 'Diseño, muestra calculada, cronograma y presupuesto.' },
+    { icon: ClipboardList, title: 'Instrumentos y encuestas', text: 'Ármalos, valídalos y recoge respuestas con un enlace.' },
+    { icon: BarChart3, title: 'Análisis de datos', text: 'Descriptivos, cruces, correlaciones y análisis cualitativo.' },
+    { icon: Download, title: 'Documento listo', text: 'Word, PDF y diapositivas, con índice, tablas y anexos.' },
+    { icon: Users, title: 'Trabajo en equipo', text: 'Invita compañeros; cada uno edita su parte.' },
+    { icon: History, title: 'Historial de versiones', text: 'Compara lado a lado y restaura una sección.' },
+    { icon: GraduationCap, title: 'Acompañamiento del profesor', text: 'Organiza grupos, autoriza y revisa tu avance.' },
+    { icon: FolderOpen, title: 'Se guarda solo', text: 'En cualquier equipo, incluso si se cae la conexión.' },
 ];
 
 // Dos columnas que llenan el alto disponible: contexto a la izquierda, acción a la derecha.
@@ -86,7 +95,7 @@ const BenefitsAside = () => (
     <>
         <div className="acc-aside-body">
             <h2>Formula tu proyecto de investigación paso a paso</h2>
-            <p>Entra con tu cuenta para guardar tu proyecto y no perder lo que construyes en cada clase.</p>
+            <p>Una sola herramienta para construir el proyecto completo, clase a clase, con el acompañamiento de tu profesor.</p>
             <ul className="acc-benefits">
                 {BENEFITS.map(({ icon: Icon, title, text }) => (
                     <li key={title}>
