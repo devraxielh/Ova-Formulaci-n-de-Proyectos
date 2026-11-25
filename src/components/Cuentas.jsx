@@ -81,7 +81,7 @@ export const Credenciales = ({ cuentas, mail, onCerrar }) => {
     );
 };
 
-// Lee el texto pegado o el archivo CSV: nombre, correo, rol y (para estudiantes) el correo de su profesor.
+// Lee el texto pegado o el archivo CSV: nombre, correo, rol, (para estudiantes) el correo de su profesor y el grupo.
 // Acepta coma, punto y coma o tabulador, con o sin fila de encabezados.
 export const leerLote = (texto) => {
     const lineas = String(texto || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
@@ -101,24 +101,25 @@ export const leerLote = (texto) => {
             } else if (ch === sep && !entreComillas) { celdas.push(actual.trim()); actual = ''; } else actual += ch;
         }
         celdas.push(actual.trim());
-        return celdas.slice(0, 4);
+        return celdas.slice(0, 5);
     };
     const filas = lineas.map(partir);
     const conEncabezado = /nombre|name/i.test(filas[0][0] || '') || /correo|email|mail/i.test(filas[0][1] || '');
-    return (conEncabezado ? filas.slice(1) : filas).filter((f) => f.some(Boolean)).map(([name = '', email = '', rol = '', teacher = '']) => {
+    return (conEncabezado ? filas.slice(1) : filas).filter((f) => f.some(Boolean)).map(([name = '', email = '', rol = '', teacher = '', group = '']) => {
         const role = rolDesdeTexto(rol);
         const correo = email.trim().toLowerCase();
         const error = !name.trim() ? 'Falta el nombre.' : !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(correo) ? 'El correo no es válido.' : !role ? `No se reconoce el rol «${rol}».` : '';
-        return { name: name.trim(), email: correo, role: role || 'student', teacher: role === 'student' ? teacher.trim().toLowerCase() : '', error };
+        return { name: name.trim(), email: correo, role: role || 'student', teacher: role === 'student' ? teacher.trim().toLowerCase() : '', group: group.trim().replace(/\s+/g, ' ').slice(0, 60), error };
     });
 };
 
 /* ---------- Administrador: crear un usuario o cargar un lote ---------- */
 
-export const CrearCuentas = ({ profesores, onCreadas }) => {
+export const CrearCuentas = ({ profesores, grupos = [], onCreadas }) => {
     const [modo, setModo] = useState('uno');
-    const [form, setForm] = useState({ name: '', email: '', role: 'student', teacherId: '' });
+    const [form, setForm] = useState({ name: '', email: '', role: 'student', teacherId: '', grupo: '' });
     const [lote, setLote] = useState('');
+    const [grupoLote, setGrupoLote] = useState(''); // grupo para las filas del lote que no traen el suyo
     const [busy, setBusy] = useState(false);
     const setError = (texto) => avisar(texto, 'error');
     const [creadas, setCreadas] = useState(null); // { cuentas, mail }
@@ -132,14 +133,14 @@ export const CrearCuentas = ({ profesores, onCreadas }) => {
         try {
             const r = await api.admin.createUser({ ...form, teacherId: form.role === 'student' ? Number(form.teacherId) || null : null });
             setCreadas({ cuentas: [{ name: r.user.name, email: r.user.email, clave: r.clave, emailSent: r.emailSent }], mail: r.emailSent });
-            setForm({ name: '', email: '', role: form.role, teacherId: form.teacherId });
+            setForm({ name: '', email: '', role: form.role, teacherId: form.teacherId, grupo: form.grupo });
             onCreadas();
         } catch (err) { setError(err.message); } finally { setBusy(false); }
     };
     const cargarLote = async () => {
         setBusy(true);
         try {
-            const r = await api.admin.createBatch(validas.map(({ name, email, role, teacher }) => ({ name, email, role, teacher })));
+            const r = await api.admin.createBatch(validas.map(({ name, email, role, teacher, group }) => ({ name, email, role, teacher, group: group || grupoLote.trim() })));
             setCreadas({ cuentas: r.resultados, mail: r.mail });
             if (r.creadas) { setLote(''); onCreadas(); }
         } catch (err) { setError(err.message); } finally { setBusy(false); }
@@ -163,6 +164,7 @@ export const CrearCuentas = ({ profesores, onCreadas }) => {
             </div>
             <p className="adm-muted">Nadie se registra por su cuenta: tú creas a profesores, investigadores y estudiantes, y cada profesor puede crear a los suyos.</p>
             {creadas && <Credenciales cuentas={creadas.cuentas} mail={creadas.mail} onCerrar={() => setCreadas(null)} />}
+            <datalist id="cue-grupos">{grupos.map((g) => <option key={g} value={g} />)}</datalist>
 
             {modo === 'uno' && (
                 <form className="cue-form" onSubmit={crearUno}>
@@ -176,6 +178,7 @@ export const CrearCuentas = ({ profesores, onCreadas }) => {
                             <Selector buscar etiqueta="Profesor a cargo" value={form.teacherId} onChange={(v) => setForm({ ...form, teacherId: String(v) })} opciones={[{ value: '', label: 'Sin profesor por ahora' }, ...profesores.map((p) => ({ value: p.id, label: p.name, nota: p.email }))]} />
                         </div>
                     )}
+                    <label><span>Grupo o curso (opcional)</span><input className="input-field" maxLength={60} list="cue-grupos" value={form.grupo} onChange={(e) => setForm({ ...form, grupo: e.target.value })} placeholder="Ej: Metodología 2026-2 A" /></label>
                     <p className="cue-nota">{ROLES.find((r) => r.id === form.role).nota}</p>
                     <button type="submit" className="pro-btn pro-btn--primary" disabled={busy}><UserPlus size={15} /> {busy ? 'Creando…' : 'Crear usuario'}</button>
                 </form>
@@ -183,11 +186,12 @@ export const CrearCuentas = ({ profesores, onCreadas }) => {
 
             {modo === 'lote' && (
                 <div className="cue-lote">
-                    <p>Pega la lista o sube un archivo CSV (también sirve copiar y pegar desde Excel). Una persona por fila, en este orden: <b>nombre, correo, rol, correo del profesor</b>. El rol puede ser estudiante, profesor o investigador (vacío = estudiante). El correo del profesor es opcional y solo aplica a estudiantes. Máximo 300 filas.</p>
+                    <p>Pega la lista o sube un archivo CSV (también sirve copiar y pegar desde Excel). Una persona por fila, en este orden: <b>nombre, correo, rol, correo del profesor, grupo</b>. El rol puede ser estudiante, profesor o investigador (vacío = estudiante). El correo del profesor es opcional y solo aplica a estudiantes; el grupo también es opcional. Máximo 300 filas.</p>
                     <div className="cue-acciones">
                         <label className="pro-btn pro-btn--ghost cue-archivo"><Upload size={15} /> Subir archivo CSV<input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={leerArchivo} /></label>
-                        <button type="button" className="pro-link" onClick={() => descargar('plantilla-usuarios.csv', csv([['nombre', 'correo', 'rol', 'correo del profesor'], ['Carlos Ruiz', 'carlos.ruiz@correo.edu.co', 'profesor', ''], ['Ana Pérez', 'ana.perez@correo.edu.co', 'estudiante', 'carlos.ruiz@correo.edu.co'], ['Luisa Díaz', 'luisa.diaz@correo.edu.co', 'investigador', '']]))}>Descargar plantilla</button>
+                        <button type="button" className="pro-link" onClick={() => descargar('plantilla-usuarios.csv', csv([['nombre', 'correo', 'rol', 'correo del profesor', 'grupo'], ['Carlos Ruiz', 'carlos.ruiz@correo.edu.co', 'profesor', ''], ['Ana Pérez', 'ana.perez@correo.edu.co', 'estudiante', 'carlos.ruiz@correo.edu.co'], ['Luisa Díaz', 'luisa.diaz@correo.edu.co', 'investigador', '']]))}>Descargar plantilla</button>
                     </div>
+                    <label className="cue-grupo-lote"><span>Grupo para todo el lote (opcional)</span><input className="input-field" maxLength={60} list="cue-grupos" value={grupoLote} onChange={(e) => setGrupoLote(e.target.value)} placeholder="Se pone a las filas que no traen grupo" /></label>
                     <textarea className="textarea-field cue-texto" rows={6} value={lote} onChange={(e) => setLote(e.target.value)} placeholder={'Carlos Ruiz, carlos.ruiz@correo.edu.co, profesor\nAna Pérez, ana.perez@correo.edu.co, estudiante, carlos.ruiz@correo.edu.co'} spellCheck={false} aria-label="Lista de usuarios" />
                     {filas.length > 0 && (
                         <>
@@ -199,11 +203,11 @@ export const CrearCuentas = ({ profesores, onCreadas }) => {
                             </p>
                             <div className="cue-tabla-wrap">
                                 <table className="cue-tabla">
-                                    <thead><tr><th scope="col">#</th><th scope="col">Nombre</th><th scope="col">Correo</th><th scope="col">Rol</th><th scope="col">Profesor</th><th scope="col">Estado</th></tr></thead>
+                                    <thead><tr><th scope="col">#</th><th scope="col">Nombre</th><th scope="col">Correo</th><th scope="col">Rol</th><th scope="col">Profesor</th><th scope="col">Grupo</th><th scope="col">Estado</th></tr></thead>
                                     <tbody>
                                         {filas.slice(0, 300).map((f, i) => (
                                             <tr key={i} data-mal={Boolean(f.error) || undefined}>
-                                                <td>{i + 1}</td><td>{f.name || '—'}</td><td>{f.email || '—'}</td><td>{nombreRol(f.role)}</td><td>{f.teacher || '—'}</td>
+                                                <td>{i + 1}</td><td>{f.name || '—'}</td><td>{f.email || '—'}</td><td>{nombreRol(f.role)}</td><td>{f.teacher || '—'}</td><td>{f.group || grupoLote.trim() || '—'}</td>
                                                 <td>{f.error || 'Lista'}</td>
                                             </tr>
                                         ))}

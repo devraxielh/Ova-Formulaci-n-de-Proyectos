@@ -49,3 +49,6 @@
 .adm-rol { display: grid; gap: 0.3rem; min-width: 9.5rem; }
 .adm-rol select.input-field { padding: 0.3rem 0.5rem; font-size: 0.85rem; height: auto; }
 .adm-user-acciones { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+
+.cue-grupo-lote { display: grid; gap: 0.25rem; max-width: 24rem; }
+.cue-grupo-lote > span { font-size: 0.82rem; font-weight: 600; color: #475569; }

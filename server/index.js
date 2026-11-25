@@ -110,6 +110,16 @@ addColumn('users', 'last_login_at', 'TEXT');
 // Roles: admin | teacher (profesor) | student (estudiante) | researcher (investigador). Los asigna el administrador.
 // `teacher_id`: el profesor que tiene a cargo a un estudiante.
 addColumn('users', 'teacher_id', 'INTEGER');
+addColumn('users', 'grupo', "TEXT NOT NULL DEFAULT ''"); // curso o grupo al que pertenece la cuenta (lo pone el administrador)
+// Registro de lo que hacen el administrador y los profesores con las cuentas: quién, qué y cuándo.
+db.exec(`CREATE TABLE IF NOT EXISTS admin_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at INTEGER NOT NULL,
+    actor_id INTEGER,
+    actor TEXT NOT NULL,
+    action TEXT NOT NULL,
+    detail TEXT NOT NULL DEFAULT ''
+)`);
 // Cupo de proyectos que el administrador le autoriza a cada cuenta.
 if (!db.prepare('PRAGMA table_info(users)').all().some((col) => col.name === 'project_limit')) {
     db.exec('ALTER TABLE users ADD COLUMN project_limit INTEGER NOT NULL DEFAULT 0');
@@ -315,6 +325,15 @@ const sendReset = async (user) => {
 };
 
 /* ---------- Registro de errores y alertas ---------- */
+
+const bitacora = (req, action, detail = '') => {
+    try {
+        db.prepare('INSERT INTO admin_log (created_at, actor_id, actor, action, detail) VALUES (?, ?, ?, ?, ?)')
+            .run(Date.now(), req.user?.id ?? null, String(req.user?.name || 'Sistema').slice(0, 80), String(action).slice(0, 60), String(detail || '').slice(0, 400));
+        db.prepare('DELETE FROM admin_log WHERE id NOT IN (SELECT id FROM admin_log ORDER BY id DESC LIMIT 3000)').run();
+    } catch { /* el registro nunca debe tumbar la solicitud */ }
+};
+const grupoLimpio = (texto) => String(texto || '').trim().replace(/\s+/g, ' ').slice(0, 60);
 
 const logError = (kind, message, detail = '', userId = null) => {
     try {
@@ -946,6 +965,7 @@ const adminUserRow = (row) => ({
     projectCount: row.project_count ?? 0,
     lastActivity: row.last_activity,
     teacherId: row.teacher_id || null,
+    grupo: row.grupo || '',
     teacherName: row.teacher_id ? (db.prepare('SELECT name FROM users WHERE id = ?').get(row.teacher_id)?.name || '') : '',
     mustChangePassword: Boolean(row.must_change_password),
 });
@@ -1008,6 +1028,134 @@ app.get('/api/admin/projects/:id', requireAdmin, (req, res) => {
     return res.json({ project: projectRow(row), owner });
 });
 
+// Corregir el nombre o el correo (usuario) de una cuenta. Si cambia el correo, se cierran sus sesiones
+// y sus invitaciones a proyectos de compañeros pasan al correo nuevo.
+app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
+    const target = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(req.params.id));
+    if (!target) return res.status(404).json({ error: 'No se encontró el usuario.' });
+    if (target.role === 'admin') return res.status(400).json({ error: 'El administrador cambia sus datos desde su cuenta.' });
+    const name = String(req.body?.name ?? target.name).trim().replace(/\s+/g, ' ').slice(0, 80);
+    const email = String(req.body?.email ?? target.email).trim().toLowerCase().slice(0, 160);
+    const grupo = req.body?.grupo === undefined ? (target.grupo || '') : grupoLimpio(req.body.grupo);
+    if (!name) return res.status(400).json({ error: 'Falta el nombre.' });
+    if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'El correo no es válido.' });
+    if (email !== target.email && db.prepare('SELECT 1 FROM users WHERE email = ? AND id != ?').get(email, target.id)) return res.status(400).json({ error: 'Ya existe una cuenta con ese correo.' });
+    db.transaction(() => {
+        db.prepare('UPDATE users SET name = ?, email = ?, grupo = ? WHERE id = ?').run(name, email, grupo, target.id);
+        if (email !== target.email) {
+            db.prepare('UPDATE OR IGNORE project_members SET email = ? WHERE email = ?').run(email, target.email);
+            db.prepare('DELETE FROM project_members WHERE email = ?').run(target.email);
+            db.prepare('DELETE FROM sessions WHERE user_id = ?').run(target.id);
+            db.prepare('DELETE FROM email_tokens WHERE user_id = ?').run(target.id);
+        }
+    })();
+    bitacora(req, 'Modificó una cuenta', `${target.name} (${target.email})${email !== target.email ? ` → ${email}` : ''}${name !== target.name ? ` → ${name}` : ''}${grupo !== (target.grupo || '') ? ` → grupo «${grupo || 'ninguno'}»` : ''}`);
+    const row = db.prepare(`${ADMIN_USERS_SQL} WHERE users.id = ? GROUP BY users.id`).get(target.id);
+    return res.json({ user: adminUserRow(row) });
+});
+
+// Borra la cuenta y lo que cuelga de ella: sus estudiantes quedan sin profesor, salen sus invitaciones,
+// y sesiones, enlaces y proyectos caen en cascada.
+const borrarCuenta = (target) => db.transaction(() => {
+    db.prepare('UPDATE users SET teacher_id = NULL WHERE teacher_id = ?').run(target.id);
+    db.prepare('DELETE FROM project_members WHERE email = ?').run(target.email);
+    db.prepare('DELETE FROM users WHERE id = ?').run(target.id);
+})();
+
+// Eliminar una cuenta para siempre, con sus proyectos (y sus versiones, figuras y encuestas).
+// Antes se guarda una copia de seguridad, por si hubiera que recuperar algo.
+app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
+    const target = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(req.params.id));
+    if (!target) return res.status(404).json({ error: 'No se encontró el usuario.' });
+    if (target.role === 'admin') return res.status(400).json({ error: 'No se puede eliminar a un administrador.' });
+    const proyectos = db.prepare('SELECT COUNT(*) AS n FROM projects WHERE user_id = ?').get(target.id).n;
+    if (proyectos > 0 && !(await runBackup())) return res.status(500).json({ error: 'No se pudo crear la copia de seguridad previa, así que la cuenta no se eliminó. Inténtalo de nuevo.' });
+    borrarCuenta(target);
+    bitacora(req, 'Eliminó una cuenta', `${target.name} (${target.email}), ${ROL_NOMBRE[target.role] || target.role}, ${proyectos} ${proyectos === 1 ? 'proyecto' : 'proyectos'}`);
+    return res.json({ ok: true, proyectos });
+});
+
+// El mismo cambio a muchas cuentas de una vez (hasta 1000): con cientos de usuarios no se puede ir de una en una.
+//   action: 'teacher' | 'group' | 'limit' | 'status' | 'role' | 'access' | 'delete'
+// Los administradores nunca entran en el lote. No se envían correos uno por uno, salvo al dar contraseñas nuevas.
+const LOTE_MAX = 1000;
+app.post('/api/admin/users/bulk', requireAdmin, async (req, res) => {
+    const ids = [...new Set((Array.isArray(req.body?.ids) ? req.body.ids : []).map(Number).filter(Number.isInteger))].slice(0, LOTE_MAX);
+    const action = String(req.body?.action || '');
+    const value = req.body?.value;
+    if (!ids.length) return res.status(400).json({ error: 'No hay cuentas seleccionadas.' });
+    const marcas = ids.map(() => '?').join(',');
+    const cuentas = db.prepare(`SELECT * FROM users WHERE id IN (${marcas}) AND role != 'admin'`).all(...ids);
+    let aplica = cuentas;
+    let hacer;
+    let texto;
+    const credenciales = [];
+
+    if (action === 'teacher') {
+        const prof = value ? db.prepare("SELECT id, name FROM users WHERE id = ? AND role = 'teacher'").get(Number(value)) : null;
+        if (value && !prof) return res.status(400).json({ error: 'El profesor indicado no existe.' });
+        aplica = cuentas.filter((u) => u.role === 'student');
+        const upd = db.prepare('UPDATE users SET teacher_id = ? WHERE id = ?');
+        hacer = (u) => upd.run(prof ? prof.id : null, u.id);
+        texto = prof ? `Asignó profesor (${prof.name})` : 'Quitó el profesor a cargo';
+    } else if (action === 'group') {
+        const grupo = grupoLimpio(value);
+        const upd = db.prepare('UPDATE users SET grupo = ? WHERE id = ?');
+        hacer = (u) => upd.run(grupo, u.id);
+        texto = grupo ? `Puso en el grupo «${grupo}»` : 'Sacó del grupo';
+    } else if (action === 'limit') {
+        const limit = parseInt(value, 10);
+        if (!Number.isInteger(limit) || limit < 0 || limit > MAX_PROJECTS) return res.status(400).json({ error: `El cupo debe estar entre 0 y ${MAX_PROJECTS}.` });
+        const upd = db.prepare('UPDATE users SET project_limit = ? WHERE id = ?');
+        hacer = (u) => upd.run(limit, u.id);
+        texto = `Puso el cupo en ${limit}`;
+    } else if (action === 'status') {
+        if (!['active', 'blocked'].includes(value)) return res.status(400).json({ error: 'Estado no válido.' });
+        aplica = cuentas.filter((u) => u.status !== value);
+        const upd = db.prepare('UPDATE users SET status = ? WHERE id = ?');
+        const cerrar = db.prepare('DELETE FROM sessions WHERE user_id = ?');
+        const activar = db.prepare("DELETE FROM email_tokens WHERE user_id = ? AND purpose = 'activate'");
+        hacer = (u) => { upd.run(value, u.id); if (value === 'blocked') cerrar.run(u.id); else activar.run(u.id); };
+        texto = value === 'blocked' ? 'Bloqueó' : 'Activó';
+    } else if (action === 'role') {
+        if (!ROLES.includes(value) || value === 'admin') return res.status(400).json({ error: 'Rol no válido.' });
+        aplica = cuentas.filter((u) => u.role !== value);
+        const upd = db.prepare('UPDATE users SET role = ?, teacher_id = ?, project_limit = ? WHERE id = ?');
+        const soltar = db.prepare('UPDATE users SET teacher_id = NULL WHERE teacher_id = ?');
+        hacer = (u) => {
+            const cupo = value !== 'student' && !Number(u.project_limit) ? CUPO_AUTONOMO : Number(u.project_limit) || 0;
+            upd.run(value, value === 'student' ? u.teacher_id : null, cupo, u.id);
+            if (u.role === 'teacher') soltar.run(u.id);
+        };
+        texto = `Cambió el rol a ${ROL_NOMBRE[value] || value}`;
+    } else if (action === 'access') {
+        if (cuentas.length > 300) return res.status(400).json({ error: 'Las contraseñas nuevas se dan a 300 cuentas como máximo cada vez.' });
+        for (const u of cuentas) {
+            // eslint-disable-next-line no-await-in-loop
+            const r = await renovarAcceso(u, 'El administrador');
+            credenciales.push({ name: u.name, email: u.email, ok: true, clave: r.clave, emailSent: r.emailSent });
+        }
+        texto = 'Dio contraseñas nuevas';
+    } else if (action === 'delete') {
+        const conProyectos = db.prepare(`SELECT COUNT(*) AS n FROM projects WHERE user_id IN (${cuentas.map(() => '?').join(',') || 'NULL'})`).get(...cuentas.map((u) => u.id)).n;
+        if (conProyectos > 0 && !(await runBackup())) return res.status(500).json({ error: 'No se pudo crear la copia de seguridad previa, así que no se eliminó nada. Inténtalo de nuevo.' });
+        hacer = (u) => borrarCuenta(u);
+        texto = `Eliminó (con ${conProyectos} ${conProyectos === 1 ? 'proyecto' : 'proyectos'})`;
+    } else {
+        return res.status(400).json({ error: 'Acción no válida.' });
+    }
+
+    if (hacer) db.transaction(() => aplica.forEach(hacer))();
+    if (aplica.length) bitacora(req, `${texto}: ${aplica.length} ${aplica.length === 1 ? 'cuenta' : 'cuentas'}`, aplica.slice(0, 12).map((u) => u.email).join(', ') + (aplica.length > 12 ? '…' : ''));
+    return res.json({ hechas: aplica.length, omitidas: ids.length - aplica.length, ...(action === 'access' ? { cuentas: credenciales, mail: Boolean(mailer) } : {}) });
+});
+
+// Últimos cambios hechos a las cuentas (para la pestaña «Sistema»).
+app.get('/api/admin/log', requireAdmin, (_req, res) => {
+    const rows = db.prepare('SELECT id, created_at, actor, action, detail FROM admin_log ORDER BY id DESC LIMIT 300').all();
+    res.json({ log: rows.map((r) => ({ id: r.id, createdAt: r.created_at, actor: r.actor, action: r.action, detail: r.detail })) });
+});
+
 app.post('/api/admin/users/:id/status', requireAdmin, async (req, res) => {
     const status = String(req.body?.status || '');
     if (!['active', 'blocked'].includes(status)) return res.status(400).json({ error: 'Estado no válido.' });
@@ -1018,6 +1166,7 @@ app.post('/api/admin/users/:id/status', requireAdmin, async (req, res) => {
     db.prepare('UPDATE users SET status = ? WHERE id = ?').run(status, target.id);
     if (status === 'blocked') db.prepare('DELETE FROM sessions WHERE user_id = ?').run(target.id);
     if (status === 'active') db.prepare("DELETE FROM email_tokens WHERE user_id = ? AND purpose = 'activate'").run(target.id);
+    bitacora(req, status === 'blocked' ? 'Bloqueó una cuenta' : 'Activó una cuenta', `${target.name} (${target.email})`);
 
     const row = db.prepare(`${ADMIN_USERS_SQL} WHERE users.id = ? GROUP BY users.id`).get(target.id);
     return res.json({ user: adminUserRow(row) });
@@ -1031,6 +1180,7 @@ app.post('/api/admin/users/:id/limit', requireAdmin, async (req, res) => {
     if (!target) return res.status(404).json({ error: 'No se encontró el usuario.' });
     if (target.role === 'admin') return res.status(400).json({ error: 'El administrador no tiene cupo.' });
     db.prepare('UPDATE users SET project_limit = ? WHERE id = ?').run(limit, target.id);
+    bitacora(req, 'Cambió un cupo', `${target.name} (${target.email}): ${limit}`);
     // Primera autorización: se le avisa al estudiante que ya puede empezar.
     if (!Number(target.project_limit) && limit > 0 && mailer && String(target.email).includes('@')) {
         mailer.sendMail({
@@ -1084,7 +1234,7 @@ const sendInvite = async (user, creador) => {
 };
 
 // Crea una cuenta activa con contraseña temporal (que debe cambiar al entrar). Devuelve { user, clave, emailSent } o { error }.
-const crearCuenta = async ({ name, email, role, teacherId = null, projectLimit = null }, creador) => {
+const crearCuenta = async ({ name, email, role, teacherId = null, projectLimit = null, grupo = '' }, creador) => {
     const nombre = String(name || '').trim().replace(/\s+/g, ' ').slice(0, 80);
     const correo = String(email || '').trim().toLowerCase().slice(0, 160);
     if (!nombre) return { error: 'Falta el nombre.' };
@@ -1097,8 +1247,8 @@ const crearCuenta = async ({ name, email, role, teacherId = null, projectLimit =
     }
     const clave = claveTemporal();
     const cupo = projectLimit ?? (role === 'student' ? 0 : CUPO_AUTONOMO);
-    const info = db.prepare(`INSERT INTO users (email, name, password_hash, role, status, must_change_password, project_limit, teacher_id)
-                             VALUES (?, ?, ?, ?, 'active', 1, ?, ?)`).run(correo, nombre, hashPassword(clave), role, Math.min(MAX_PROJECTS, Math.max(0, cupo)), role === 'student' ? teacherId : null);
+    const info = db.prepare(`INSERT INTO users (email, name, password_hash, role, status, must_change_password, project_limit, teacher_id, grupo)
+                             VALUES (?, ?, ?, ?, 'active', 1, ?, ?, ?)`).run(correo, nombre, hashPassword(clave), role, Math.min(MAX_PROJECTS, Math.max(0, cupo)), role === 'student' ? teacherId : null, grupoLimpio(grupo));
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(info.lastInsertRowid));
     const emailSent = await sendInvite(user, creador);
     return { user, clave, emailSent };
@@ -1116,8 +1266,9 @@ const renovarAcceso = async (target, creador) => {
 const crearLimit = rateLimit({ name: 'crear-cuenta', limit: 400, windowMs: 60 * 60 * 1000, key: (req) => String(req.user?.id || req.ip) });
 
 app.post('/api/admin/users', requireAdmin, crearLimit, async (req, res) => {
-    const r = await crearCuenta({ name: req.body?.name, email: req.body?.email, role: String(req.body?.role || 'student'), teacherId: Number(req.body?.teacherId) || null }, 'El administrador');
+    const r = await crearCuenta({ name: req.body?.name, email: req.body?.email, role: String(req.body?.role || 'student'), teacherId: Number(req.body?.teacherId) || null, grupo: req.body?.grupo }, 'El administrador');
     if (r.error) return res.status(400).json({ error: r.error });
+    bitacora(req, 'Creó una cuenta', `${r.user.name} (${r.user.email}), ${ROL_NOMBRE[r.user.role] || r.user.role}`);
     const row = db.prepare(`${ADMIN_USERS_SQL} WHERE users.id = ? GROUP BY users.id`).get(r.user.id);
     return res.status(201).json({ user: adminUserRow(row), clave: r.clave, emailSent: r.emailSent });
 });
@@ -1139,10 +1290,12 @@ app.post('/api/admin/users/batch', requireAdmin, crearLimit, async (req, res) =>
             teacherId = prof.id;
         }
         // eslint-disable-next-line no-await-in-loop
-        const r = await crearCuenta({ name: fila?.name, email, role, teacherId }, 'El administrador');
+        const r = await crearCuenta({ name: fila?.name, email, role, teacherId, grupo: fila?.group ?? req.body?.group }, 'El administrador');
         resultados.push(r.error ? { email, name: String(fila?.name || ''), ok: false, error: r.error } : { email: r.user.email, name: r.user.name, role, ok: true, clave: r.clave, emailSent: r.emailSent });
     }
-    return res.json({ resultados, creadas: resultados.filter((x) => x.ok).length, mail: Boolean(mailer) });
+    const creadas = resultados.filter((x) => x.ok).length;
+    if (creadas) bitacora(req, 'Cargó un lote de cuentas', `${creadas} creadas de ${filas.length} filas`);
+    return res.json({ resultados, creadas, mail: Boolean(mailer) });
 });
 
 // Cambiar el rol (y el profesor a cargo, si es estudiante). Solo el administrador.
@@ -1161,6 +1314,7 @@ app.post('/api/admin/users/:id/role', requireAdmin, (req, res) => {
     // Quien pasa a profesor o investigador recibe el cupo propio de ese rol si no tenía ninguno.
     const cupo = role !== 'student' && !Number(target.project_limit) ? CUPO_AUTONOMO : Number(target.project_limit) || 0;
     db.prepare('UPDATE users SET role = ?, teacher_id = ?, project_limit = ? WHERE id = ?').run(role, teacherId, cupo, target.id);
+    bitacora(req, role !== target.role ? 'Cambió un rol' : 'Cambió el profesor a cargo', `${target.name} (${target.email}): ${ROL_NOMBRE[role] || role}${teacherId ? `, profesor #${teacherId}` : ''}`);
     // Si deja de ser profesor, sus estudiantes quedan sin profesor a cargo (el administrador los reasigna).
     if (target.role === 'teacher' && role !== 'teacher') db.prepare('UPDATE users SET teacher_id = NULL WHERE teacher_id = ?').run(target.id);
     const row = db.prepare(`${ADMIN_USERS_SQL} WHERE users.id = ? GROUP BY users.id`).get(target.id);
@@ -1171,6 +1325,7 @@ app.post('/api/admin/users/:id/access', requireAdmin, crearLimit, async (req, re
     const target = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(req.params.id));
     if (!target) return res.status(404).json({ error: 'No se encontró el usuario.' });
     if (target.role === 'admin') return res.status(400).json({ error: 'El administrador cambia su contraseña desde su cuenta.' });
+    bitacora(req, 'Dio una contraseña nueva', `${target.name} (${target.email})`);
     return res.json(await renovarAcceso(target, 'El administrador'));
 });
 
@@ -1204,6 +1359,7 @@ app.post('/api/teacher/students', requireTeacher, crearLimit, async (req, res) =
     if (total >= 300) return res.status(400).json({ error: 'Llegaste al máximo de 300 estudiantes a tu cargo.' });
     const r = await crearCuenta({ name: req.body?.name, email: req.body?.email, role: 'student', teacherId: req.user.id, projectLimit: req.body?.permitir ? 1 : 0 }, `Tu profesor, ${req.user.name},`);
     if (r.error) return res.status(400).json({ error: r.error });
+    bitacora(req, 'Creó a un estudiante', `${r.user.name} (${r.user.email})`);
     return res.status(201).json({ student: filaEstudiante(r.user), clave: r.clave, emailSent: r.emailSent });
 });
 
@@ -1214,6 +1370,7 @@ app.post('/api/teacher/students/:id/limit', requireTeacher, (req, res) => {
     const target = miEstudiante(req);
     if (!target) return res.status(404).json({ error: 'Ese estudiante no está a tu cargo.' });
     db.prepare('UPDATE users SET project_limit = ? WHERE id = ?').run(limit, target.id);
+    bitacora(req, 'Cambió el permiso de un estudiante', `${target.name} (${target.email}): ${limit}`);
     return res.json({ student: filaEstudiante({ ...target, project_limit: limit }) });
 });
 

@@ -173,3 +173,54 @@
 /* Selectores dentro del panel */
 .adm-ajustes .sel { min-width: 13rem; }
 .adm-lote .sel { background: #fff; min-width: 12rem; }
+
+/* Ficha: corregir nombre y correo, y eliminar la cuenta */
+.adm-editar { flex: 1 1 24rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.7rem 1rem; align-items: end; }
+.adm-editar label { display: grid; gap: 0.3rem; }
+.adm-editar label > span { font-size: 0.84rem; font-weight: 600; color: var(--pro-ink); }
+.adm-editar > div { display: flex; gap: 0.4rem; padding-bottom: 0.3rem; }
+.adm-editar > p { grid-column: 1 / -1; margin: 0; }
+.adm-eliminar { margin-left: auto; }
+@media (max-width: 760px) { .adm-eliminar { margin-left: 0; } }
+
+/* Muchas cuentas: filtros en varias filas, encabezado fijo, tamaño de página y tablas de resumen */
+.adm-panel .adm-toolbar { align-items: center; }
+.adm-panel .adm-toolbar .sel { min-width: 9.5rem; }
+.adm-panel .adm-toolbar > .pro-link { font-size: 0.86rem; }
+.adm-table--usuarios thead th, .adm-table--proyectos thead th { position: sticky; top: 0; z-index: 1; background: #fff; }
+.adm-lote > .pro-link { margin-left: 0; }
+.adm-lote .adm-lote-quitar { margin-left: auto; }
+.adm-lote-grupo { align-items: center; }
+.adm-lote-grupo .input-field { width: 12rem; padding: 0.3rem 0.6rem; font-size: 0.86rem; height: auto; }
+.adm-por-pagina { display: inline-flex; align-items: center; gap: 0.4rem; }
+.adm-por-pagina select { font: inherit; font-size: 0.86rem; padding: 0.25rem 0.4rem; border: 1px solid #cbd5e1; border-radius: 0.45rem; background: #fff; color: var(--pro-ink); cursor: pointer; }
+.adm-bitacora-cabeza { display: grid; gap: 0.2rem; margin-bottom: 0.8rem; }
+.adm-bitacora-cabeza h2 { margin: 0; }
+.adm-bitacora-cabeza p { margin: 0; max-width: 70ch; }
+.adm-bitacora-lista { max-height: 26rem; overflow-y: auto; }
+.adm-bitacora-lista thead th { position: sticky; top: 0; background: #fff; }
+.adm-bitacora-lista td { font-size: 0.88rem; white-space: nowrap; }
+.adm-bitacora-lista td b { color: var(--pro-ink); font-weight: 600; }
+.adm-bitacora-lista td.adm-bitacora-detalle { white-space: normal; overflow-wrap: anywhere; min-width: 16rem; color: #64748b; }
+.adm-table--grupos { min-width: 760px; }
+.adm-table--grupos td[data-alerta] { color: #b45309; font-weight: 600; }
+.adm-panel .cue { margin-bottom: 0.9rem; }
+@media (max-width: 760px) { .adm-lote .adm-lote-quitar { margin-left: 0; } }
+
+.adm-sub { white-space: nowrap; }
+.adm-user-link small.adm-grupo { color: #475569; }
+.adm-table--usuarios td:nth-child(2) { min-width: 13rem; }
+
+/* Celular: la tabla ancha no debe ensanchar la página; se desplaza dentro de su tarjeta. */
+.adm { grid-template-columns: minmax(0, 1fr); }
+.adm-panel { min-width: 0; }
+.adm-barra .pro-modes { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+@media (max-width: 760px) {
+  .adm-panel { padding: 0.9rem 0.85rem 0.8rem; }
+  .adm-panel .adm-toolbar .sel { flex: 1 1 9rem; min-width: 0; }
+  .adm-panel .adm-search { flex-basis: 100%; }
+  .adm-lote .sel { flex: 1 1 10rem; }
+  .cue-cabeza { row-gap: 0.5rem; }
+}
+.adm-panel, .adm-ficha { grid-template-columns: minmax(0, 1fr); }
+.adm-panel > *, .adm > * { min-width: 0; }

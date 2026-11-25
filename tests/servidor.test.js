@@ -392,6 +392,120 @@ test('roles: el administrador crea y asigna; el profesor crea a sus estudiantes,
     assert.equal((await admin('/admin/users')).body.users.find((u) => u.id === idEst).teacherId, null);
 });
 
+test('modificar y eliminar usuarios: solo el administrador; al eliminar se van sus proyectos y queda una copia', async () => {
+    const admin = await entrarAdmin();
+    const profe = await cuenta('profe12', 'teacher');
+    const otro = await cuenta('otro12');
+    const creado = await profe.api('/teacher/students', 'POST', { name: 'Estudiante Doce', email: `est12.${Date.now()}@example.test`, permitir: true });
+    const est = await estrenar(creado.body.student.email, creado.body.clave);
+    const idEst = creado.body.student.id;
+    const propio = (await est.api('/projects', 'POST', { name: 'Del estudiante', data: {} })).body.project;
+    // El estudiante además está invitado al proyecto de otro.
+    const ajeno = (await otro.api('/projects', 'POST', { name: 'Compartido', data: {} })).body.project;
+    assert.equal((await otro.api(`/projects/${ajeno.id}/members`, 'POST', { email: est.email })).status, 201);
+
+    // Modificar: valida, no deja repetir correo, y solo el administrador.
+    assert.equal((await profe.api(`/admin/users/${idEst}`, 'PUT', { name: 'X' })).status, 403);
+    assert.equal((await admin(`/admin/users/${idEst}`, 'PUT', { name: '  ' })).status, 400);
+    assert.equal((await admin(`/admin/users/${idEst}`, 'PUT', { email: 'sin-arroba' })).status, 400);
+    assert.equal((await admin(`/admin/users/${idEst}`, 'PUT', { email: otro.email })).status, 400);
+    assert.equal((await admin('/admin/users/1', 'PUT', { name: 'Otro admin' })).status, 400);
+    const soloNombre = await admin(`/admin/users/${idEst}`, 'PUT', { name: 'Estudiante  Corregido' });
+    assert.equal(soloNombre.body.user.name, 'Estudiante Corregido');
+    assert.equal((await est.api('/auth/me')).body.user.name, 'Estudiante Corregido'); // cambiar el nombre no cierra la sesión
+
+    // Cambiar el correo: cierra la sesión, entra con el nuevo y la misma contraseña, y conserva la invitación.
+    const nuevoCorreo = `est12b.${Date.now()}@example.test`;
+    assert.equal((await admin(`/admin/users/${idEst}`, 'PUT', { email: nuevoCorreo.toUpperCase() })).body.user.email, nuevoCorreo);
+    assert.equal((await est.api('/auth/me')).body.user, null);
+    assert.equal((await cliente()('/auth/login', 'POST', { email: est.email, password: est.password })).status, 401);
+    const denuevo = cliente();
+    assert.equal((await denuevo('/auth/login', 'POST', { email: nuevoCorreo, password: est.password })).status, 200);
+    assert.equal((await denuevo(`/projects/${ajeno.id}`)).status, 200);
+
+    // Eliminar: solo el administrador, nunca a un administrador.
+    assert.equal((await profe.api(`/admin/users/${idEst}`, 'DELETE')).status, 403);
+    assert.equal((await admin('/admin/users/1', 'DELETE')).status, 400);
+    assert.equal((await admin('/admin/users/999999', 'DELETE')).status, 404);
+    const borrado = await admin(`/admin/users/${idEst}`, 'DELETE');
+    assert.equal(borrado.status, 200);
+    assert.equal(borrado.body.proyectos, 1);
+    assert.equal((await denuevo('/auth/me')).body.user, null);
+    assert.equal((await cliente()('/auth/login', 'POST', { email: nuevoCorreo, password: est.password })).status, 401);
+    assert.equal((await admin(`/admin/projects/${propio.id}`)).status, 404);
+    assert.ok(!(await otro.api(`/projects/${ajeno.id}/members`)).body.members.some((m) => m.email === nuevoCorreo));
+    assert.equal((await profe.api('/teacher/students')).body.students.length, 0);
+    assert.ok((await admin('/admin/estado')).body.backups.length >= 1); // quedó copia antes de borrar
+
+    // Al eliminar a un profesor, sus estudiantes quedan sin profesor (no se borran).
+    const hijo = await profe.api('/teacher/students', 'POST', { name: 'Queda', email: `queda12.${Date.now()}@example.test` });
+    assert.equal((await admin(`/admin/users/${profe.id}`, 'DELETE')).status, 200);
+    const queda = (await admin('/admin/users')).body.users.find((u) => u.id === hijo.body.student.id);
+    assert.equal(queda.teacherId, null);
+});
+
+test('muchas cuentas: grupos, cambios masivos en una llamada y registro de lo que se hizo', async () => {
+    const admin = await entrarAdmin();
+    const t = Date.now();
+    const profe = await cuenta('profe13', 'teacher');
+    // 40 estudiantes en un lote, con grupo para todo el lote salvo los que traen el suyo.
+    const lote = Array.from({ length: 40 }, (_, i) => ({ name: `Alumno ${i}`, email: `a${i}.${t}@example.test`, role: 'student', ...(i < 5 ? { group: 'Grupo B' } : {}) }));
+    const cargado = (await admin('/admin/users/batch', 'POST', { users: lote, group: '  Grupo   A ' })).body;
+    assert.equal(cargado.creadas, 40);
+    const lista = async () => (await admin('/admin/users')).body.users.filter((u) => /^a\d+\./.test(u.email) && u.email.endsWith(`.${t}@example.test`));
+    let cuentas = await lista();
+    assert.equal(cuentas.filter((u) => u.grupo === 'Grupo A').length, 35);
+    assert.equal(cuentas.filter((u) => u.grupo === 'Grupo B').length, 5);
+    const ids = cuentas.map((u) => u.id);
+
+    // Solo el administrador; valida la acción y los valores; nunca toca a un administrador.
+    assert.equal((await profe.api('/admin/users/bulk', 'POST', { ids, action: 'limit', value: 1 })).status, 403);
+    assert.equal((await admin('/admin/users/bulk', 'POST', { ids: [], action: 'limit', value: 1 })).status, 400);
+    assert.equal((await admin('/admin/users/bulk', 'POST', { ids, action: 'inventada' })).status, 400);
+    assert.equal((await admin('/admin/users/bulk', 'POST', { ids, action: 'limit', value: 99 })).status, 400);
+    assert.equal((await admin('/admin/users/bulk', 'POST', { ids, action: 'role', value: 'admin' })).status, 400);
+    assert.equal((await admin('/admin/users/bulk', 'POST', { ids, action: 'teacher', value: 999999 })).status, 400);
+    assert.deepEqual((await admin('/admin/users/bulk', 'POST', { ids: [1], action: 'delete' })).body, { hechas: 0, omitidas: 1 });
+    assert.equal((await admin('/auth/me')).body.user.role, 'admin');
+
+    // Profesor, cupo y grupo para las 40 de una vez.
+    assert.equal((await admin('/admin/users/bulk', 'POST', { ids, action: 'teacher', value: profe.id })).body.hechas, 40);
+    assert.equal((await admin('/admin/users/bulk', 'POST', { ids, action: 'limit', value: 1 })).body.hechas, 40);
+    assert.equal((await admin('/admin/users/bulk', 'POST', { ids: ids.slice(0, 10), action: 'group', value: 'Grupo C' })).body.hechas, 10);
+    cuentas = await lista();
+    assert.ok(cuentas.every((u) => u.teacherId === profe.id && u.projectLimit === 1));
+    assert.equal(cuentas.filter((u) => u.grupo === 'Grupo C').length, 10);
+    assert.equal((await profe.api('/teacher/students')).body.students.length, 40);
+
+    // Bloquear solo cuenta las que cambian; contraseñas nuevas devuelve la lista y sirven para entrar.
+    assert.equal((await admin('/admin/users/bulk', 'POST', { ids: ids.slice(0, 3), action: 'status', value: 'blocked' })).body.hechas, 3);
+    assert.deepEqual((await admin('/admin/users/bulk', 'POST', { ids: ids.slice(0, 5), action: 'status', value: 'blocked' })).body, { hechas: 2, omitidas: 3 });
+    assert.equal((await admin('/admin/users/bulk', 'POST', { ids: ids.slice(0, 5), action: 'status', value: 'active' })).body.hechas, 5);
+    const claves = (await admin('/admin/users/bulk', 'POST', { ids: ids.slice(0, 2), action: 'access' })).body;
+    assert.equal(claves.cuentas.length, 2);
+    await estrenar(claves.cuentas[0].email, claves.cuentas[0].clave);
+
+    // Cambiar el rol a investigador les da cupo propio y los suelta del profesor.
+    assert.equal((await admin('/admin/users/bulk', 'POST', { ids: ids.slice(30), action: 'role', value: 'researcher' })).body.hechas, 10);
+    cuentas = await lista();
+    assert.ok(cuentas.filter((u) => u.role === 'researcher').every((u) => u.teacherId === null));
+    assert.equal((await profe.api('/teacher/students')).body.students.length, 30);
+
+    // Corregir el grupo de una cuenta desde su ficha; eliminar varias de una vez.
+    assert.equal((await admin(`/admin/users/${ids[0]}`, 'PUT', { grupo: ' Grupo  Z ' })).body.user.grupo, 'Grupo Z');
+    assert.equal((await admin(`/admin/users/${ids[0]}`, 'PUT', { name: 'Solo nombre' })).body.user.grupo, 'Grupo Z');
+    assert.equal((await admin('/admin/users/bulk', 'POST', { ids: ids.slice(20), action: 'delete' })).body.hechas, 20);
+    assert.equal((await lista()).length, 20);
+
+    // Todo quedó en el registro, con quién lo hizo; solo el administrador lo lee.
+    const log = (await admin('/admin/log')).body.log;
+    assert.ok(log.some((l) => l.action.startsWith('Eliminó') && l.action.includes('20 cuentas') && l.actor === 'Administrador'));
+    assert.ok(log.some((l) => l.action === 'Cargó un lote de cuentas'));
+    assert.ok(log.some((l) => l.action === 'Modificó una cuenta' && l.detail.includes('Grupo Z')));
+    assert.ok(!log.some((l) => l.detail.includes(claves.cuentas[0].clave)));
+    assert.equal((await profe.api('/admin/log')).status, 403);
+});
+
 test('carga por lotes: crea las filas buenas, explica las malas y enlaza cada estudiante con su profesor', async () => {
     const admin = await entrarAdmin();
     const t = Date.now();

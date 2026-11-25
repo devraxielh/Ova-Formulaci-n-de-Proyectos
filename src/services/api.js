@@ -82,6 +82,11 @@ export const api = {
         createBatch: (users) => request('/admin/users/batch', { method: 'POST', body: { users } }),
         setRole: (id, role, teacherId) => request(`/admin/users/${id}/role`, { method: 'POST', body: { role, teacherId } }),
         newAccess: (id) => request(`/admin/users/${id}/access`, { method: 'POST' }),
+        updateUser: (id, payload) => request(`/admin/users/${id}`, { method: 'PUT', body: payload }),
+        deleteUser: (id) => request(`/admin/users/${id}`, { method: 'DELETE' }),
+        // El mismo cambio a muchas cuentas en una sola llamada, y el registro de lo que se ha hecho.
+        bulk: (ids, action, value) => request('/admin/users/bulk', { method: 'POST', body: { ids, action, value } }),
+        log: () => request('/admin/log'),
     },
     // Profesor: los estudiantes a su cargo y sus proyectos (solo lectura).
     teacher: {

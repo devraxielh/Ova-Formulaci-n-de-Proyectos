@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowLeft, ArrowUp, Ban, CheckCircle2, ChevronLeft, ChevronRight, Download, FileText, KeyRound, Mail, RefreshCw, Search, UserCheck, UserPlus, Users, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Ban, CheckCircle2, ChevronLeft, ChevronRight, Download, FileText, KeyRound, Mail, Pencil, RefreshCw, Search, UserCheck, Trash2, UserPlus, Users, X } from 'lucide-react';
 import { api } from '../services/api';
 import { buildDocument } from '../services/projectDoc';
 import { DocumentPaper } from './ProjectDocument';
@@ -19,7 +19,8 @@ import './Admin.css';
  *  - Sistema: copias de seguridad, servicios y errores.
  */
 
-const POR_PAGINA = 25;
+const TAMANOS = [25, 50, 100, 200];
+const SIN_GRUPO = '—'; // valor del filtro «Sin grupo»
 const STATUS = { active: 'Activo', pending: 'Pendiente', blocked: 'Bloqueado' };
 const ROLES_FILTRO = [{ id: 'admin', nombre: 'Administrador' }, ...ROLES];
 
@@ -107,21 +108,28 @@ const Th = ({ id, orden, onOrden, children, num }) => {
     );
 };
 
-const Paginas = ({ total, pagina, onPagina, que }) => {
+const Paginas = ({ total, pagina, onPagina, que, porPagina, onPorPagina }) => {
     if (total === 0) return null;
-    const paginas = Math.ceil(total / POR_PAGINA);
-    const desde = (pagina - 1) * POR_PAGINA + 1;
-    const hasta = Math.min(total, pagina * POR_PAGINA);
+    const paginas = Math.ceil(total / porPagina);
+    const desde = (pagina - 1) * porPagina + 1;
+    const hasta = Math.min(total, pagina * porPagina);
     return (
         <div className="adm-paginas">
             <span>{desde}–{hasta} de {total} {que}</span>
-            {paginas > 1 && (
-                <span className="adm-paginas-botones">
-                    <button type="button" className="pro-btn pro-btn--ghost adm-sm" disabled={pagina <= 1} onClick={() => onPagina(pagina - 1)}><ChevronLeft size={15} /> Anterior</button>
-                    <span>Página {pagina} de {paginas}</span>
-                    <button type="button" className="pro-btn pro-btn--ghost adm-sm" disabled={pagina >= paginas} onClick={() => onPagina(pagina + 1)}>Siguiente <ChevronRight size={15} /></button>
-                </span>
-            )}
+            <span className="adm-paginas-botones">
+                {total > TAMANOS[0] && (
+                    <label className="adm-por-pagina">Filas
+                        <select value={porPagina} onChange={(e) => onPorPagina(Number(e.target.value))}>{TAMANOS.map((n) => <option key={n} value={n}>{n}</option>)}</select>
+                    </label>
+                )}
+                {paginas > 1 && (
+                    <>
+                        <button type="button" className="pro-btn pro-btn--ghost adm-sm" disabled={pagina <= 1} onClick={() => onPagina(pagina - 1)}><ChevronLeft size={15} /> Anterior</button>
+                        <span>Página {pagina} de {paginas}</span>
+                        <button type="button" className="pro-btn pro-btn--ghost adm-sm" disabled={pagina >= paginas} onClick={() => onPagina(pagina + 1)}>Siguiente <ChevronRight size={15} /></button>
+                    </>
+                )}
+            </span>
         </div>
     );
 };
@@ -153,7 +161,11 @@ const Admin = () => {
     const [pagina, setPagina] = useState(1);
     const [marcados, setMarcados] = useState(() => new Set());
     const [creando, setCreando] = useState(false);
-    const [loteProfesor, setLoteProfesor] = useState('');
+    const [fGrupo, setFGrupo] = useState(''); // nombre del grupo o SIN_GRUPO
+    const [fActividad, setFActividad] = useState(''); // 'semana' | 'mes' | 'nunca'
+    const [porPagina, setPorPagina] = useState(TAMANOS[0]);
+    const [grupoNuevo, setGrupoNuevo] = useState(null); // texto mientras se escribe un grupo nuevo para la selección
+    const [bitacora, setBitacora] = useState(null); // registro de cambios (pestaña Sistema)
 
     // Lista de proyectos.
     const [pQuery, setPQuery] = useState('');
@@ -163,6 +175,7 @@ const Admin = () => {
     const [selected, setSelected] = useState(null); // { user, projects }
     const [openProject, setOpenProject] = useState(null); // { project, owner }
     const [acceso, setAcceso] = useState(null); // contraseña temporal recién generada
+    const [edicion, setEdicion] = useState(null); // { name, email } mientras se corrigen los datos de la ficha
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -182,6 +195,10 @@ const Admin = () => {
 
     useEffect(() => { load(); }, [load]);
     useEffect(() => { if (vista === 'proyectos' && projects === null) loadProjects(); }, [vista, projects, loadProjects]);
+    useEffect(() => {
+        if (vista !== 'sistema') return;
+        api.admin.log().then((r) => setBitacora(r.log)).catch((err) => avisar(err.message, 'error'));
+    }, [vista]);
 
     const profesores = useMemo(() => users.filter((u) => u.role === 'teacher'), [users]);
     const opcionesProfesor = useMemo(() => [{ value: '', label: 'Sin profesor' }, ...profesores.map((p) => ({ value: p.id, label: p.name, nota: p.email }))], [profesores]);
@@ -195,6 +212,9 @@ const Admin = () => {
         sinPermiso: (u) => u.role === 'student' && u.status === 'active' && !u.projectLimit && !u.projectCount,
         sinEstrenar: (u) => u.role !== 'admin' && u.mustChangePassword,
     };
+    const grupos = useMemo(() => [...new Set(users.map((u) => u.grupo).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es', { numeric: true })), [users]);
+    const diasSin = (u) => { const f = aFecha(u.lastActivity || u.lastLoginAt); return f ? (Date.now() - f.getTime()) / 86400000 : Infinity; };
+    const porActividad = { semana: (u) => diasSin(u) <= 7, mes: (u) => diasSin(u) > 30 && diasSin(u) !== Infinity, nunca: (u) => diasSin(u) === Infinity };
     const resumen = useMemo(() => ({
         total: users.length,
         teacher: users.filter((u) => u.role === 'teacher').length,
@@ -214,7 +234,9 @@ const Admin = () => {
             && (!fEstado || u.status === fEstado)
             && (!fProfesor || (fProfesor === 'ninguno' ? u.role === 'student' && !u.teacherId : String(u.teacherId) === String(fProfesor)))
             && (!fAtencion || atencion[fAtencion](u))
-            && (!q || sinTildes(u.name).includes(q) || u.email.toLowerCase().includes(q) || sinTildes(u.teacherName).includes(q)));
+            && (!fGrupo || (fGrupo === SIN_GRUPO ? !u.grupo : u.grupo === fGrupo))
+            && (!fActividad || porActividad[fActividad](u))
+            && (!q || sinTildes(u.name).includes(q) || u.email.toLowerCase().includes(q) || sinTildes(u.teacherName).includes(q) || sinTildes(u.grupo).includes(q)));
         const clave = {
             nombre: (u) => sinTildes(u.name),
             rol: (u) => nombreRol(u.role),
@@ -225,11 +247,13 @@ const Admin = () => {
         const sentido = orden.asc ? 1 : -1;
         return [...lista].sort((a, b) => { const x = clave(a); const y = clave(b); return (x < y ? -1 : x > y ? 1 : 0) * sentido || a.id - b.id; });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [users, query, fRol, fEstado, fProfesor, fAtencion, orden]);
-    useEffect(() => { setPagina(1); }, [query, fRol, fEstado, fProfesor, fAtencion]);
-    const enPagina = visible.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
-    const hayFiltros = Boolean(query || fRol || fEstado || fProfesor || fAtencion);
-    const limpiarFiltros = () => { setQuery(''); setFRol(''); setFEstado(''); setFProfesor(''); setFAtencion(''); };
+    }, [users, query, fRol, fEstado, fProfesor, fAtencion, fGrupo, fActividad, orden]);
+    useEffect(() => { setPagina(1); }, [query, fRol, fEstado, fProfesor, fAtencion, fGrupo, fActividad, porPagina]);
+    const enPagina = visible.slice((pagina - 1) * porPagina, pagina * porPagina);
+    const hayFiltros = Boolean(query || fRol || fEstado || fProfesor || fAtencion || fGrupo || fActividad);
+    const limpiarFiltros = () => { setQuery(''); setFRol(''); setFEstado(''); setFProfesor(''); setFAtencion(''); setFGrupo(''); setFActividad(''); };
+    // Desde la pestaña «Grupos»: abre la lista de usuarios ya filtrada.
+    const verUsuarios = (filtros) => { limpiarFiltros(); if (filtros.grupo !== undefined) setFGrupo(filtros.grupo); if (filtros.profesor !== undefined) setFProfesor(filtros.profesor); if (filtros.rol) setFRol(filtros.rol); setMarcados(new Set()); setVista('usuarios'); };
     const ordenar = (por) => setOrden((prev) => (prev.por === por ? { por, asc: !prev.asc } : { por, asc: por === 'nombre' || por === 'rol' }));
 
     const proyectosVisibles = useMemo(() => {
@@ -245,7 +269,7 @@ const Admin = () => {
         const sentido = pOrden.asc ? 1 : -1;
         return [...lista].sort((a, b) => { const x = clave(a); const y = clave(b); return (x < y ? -1 : x > y ? 1 : 0) * sentido || a.id - b.id; });
     }, [projects, pQuery, pOrden]);
-    useEffect(() => { setPPagina(1); }, [pQuery]);
+    useEffect(() => { setPPagina(1); }, [pQuery, porPagina]);
     const ordenarP = (por) => setPOrden((prev) => (prev.por === por ? { por, asc: !prev.asc } : { por, asc: por === 'proyecto' || por === 'dueno' }));
 
     const replaceUser = (updated) => {
@@ -284,45 +308,79 @@ const Admin = () => {
             setAcceso({ cuentas: [{ name: user.name, email: user.email, clave: r.clave, emailSent: r.emailSent }], mail: r.emailSent });
         });
     };
+    const guardarDatos = (event, user) => {
+        event.preventDefault();
+        return accion(async () => {
+            const { user: updated } = await api.admin.updateUser(user.id, edicion);
+            replaceUser(updated);
+            setEdicion(null);
+            setNotice(updated.email !== user.email ? `Datos guardados. ${updated.name} ahora entra con ${updated.email}; se cerraron sus sesiones.` : `Datos de ${updated.name} guardados.`);
+        });
+    };
+    const eliminar = async (user) => {
+        const n = user.projectCount || 0;
+        const alumnos = users.filter((u) => u.teacherId === user.id).length;
+        const detalle = [
+            n ? `Se ${n === 1 ? 'borra su proyecto' : `borran sus ${n} proyectos`}, con versiones, figuras y encuestas. Antes se guarda una copia de seguridad.` : 'No tiene proyectos.',
+            alumnos ? `Sus ${alumnos} estudiantes quedan sin profesor a cargo.` : '',
+            'No se puede deshacer desde aquí.',
+        ].filter(Boolean).join(' ');
+        if (!(await confirmar({ texto: `¿Eliminar la cuenta de ${user.name}?`, detalle, aceptar: 'Eliminar', peligro: true }))) return undefined;
+        return accion(async () => {
+            await api.admin.deleteUser(user.id);
+            setSelected(null);
+            setAcceso(null);
+            setEdicion(null);
+            setProjects(null);
+            await load();
+            setNotice(`Se eliminó la cuenta de ${user.name}.`);
+        });
+    };
     const resend = (user) => accion(async () => {
         await api.admin.resend(user.id);
         setNotice(`Se envió un enlace de activación nuevo a ${user.email}.`);
     });
 
-    // Cambios a varias cuentas a la vez: se aplican una por una y al final se cuenta cuántas quedaron.
+    // Cambios a muchas cuentas a la vez: una sola llamada al servidor, que responde cuántas cambió.
     const elegidos = users.filter((u) => marcados.has(u.id) && u.role !== 'admin');
-    const enLote = (texto, sirve, fn) => accion(async () => {
-        const destino = elegidos.filter(sirve);
-        if (!destino.length) { setNotice('Ninguna de las cuentas seleccionadas admite ese cambio.'); return; }
-        let hechas = 0;
-        let fallo = '';
-        for (const u of destino) {
-            // eslint-disable-next-line no-await-in-loop
-            try { await fn(u); hechas += 1; } catch (err) { fallo = err.message; }
-        }
-        await load();
-        setMarcados(new Set());
-        setNotice(`${texto}: ${hechas} de ${destino.length} ${destino.length === 1 ? 'cuenta' : 'cuentas'}.${destino.length < elegidos.length ? ` Las otras ${elegidos.length - destino.length} no aplicaban.` : ''}`);
-        if (fallo) setError(`Algunas no se pudieron cambiar: ${fallo}`);
-    });
-    const loteAsignar = () => {
-        const prof = profesores.find((p) => String(p.id) === loteProfesor);
-        if (!prof) return undefined;
-        return enLote(`A cargo de ${prof.name}`, (u) => u.role === 'student', (u) => api.admin.setRole(u.id, 'student', prof.id));
+    const cuantas = `${elegidos.length} ${elegidos.length === 1 ? 'cuenta' : 'cuentas'}`;
+    const enLote = async ({ action, value, hecho, pregunta }) => {
+        if (pregunta && !(await confirmar(pregunta))) return undefined;
+        return accion(async () => {
+            const r = await api.admin.bulk(elegidos.map((u) => u.id), action, value);
+            if (action === 'delete') setProjects(null);
+            if (r.cuentas) setAcceso({ cuentas: r.cuentas, mail: r.mail });
+            await load();
+            setMarcados(new Set());
+            setGrupoNuevo(null);
+            setNotice(r.hechas ? `${hecho}: ${r.hechas} ${r.hechas === 1 ? 'cuenta' : 'cuentas'}.${r.omitidas ? ` A las otras ${r.omitidas} no les aplicaba.` : ''}` : 'A ninguna de las cuentas seleccionadas le aplicaba ese cambio.');
+        });
     };
-    const lotePermitir = () => enLote('Permiso para crear un proyecto', (u) => !u.projectLimit, (u) => api.admin.setLimit(u.id, 1));
-    const loteEstado = async (status) => {
-        if (status === 'blocked' && !(await confirmar({ texto: `¿Bloquear ${elegidos.length} ${elegidos.length === 1 ? 'cuenta' : 'cuentas'}?`, detalle: 'No podrán entrar hasta que las desbloquees.', aceptar: 'Bloquear', peligro: true }))) return undefined;
-        return enLote(status === 'blocked' ? 'Bloqueadas' : 'Activadas', (u) => u.status !== status, (u) => api.admin.setStatus(u.id, status));
+    const loteProfesor = (v) => {
+        const prof = profesores.find((p) => String(p.id) === String(v));
+        return enLote({ action: 'teacher', value: prof ? prof.id : '', hecho: prof ? `A cargo de ${prof.name}` : 'Sin profesor a cargo', pregunta: { texto: prof ? `¿Poner ${cuantas} a cargo de ${prof.name}?` : `¿Quitar el profesor a ${cuantas}?`, detalle: 'Solo aplica a las que son de estudiantes.', aceptar: prof ? 'Asignar' : 'Quitar' } });
     };
+    const loteGrupo = (grupo) => enLote({ action: 'group', value: grupo, hecho: grupo ? `En el grupo «${grupo}»` : 'Sin grupo', pregunta: { texto: grupo ? `¿Poner ${cuantas} en el grupo «${grupo}»?` : `¿Sacar ${cuantas} de su grupo?`, aceptar: grupo ? 'Poner en el grupo' : 'Sacar' } });
+    const ACCIONES = [
+        { value: 'permitir', label: 'Permitir un proyecto', nota: 'Cupo en 1', run: () => enLote({ action: 'limit', value: 1, hecho: 'Con permiso para un proyecto', pregunta: { texto: `¿Permitir un proyecto a ${cuantas}?`, detalle: 'El cupo de cada una queda en 1. Lo que ya crearon se conserva.', aceptar: 'Permitir' } }) },
+        { value: 'quitar', label: 'Quitar el permiso de crear', nota: 'Cupo en 0', run: () => enLote({ action: 'limit', value: 0, hecho: 'Sin permiso para crear', pregunta: { texto: `¿Quitar el permiso de crear proyectos a ${cuantas}?`, detalle: 'Conservan los proyectos que ya tienen.', aceptar: 'Quitar permiso' } }) },
+        ...ROLES.map((r) => ({ value: `rol-${r.id}`, label: `Cambiar el rol a ${r.nombre.toLowerCase()}`, run: () => enLote({ action: 'role', value: r.id, hecho: `Ahora con rol de ${r.nombre.toLowerCase()}`, pregunta: { texto: `¿Cambiar el rol de ${cuantas} a ${r.nombre.toLowerCase()}?`, detalle: r.nota, aceptar: 'Cambiar rol' } }) })),
+        { value: 'claves', label: 'Dar contraseñas nuevas', nota: 'Se muestran una sola vez', run: () => enLote({ action: 'access', hecho: 'Con contraseña nueva', pregunta: { texto: `¿Dar una contraseña nueva a ${cuantas}?`, detalle: 'Las anteriores dejan de servir y se cierran sus sesiones. Verás la lista para descargarla.', aceptar: 'Dar contraseñas' } }) },
+        { value: 'activar', label: 'Activar o desbloquear', run: () => enLote({ action: 'status', value: 'active', hecho: 'Activadas' }) },
+        { value: 'bloquear', label: 'Bloquear', run: () => enLote({ action: 'status', value: 'blocked', hecho: 'Bloqueadas', pregunta: { texto: `¿Bloquear ${cuantas}?`, detalle: 'No podrán entrar hasta que las desbloquees.', aceptar: 'Bloquear', peligro: true } }) },
+        { value: 'eliminar', label: 'Eliminar', nota: 'Con sus proyectos', run: () => { const n = elegidos.reduce((t, u) => t + (u.projectCount || 0), 0); return enLote({ action: 'delete', hecho: 'Eliminadas', pregunta: { texto: `¿Eliminar ${cuantas}?`, detalle: `${n ? `Se borran también sus ${n} ${n === 1 ? 'proyecto' : 'proyectos'}; antes se guarda una copia de seguridad.` : 'Ninguna tiene proyectos.'} No se puede deshacer desde aquí.`, aceptar: 'Eliminar', peligro: true } }); } },
+    ];
     const marcar = (id) => setMarcados((prev) => { const s = new Set(prev); if (s.has(id)) s.delete(id); else s.add(id); return s; });
     const marcables = enPagina.filter((u) => u.role !== 'admin');
     const todosMarcados = marcables.length > 0 && marcables.every((u) => marcados.has(u.id));
+    // Con muchas cuentas: marcar de una vez todas las que cumplen el filtro, no solo las de la página.
+    const todasLasVisibles = visible.filter((u) => u.role !== 'admin');
+    const marcarTodas = () => setMarcados(new Set(todasLasVisibles.map((u) => u.id)));
     const marcarPagina = () => setMarcados((prev) => { const s = new Set(prev); marcables.forEach((u) => (todosMarcados ? s.delete(u.id) : s.add(u.id))); return s; });
 
     const exportar = () => descargar('usuarios-projectsia.csv', csv([
-        ['Nombre', 'Correo', 'Rol', 'Profesor a cargo', 'Estado', 'Proyectos', 'Cupo', 'Coherencia (%)', 'Última actividad', 'Registro'],
-        ...visible.map((u) => [u.name, u.email, nombreRol(u.role), u.teacherName || '', STATUS[u.status] || u.status, u.projectCount, u.role === 'admin' ? '' : u.projectLimit, u.coherencia ? u.coherencia.score : '', formatDate(u.lastActivity || u.lastLoginAt), formatDate(u.createdAt)]),
+        ['Nombre', 'Correo', 'Rol', 'Grupo', 'Profesor a cargo', 'Estado', 'Proyectos', 'Cupo', 'Coherencia (%)', 'Última actividad', 'Registro'],
+        ...visible.map((u) => [u.name, u.email, nombreRol(u.role), u.grupo || '', u.teacherName || '', STATUS[u.status] || u.status, u.projectCount, u.role === 'admin' ? '' : u.projectLimit, u.coherencia ? u.coherencia.score : '', formatDate(u.lastActivity || u.lastLoginAt), formatDate(u.createdAt)]),
     ]));
     const exportarProyectos = () => descargar('proyectos-projectsia.csv', csv([
         ['Título', 'Nombre del proyecto', 'Dueño', 'Correo', 'Rol', 'Avance (%)', 'Coherencia (%)', 'Invitados', 'Actualizado'],
@@ -331,6 +389,7 @@ const Admin = () => {
 
     const viewUser = async (id) => {
         setAcceso(null);
+        setEdicion(null);
         setOpenProject(null);
         try { setSelected(await api.admin.user(id)); } catch (err) { setError(err.message); }
     };
@@ -378,22 +437,40 @@ const Admin = () => {
         return (
             <div className="pro-page">
                 <div className="adm-crumbs">
-                    <button type="button" className="pro-btn pro-btn--ghost" onClick={() => { setSelected(null); setAcceso(null); load(); }}>
+                    <button type="button" className="pro-btn pro-btn--ghost" onClick={() => { setSelected(null); setAcceso(null); setEdicion(null); load(); }}>
                         <ArrowLeft size={16} /> Todos los usuarios
                     </button>
                 </div>
                 <section className="pro-card adm-ficha">
                     <header className="adm-ficha-cabeza">
-                        <div>
-                            <h2>{user.name}</h2>
-                            <p>{user.email}</p>
+                        {edicion ? (
+                            <form className="adm-editar" onSubmit={(e) => guardarDatos(e, user)}>
+                                <label><span>Nombre completo</span><input className="input-field" required maxLength={80} value={edicion.name} onChange={(e) => setEdicion({ ...edicion, name: e.target.value })} autoFocus /></label>
+                                <label><span>Correo (su usuario)</span><input className="input-field" type="email" required maxLength={160} value={edicion.email} onChange={(e) => setEdicion({ ...edicion, email: e.target.value })} /></label>
+                                <label><span>Grupo o curso</span><input className="input-field" maxLength={60} list="adm-grupos" value={edicion.grupo} onChange={(e) => setEdicion({ ...edicion, grupo: e.target.value })} placeholder="Sin grupo" /></label>
+                                <datalist id="adm-grupos">{grupos.map((g) => <option key={g} value={g} />)}</datalist>
+                                <div>
+                                    <button type="submit" className="pro-btn pro-btn--primary adm-sm" disabled={busy}>{busy ? 'Guardando…' : 'Guardar'}</button>
+                                    <button type="button" className="pro-btn pro-btn--ghost adm-sm" onClick={() => setEdicion(null)}>Cancelar</button>
+                                </div>
+                                {edicion.email.trim().toLowerCase() !== user.email && <p className="adm-muted">Al cambiar el correo cambia su usuario para entrar: se cierran sus sesiones y conserva su contraseña.</p>}
+                            </form>
+                        ) : (
+                            <div>
+                                <h2>{user.name}</h2>
+                                <p>{user.email}</p>
+                            </div>
+                        )}
+                        <div className="adm-ficha-insignias">
+                            <RolBadge role={user.role} /><StatusBadge status={user.status} />
+                            {!esAdmin && !edicion && <button type="button" className="pro-btn pro-btn--ghost adm-sm" onClick={() => setEdicion({ name: user.name, email: user.email, grupo: user.grupo || '' })}><Pencil size={15} /> Modificar</button>}
                         </div>
-                        <div className="adm-ficha-insignias"><RolBadge role={user.role} /><StatusBadge status={user.status} /></div>
                     </header>
                     <dl className="adm-datos">
                         <div><dt>Registro</dt><dd>{formatDate(user.createdAt)}</dd></div>
                         <div><dt>Último ingreso</dt><dd>{formatDate(user.lastLoginAt)}</dd></div>
                         <div><dt>Última actividad</dt><dd>{formatDate(user.lastActivity)}</dd></div>
+                        <div><dt>Grupo</dt><dd>{user.grupo || 'Sin grupo'}</dd></div>
                         <div><dt>Contraseña</dt><dd>{user.mustChangePassword ? 'Temporal, aún sin cambiar' : 'Propia'}</dd></div>
                     </dl>
                     {!esAdmin && (
@@ -419,6 +496,7 @@ const Admin = () => {
                         <footer className="adm-ficha-acciones">
                             <button type="button" className="pro-btn pro-btn--ghost adm-sm" disabled={busy} onClick={() => newAccess(user)}><KeyRound size={15} /> Dar contraseña nueva</button>
                             <StatusActions user={user} onChange={changeStatus} onResend={resend} busy={busy} />
+                            <button type="button" className="pro-btn pro-btn--ghost adm-sm adm-danger adm-eliminar" disabled={busy} onClick={() => eliminar(user)}><Trash2 size={15} /> Eliminar cuenta</button>
                         </footer>
                     )}
                 </section>
@@ -467,6 +545,32 @@ const Admin = () => {
         );
     }
 
+    /* ---------- Resúmenes por grupo y por profesor ---------- */
+    const resumir = (lista, extra) => {
+        const conNota = lista.filter((u) => u.coherencia);
+        const media = conNota.length ? Math.round(conNota.reduce((t, u) => t + u.coherencia.score, 0) / conNota.length) : null;
+        return {
+            n: lista.length,
+            proyectos: lista.reduce((t, u) => t + (u.projectCount || 0), 0),
+            sinPermiso: lista.filter(atencion.sinPermiso).length,
+            sinEstrenar: lista.filter(atencion.sinEstrenar).length,
+            inactivos: lista.filter(porActividad.mes).length,
+            coherencia: media === null ? null : { score: media, nivel: media >= 75 ? 'alta' : media >= 50 ? 'media' : 'baja', evaluados: conNota.length },
+            ...extra,
+        };
+    };
+    const noAdmin = users.filter((u) => u.role !== 'admin');
+    const unicos = (lista) => [...new Set(lista.filter(Boolean))];
+    const tablaGrupos = [
+        ...grupos.map((g) => { const l = noAdmin.filter((u) => u.grupo === g); return resumir(l, { clave: g, nombre: g, profesores: unicos([...l.filter((u) => u.role === 'teacher').map((u) => u.name), ...l.map((u) => u.teacherName)]) }); }),
+        ...(grupos.length && noAdmin.some((u) => !u.grupo) ? [resumir(noAdmin.filter((u) => !u.grupo), { clave: SIN_GRUPO, nombre: 'Sin grupo', profesores: [] })] : []),
+    ];
+    const sinProfe = users.filter(atencion.sinProfesor);
+    const tablaProfesores = [
+        ...profesores.map((p) => { const l = users.filter((u) => u.teacherId === p.id); return resumir(l, { clave: String(p.id), nombre: p.name, nota: p.email, grupos: unicos(l.map((u) => u.grupo)) }); }).sort((a, b) => b.n - a.n),
+        ...(profesores.length && sinProfe.length ? [resumir(sinProfe, { clave: 'ninguno', nombre: 'Estudiantes sin profesor', nota: '', grupos: unicos(sinProfe.map((u) => u.grupo)) })] : []),
+    ];
+
     /* ---------- Panel ---------- */
     const pendientes = [
         { id: 'sinProfesor', n: resumen.sinProfesor, texto: (n) => `${n} ${n === 1 ? 'estudiante sin profesor' : 'estudiantes sin profesor'}` },
@@ -480,10 +584,11 @@ const Admin = () => {
                 <div className="pro-modes" role="tablist" aria-label="Secciones de la administración">
                     <button type="button" role="tab" aria-selected={vista === 'usuarios'} onClick={() => setVista('usuarios')}>Usuarios <span className="adm-count">{resumen.total}</span></button>
                     <button type="button" role="tab" aria-selected={vista === 'proyectos'} onClick={() => setVista('proyectos')}>Proyectos <span className="adm-count">{projects ? projects.length : resumen.proyectos}</span></button>
+                    <button type="button" role="tab" aria-selected={vista === 'grupos'} onClick={() => setVista('grupos')}>Grupos <span className="adm-count">{grupos.length}</span></button>
                     <button type="button" role="tab" aria-selected={vista === 'sistema'} onClick={() => setVista('sistema')}>Sistema</button>
                 </div>
                 {vista !== 'sistema' && (
-                    <button type="button" className="pro-btn pro-btn--ghost adm-sm" onClick={() => (vista === 'usuarios' ? load() : loadProjects())} disabled={loading}><RefreshCw size={15} /> Actualizar</button>
+                    <button type="button" className="pro-btn pro-btn--ghost adm-sm" onClick={() => (vista === 'proyectos' ? loadProjects() : load())} disabled={loading}><RefreshCw size={15} /> Actualizar</button>
                 )}
             </div>
 
@@ -507,7 +612,7 @@ const Admin = () => {
 
                     {creando && (
                         <div className="adm-crear">
-                            <CrearCuentas profesores={profesores} onCreadas={load} />
+                            <CrearCuentas profesores={profesores} grupos={grupos} onCreadas={load} />
                             <button type="button" className="adm-crear-cerrar" onClick={() => setCreando(false)} aria-label="Cerrar la creación de cuentas"><X size={18} /></button>
                         </div>
                     )}
@@ -516,11 +621,14 @@ const Admin = () => {
                         <div className="adm-toolbar">
                             <div className="adm-search">
                                 <Search size={16} aria-hidden="true" />
-                                <input className="input-field" type="search" placeholder="Buscar por nombre, correo o profesor" aria-label="Buscar usuarios" value={query} onChange={(event) => setQuery(event.target.value)} />
+                                <input className="input-field" type="search" placeholder="Buscar por nombre, correo, profesor o grupo" aria-label="Buscar usuarios" value={query} onChange={(event) => setQuery(event.target.value)} />
                             </div>
                             <Selector etiqueta="Filtrar por rol" value={fRol} onChange={setFRol} buscar={false} opciones={[{ value: '', label: 'Todos los roles' }, ...ROLES_FILTRO.map((r) => ({ value: r.id, label: r.nombre }))]} />
                             <Selector buscar etiqueta="Filtrar por profesor" value={fProfesor} onChange={setFProfesor} opciones={[{ value: '', label: 'Todos los profesores' }, { value: 'ninguno', label: 'Sin profesor' }, ...profesores.map((p) => ({ value: p.id, label: p.name, nota: p.email }))]} />
                             <Selector etiqueta="Filtrar por estado" value={fEstado} onChange={setFEstado} buscar={false} opciones={[{ value: '', label: 'Todos los estados' }, ...Object.entries(STATUS).map(([id, nombre]) => ({ value: id, label: nombre }))]} />
+                            <Selector buscar etiqueta="Filtrar por grupo" value={fGrupo} onChange={setFGrupo} opciones={[{ value: '', label: 'Todos los grupos' }, { value: SIN_GRUPO, label: 'Sin grupo' }, ...grupos.map((g) => ({ value: g, label: g }))]} />
+                            <Selector buscar={false} etiqueta="Filtrar por actividad" value={fActividad} onChange={setFActividad} opciones={[{ value: '', label: 'Cualquier actividad' }, { value: 'semana', label: 'Activos esta semana' }, { value: 'mes', label: 'Más de 30 días sin actividad' }, { value: 'nunca', label: 'Nunca han entrado' }]} />
+                            {hayFiltros && <button type="button" className="pro-link" onClick={limpiarFiltros}>Quitar filtros</button>}
                             <span className="adm-toolbar-fin">
                                 <button type="button" className="pro-btn pro-btn--ghost" onClick={exportar} disabled={visible.length === 0} title="Descarga la lista que ves, con sus filtros"><Download size={15} /> Exportar</button>
                                 <button type="button" className="pro-btn pro-btn--primary" onClick={() => setCreando(!creando)} aria-expanded={creando}><UserPlus size={15} /> Crear cuentas</button>
@@ -530,16 +638,22 @@ const Admin = () => {
                         {elegidos.length > 0 && (
                             <div className="adm-lote" role="region" aria-label="Cambios a las cuentas seleccionadas">
                                 <b>{elegidos.length} {elegidos.length === 1 ? 'seleccionada' : 'seleccionadas'}</b>
-                                <span className="adm-lote-grupo">
-                                    <Selector compacto buscar etiqueta="Profesor para las cuentas seleccionadas" vacio="Asignar profesor…" value={loteProfesor} onChange={(v) => setLoteProfesor(String(v))} opciones={profesores.map((p) => ({ value: p.id, label: p.name, nota: p.email }))} />
-                                    <button type="button" className="pro-btn pro-btn--ghost adm-sm" disabled={busy || !loteProfesor} onClick={loteAsignar}>Asignar</button>
-                                </span>
-                                <button type="button" className="pro-btn pro-btn--ghost adm-sm" disabled={busy} onClick={lotePermitir}>Permitir un proyecto</button>
-                                <button type="button" className="pro-btn pro-btn--ghost adm-sm" disabled={busy} onClick={() => loteEstado('active')}><CheckCircle2 size={15} /> Activar</button>
-                                <button type="button" className="pro-btn pro-btn--ghost adm-sm adm-danger" disabled={busy} onClick={() => loteEstado('blocked')}><Ban size={15} /> Bloquear</button>
-                                <button type="button" className="pro-link" onClick={() => setMarcados(new Set())}>Quitar selección</button>
+                                {todosMarcados && elegidos.length < todasLasVisibles.length && <button type="button" className="pro-link" onClick={marcarTodas}>Seleccionar las {todasLasVisibles.length} que coinciden</button>}
+                                <Selector compacto buscar etiqueta="Profesor para las cuentas seleccionadas" vacio="Asignar profesor…" value="" disabled={busy} onChange={loteProfesor} opciones={[...profesores.map((p) => ({ value: p.id, label: p.name, nota: p.email })), { value: 'ninguno', label: 'Quitar el profesor' }]} />
+                                {grupoNuevo === null ? (
+                                    <Selector compacto buscar etiqueta="Grupo para las cuentas seleccionadas" vacio="Poner en grupo…" value="" disabled={busy} onChange={(v) => (v === '+' ? setGrupoNuevo('') : loteGrupo(v === SIN_GRUPO ? '' : v))} opciones={[...grupos.map((g) => ({ value: g, label: g })), { value: '+', label: 'Grupo nuevo…' }, { value: SIN_GRUPO, label: 'Sacar del grupo' }]} />
+                                ) : (
+                                    <form className="adm-lote-grupo" onSubmit={(e) => { e.preventDefault(); if (grupoNuevo.trim()) loteGrupo(grupoNuevo.trim()); }}>
+                                        <input className="input-field" value={grupoNuevo} onChange={(e) => setGrupoNuevo(e.target.value)} maxLength={60} placeholder="Nombre del grupo" aria-label="Nombre del grupo nuevo" autoFocus />
+                                        <button type="submit" className="pro-btn pro-btn--ghost adm-sm" disabled={busy || !grupoNuevo.trim()}>Aplicar</button>
+                                        <button type="button" className="pro-btn pro-btn--ghost adm-sm" onClick={() => setGrupoNuevo(null)}>Cancelar</button>
+                                    </form>
+                                )}
+                                <Selector compacto buscar={false} etiqueta="Más acciones para las cuentas seleccionadas" vacio="Más acciones…" value="" disabled={busy} onChange={(v) => ACCIONES.find((a) => a.value === v)?.run()} opciones={ACCIONES.map(({ value, label, nota }) => ({ value, label, nota }))} />
+                                <button type="button" className="pro-link adm-lote-quitar" onClick={() => { setMarcados(new Set()); setGrupoNuevo(null); }}>Quitar selección</button>
                             </div>
                         )}
+                        {acceso && <Credenciales cuentas={acceso.cuentas} mail={acceso.mail} onCerrar={() => setAcceso(null)} />}
 
                         <div className="adm-table-wrap">
                             <table className="adm-table adm-table--usuarios">
@@ -573,6 +687,7 @@ const Admin = () => {
                                                 <button type="button" className="adm-user-link" onClick={() => viewUser(user.id)}>
                                                     <b>{user.name}</b>
                                                     <small>{user.email}</small>
+                                                    {user.grupo && <small className="adm-grupo">{user.grupo}</small>}
                                                 </button>
                                             </td>
                                             <td>
@@ -592,7 +707,7 @@ const Admin = () => {
                                 </tbody>
                             </table>
                         </div>
-                        <Paginas total={visible.length} pagina={pagina} onPagina={setPagina} que={hayFiltros ? `(de ${users.length} cuentas)` : 'cuentas'} />
+                        <Paginas total={visible.length} pagina={pagina} onPagina={setPagina} que={hayFiltros ? `(de ${users.length} cuentas)` : 'cuentas'} porPagina={porPagina} onPorPagina={setPorPagina} />
                     </section>
                 </>
             )}
@@ -631,7 +746,7 @@ const Admin = () => {
                                         </td>
                                     </tr>
                                 )}
-                                {proyectosVisibles.slice((pPagina - 1) * POR_PAGINA, pPagina * POR_PAGINA).map((p) => (
+                                {proyectosVisibles.slice((pPagina - 1) * porPagina, pPagina * porPagina).map((p) => (
                                     <tr key={p.id}>
                                         <td>
                                             <button type="button" className="adm-user-link" onClick={() => { setSelected(null); viewProject(p.id); }}>
@@ -654,8 +769,65 @@ const Admin = () => {
                             </tbody>
                         </table>
                     </div>
-                    <Paginas total={proyectosVisibles.length} pagina={pPagina} onPagina={setPPagina} que={pQuery ? `(de ${projects?.length || 0} proyectos)` : 'proyectos'} />
+                    <Paginas total={proyectosVisibles.length} pagina={pPagina} onPagina={setPPagina} que={pQuery ? `(de ${projects?.length || 0} proyectos)` : 'proyectos'} porPagina={porPagina} onPorPagina={setPorPagina} />
                 </section>
+            )}
+
+            {vista === 'grupos' && (
+                <>
+                    <section className="pro-card adm-panel">
+                        <div className="adm-bitacora-cabeza">
+                            <h2>Por grupo</h2>
+                            <p className="adm-muted">Un grupo es un curso o cohorte. Se pone al crear las cuentas (también en la carga por lotes) o seleccionando varias en Usuarios. Presiona un grupo para ver sus cuentas.</p>
+                        </div>
+                        <div className="adm-table-wrap">
+                            <table className="adm-table adm-table--grupos">
+                                <thead><tr><th scope="col">Grupo</th><th scope="col" className="adm-num">Cuentas</th><th scope="col">Profesores</th><th scope="col" className="adm-num">Proyectos</th><th scope="col" className="adm-num" title="Estudiantes que aún no pueden crear su proyecto">Sin permiso</th><th scope="col" className="adm-num" title="Aún no entran con su contraseña temporal">Sin estrenar</th><th scope="col" className="adm-num" title="Sin actividad en más de 30 días">Inactivos</th><th scope="col" title="Promedio de la coherencia de sus proyectos">Coherencia</th></tr></thead>
+                                <tbody>
+                                    {tablaGrupos.length === 0 && <tr><td colSpan={8} className="adm-empty"><b>Todavía no hay grupos</b><span>En Usuarios, marca varias cuentas y usa «Poner en grupo…», o indica el grupo al crear las cuentas.</span><button type="button" className="pro-btn pro-btn--ghost" onClick={() => setVista('usuarios')}>Ir a Usuarios</button></td></tr>}
+                                    {tablaGrupos.map((g) => (
+                                        <tr key={g.clave}>
+                                            <td><button type="button" className="adm-user-link" onClick={() => verUsuarios({ grupo: g.clave })}><b>{g.nombre}</b></button></td>
+                                            <td className="adm-num">{g.n}</td>
+                                            <td>{g.profesores.slice(0, 3).join(', ') || '—'}{g.profesores.length > 3 ? ` y ${g.profesores.length - 3} más` : ''}</td>
+                                            <td className="adm-num">{g.proyectos}</td>
+                                            <td className="adm-num" data-alerta={g.sinPermiso > 0 || undefined}>{g.sinPermiso}</td>
+                                            <td className="adm-num" data-alerta={g.sinEstrenar > 0 || undefined}>{g.sinEstrenar}</td>
+                                            <td className="adm-num">{g.inactivos}</td>
+                                            <td><CoherenciaBadge value={g.coherencia} /></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                    <section className="pro-card adm-panel">
+                        <div className="adm-bitacora-cabeza">
+                            <h2>Por profesor</h2>
+                            <p className="adm-muted">Cuántos estudiantes tiene cada profesor a su cargo y cómo van. Presiona un profesor para ver a sus estudiantes.</p>
+                        </div>
+                        <div className="adm-table-wrap">
+                            <table className="adm-table adm-table--grupos">
+                                <thead><tr><th scope="col">Profesor</th><th scope="col" className="adm-num">Estudiantes</th><th scope="col">Grupos</th><th scope="col" className="adm-num">Proyectos</th><th scope="col" className="adm-num">Sin permiso</th><th scope="col" className="adm-num">Sin estrenar</th><th scope="col" className="adm-num">Inactivos</th><th scope="col">Coherencia</th></tr></thead>
+                                <tbody>
+                                    {tablaProfesores.length === 0 && <tr><td colSpan={8} className="adm-empty"><b>Todavía no hay profesores</b><span>Crea una cuenta con rol de profesor para que pueda tener estudiantes a su cargo.</span></td></tr>}
+                                    {tablaProfesores.map((g) => (
+                                        <tr key={g.clave}>
+                                            <td><button type="button" className="adm-user-link" onClick={() => verUsuarios({ profesor: g.clave })}><b>{g.nombre}</b>{g.nota && <small>{g.nota}</small>}</button></td>
+                                            <td className="adm-num">{g.n}</td>
+                                            <td>{g.grupos.slice(0, 3).join(', ') || '—'}{g.grupos.length > 3 ? ` y ${g.grupos.length - 3} más` : ''}</td>
+                                            <td className="adm-num">{g.proyectos}</td>
+                                            <td className="adm-num" data-alerta={g.sinPermiso > 0 || undefined}>{g.sinPermiso}</td>
+                                            <td className="adm-num" data-alerta={g.sinEstrenar > 0 || undefined}>{g.sinEstrenar}</td>
+                                            <td className="adm-num">{g.inactivos}</td>
+                                            <td><CoherenciaBadge value={g.coherencia} /></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </>
             )}
 
             {vista === 'sistema' && (
@@ -666,6 +838,31 @@ const Admin = () => {
                         </p>
                     )}
                     <AdminEstado fijo />
+                    <section className="pro-card adm-panel adm-bitacora">
+                        <div className="adm-bitacora-cabeza">
+                            <h2>Registro de cambios</h2>
+                            <p className="adm-muted">Lo que el administrador y los profesores hacen con las cuentas: quién, qué y cuándo. Se conservan los últimos 3000.</p>
+                        </div>
+                        {bitacora === null && <p className="adm-muted">Cargando…</p>}
+                        {bitacora?.length === 0 && <p className="adm-muted">Todavía no hay cambios registrados. Aparecerán aquí al crear, modificar o eliminar cuentas.</p>}
+                        {bitacora?.length > 0 && (
+                            <div className="adm-table-wrap adm-bitacora-lista">
+                                <table className="adm-table">
+                                    <thead><tr><th scope="col">Cuándo</th><th scope="col">Quién</th><th scope="col">Qué hizo</th><th scope="col">Detalle</th></tr></thead>
+                                    <tbody>
+                                        {bitacora.map((b) => (
+                                            <tr key={b.id}>
+                                                <td title={new Date(b.createdAt).toLocaleString('es-CO')}>{haceCuanto(new Date(b.createdAt).toISOString().replace('T', ' ').slice(0, 19))}</td>
+                                                <td>{b.actor}</td>
+                                                <td><b>{b.action}</b></td>
+                                                <td className="adm-bitacora-detalle">{b.detail}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </section>
                 </>
             )}
         </div>

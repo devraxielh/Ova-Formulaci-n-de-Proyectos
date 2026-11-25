@@ -34,7 +34,7 @@ const Selector = ({ value, onChange, opciones, etiqueta, vacio = 'Elegir…', di
         if (!r) return;
         const alto = Math.min(320, 48 + opciones.length * 40);
         const arriba = window.innerHeight - r.bottom < alto + 12 && r.top > alto;
-        setLugar({ left: Math.max(8, Math.min(r.left, window.innerWidth - Math.max(r.width, 224) - 8)), width: Math.max(r.width, 224), ...(arriba ? { bottom: window.innerHeight - r.top + 4 } : { top: r.bottom + 4 }) });
+        setLugar({ left: Math.max(8, Math.min(r.left, window.innerWidth - Math.max(r.width, 272) - 8)), width: Math.max(r.width, 272), ...(arriba ? { bottom: window.innerHeight - r.top + 4 } : { top: r.bottom + 4 }) });
     };
     const abrir = () => {
         if (disabled) return;
