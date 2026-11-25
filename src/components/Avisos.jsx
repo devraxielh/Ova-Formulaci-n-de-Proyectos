@@ -31,10 +31,17 @@ export const confirmar = ({ texto, detalle = '', aceptar = 'Aceptar', cancelar =
     publicar();
 });
 
+// Para componentes que guardan su mensaje en el estado: <Aviso texto={error} tipo="error" /> lo muestra como
+// notificación cada vez que cambia, en lugar de un párrafo fijo en la página.
+export const Aviso = ({ texto, tipo = 'ok' }) => {
+    useEffect(() => { if (texto) avisar(String(texto), tipo); }, [texto, tipo]);
+    return null;
+};
+
 const ICONO = { ok: CheckCircle2, error: AlertTriangle, pregunta: HelpCircle };
 const DURA = { ok: 5000, error: 9000 };
 
-const Aviso = ({ aviso }) => {
+const Tarjeta = ({ aviso }) => {
     const Icono = ICONO[aviso.tipo] || CheckCircle2;
     const primero = useRef(null);
     const [pausa, setPausa] = useState(false);
@@ -73,7 +80,7 @@ const Avisos = () => {
     const [lista, setLista] = useState(pila);
     useEffect(() => { oyentes.add(setLista); return () => { oyentes.delete(setLista); }; }, []);
     if (lista.length === 0) return null;
-    return createPortal(<div className="avi-pila">{lista.map((a) => <Aviso key={a.id} aviso={a} />)}</div>, document.body);
+    return createPortal(<div className="avi-pila">{lista.map((a) => <Tarjeta key={a.id} aviso={a} />)}</div>, document.body);
 };
 
 export default Avisos;

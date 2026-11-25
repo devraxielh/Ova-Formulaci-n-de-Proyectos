@@ -4,6 +4,9 @@ import { useProject, useProjectField } from '../context/ProjectContext';
 import { api } from '../services/api';
 import EditorRico from './EditorRico';
 import { CAMPOS_SECCION, SECTIONS, buildDocument, documentText, matrizConsistencia } from '../services/projectDoc';
+import { Aviso } from './Avisos';
+import Selector from './Selector';
+import { compararTextos, contarCambios } from '../services/diff';
 
 /* Paneles de Mi proyecto: Equipo, Historial de versiones y Anexos. */
 
@@ -86,8 +89,8 @@ export const Equipo = () => {
                     <button type="submit" className="pro-btn pro-btn--primary" disabled={busy}><UserPlus size={16} /> {busy ? 'Invitando…' : 'Invitar'}</button>
                 </form>
             )}
-            {msg && <p className="pro-notice" role="status"><CheckCircle2 size={15} /> {msg}</p>}
-            {error && <p className="pro-alert" role="alert">{error}</p>}
+            <Aviso texto={msg} />
+            <Aviso texto={error} tipo="error" />
         </div>
     );
 };
@@ -101,6 +104,7 @@ export const Historial = () => {
     const { user, project, data, setField, flush } = useProject();
     const [versions, setVersions] = useState([]);
     const [abierta, setAbierta] = useState(null); // { id, createdAt, data }
+    const [contra, setContra] = useState(null); // otra copia con la que se compara; null = lo que hay ahora
     const [msg, setMsg] = useState('');
     const [error, setError] = useState('');
 
@@ -108,27 +112,45 @@ export const Historial = () => {
         if (!project.id) return;
         try { setVersions((await api.versions(project.id)).versions); } catch { /* noop */ }
     }, [project.id]);
-    useEffect(() => { setAbierta(null); setMsg(''); cargar(); }, [cargar]);
+    useEffect(() => { setAbierta(null); setContra(null); setMsg(''); cargar(); }, [cargar]);
 
-    // Secciones cuyo contenido en la versión abierta es distinto al actual.
+    // Secciones que cambian entre la copia abierta y aquello con lo que se compara (lo de ahora u otra copia),
+    // con el texto de cada lado y las palabras que se quitaron o se agregaron.
+    const otro = contra ? contra.data : data;
     const cambios = useMemo(() => {
         if (!abierta) return [];
+        const textoDe = (documento, id) => {
+            const seccion = documento.find((x) => x.id === id);
+            return seccion.content.length ? documentText('', [{ ...seccion, inDocument: true }]).split('\n').slice(3).join('\n').trim() : '';
+        };
         const antes = buildDocument(abierta.data);
+        const despues = buildDocument(otro);
+        // La copia más antigua va a la izquierda, para leer «antes → después».
+        const abiertaEsAnterior = !contra || abierta.createdAt <= contra.createdAt;
         return SECTIONS.filter((s) => CAMPOS_SECCION[s.id]).map((s) => {
             const campos = CAMPOS_SECCION[s.id];
-            if (campos.every((k) => igual(abierta.data[k], data[k]))) return null;
-            const seccion = antes.find((x) => x.id === s.id);
-            const texto = seccion.content.length ? documentText('', [{ ...seccion, inDocument: true }]).split('\n').slice(3).join('\n').trim() : '';
-            return { id: s.id, label: s.label, campos, texto };
+            if (campos.every((k) => igual(abierta.data[k], otro[k]))) return null;
+            const deAbierta = textoDe(antes, s.id);
+            const delOtro = textoDe(despues, s.id);
+            const trozos = abiertaEsAnterior ? compararTextos(deAbierta, delOtro) : compararTextos(delOtro, deAbierta);
+            return { id: s.id, label: s.label, campos, trozos, ...contarCambios(trozos), soloFormato: deAbierta === delOtro };
         }).filter(Boolean);
-    }, [abierta, data]);
+    }, [abierta, contra, otro]);
+    const abiertaEsAnterior = !contra || (abierta && abierta.createdAt <= contra.createdAt);
+    const nombreAbierta = abierta ? `Copia del ${fecha(abierta.createdAt)}` : '';
+    const nombreOtro = contra ? `Copia del ${fecha(contra.createdAt)}` : 'Lo que tienes ahora';
 
     if (!user || !project.id) return <p className="pro-panel-hint">Con una cuenta, la app guarda copias automáticas de tu proyecto para que puedas volver atrás.</p>;
 
     const abrir = async (v) => {
         setError('');
         setMsg('');
-        try { setAbierta((await api.version(project.id, v.id)).version); } catch (err) { setError(err.message); }
+        try { setAbierta((await api.version(project.id, v.id)).version); setContra(null); } catch (err) { setError(err.message); }
+    };
+    const compararCon = async (vid) => {
+        setError('');
+        if (!vid) { setContra(null); return; }
+        try { setContra((await api.version(project.id, Number(vid))).version); } catch (err) { setError(err.message); }
     };
     // Antes de restaurar se guarda una copia de lo actual: la restauración también se puede deshacer.
     const restaurar = async (campos, etiqueta) => {
@@ -150,7 +172,7 @@ export const Historial = () => {
 
     return (
         <div className="pro-panel-body">
-            <p className="pro-panel-hint">Mientras trabajas se guarda una copia cada 10 minutos (se conservan las últimas 40). Abre una copia para ver qué secciones cambiaron y restaurar solo la que necesites.</p>
+            <p className="pro-panel-hint">Mientras trabajas se guarda una copia cada 10 minutos (se conservan las últimas 40). Abre una copia para ver qué cambió, compararla lado a lado con lo de ahora o con otra copia, y restaurar solo la sección que necesites.</p>
             <button type="button" className="pro-btn pro-btn--ghost" onClick={copiaAhora}><Plus size={15} /> Guardar una copia ahora</button>
             {versions.length === 0 && <p className="pro-panel-hint">Todavía no hay copias. La primera se crea cuando edites el proyecto.</p>}
             <ul className="pro-versions">
@@ -165,27 +187,43 @@ export const Historial = () => {
             </ul>
             {abierta && (
                 <div className="pro-version">
-                    <h4>Copia del {fecha(abierta.createdAt)}</h4>
+                    <div className="pro-version-cabeza">
+                        <h4>{nombreAbierta}</h4>
+                        <label className="pro-version-contra">
+                            <span>Comparar con</span>
+                            <Selector compacto buscar={versions.length > 8} etiqueta="Comparar con" value={contra ? contra.id : ''} onChange={compararCon} opciones={[{ value: '', label: 'Lo que tienes ahora' }, ...versions.filter((v) => v.id !== abierta.id).map((v) => ({ value: v.id, label: `Copia del ${fecha(v.createdAt)}`, nota: v.author ? `Antes de los cambios de ${v.author}` : 'Copia automática' }))]} />
+                        </label>
+                    </div>
                     {cambios.length === 0
-                        ? <p className="pro-panel-hint">Esta copia es igual a lo que tienes ahora.</p>
+                        ? <p className="pro-panel-hint">{contra ? 'Estas dos copias son iguales.' : 'Esta copia es igual a lo que tienes ahora.'}</p>
                         : (
                             <>
+                                <p className="pro-panel-hint">{cambios.length === 1 ? 'Cambia una sección' : `Cambian ${cambios.length} secciones`}. Ábrelas para ver los dos textos lado a lado: <span className="pro-dif pro-dif--menos">lo que se quitó</span> y <span className="pro-dif pro-dif--mas">lo que se agregó</span>.</p>
                                 {cambios.map((c) => (
                                     <details key={c.id}>
                                         <summary>
-                                            <span>{c.label}</span>
-                                            <button type="button" className="pro-link" onClick={(e) => { e.preventDefault(); restaurar(c.campos, `«${c.label}»`); }}><RotateCcw size={14} /> Restaurar esta sección</button>
+                                            <span>{c.label} <small>{c.soloFormato ? 'solo cambian datos internos' : `${c.quitadas ? `−${c.quitadas}` : ''}${c.quitadas && c.agregadas ? ' · ' : ''}${c.agregadas ? `+${c.agregadas}` : ''} palabras`}</small></span>
+                                            <button type="button" className="pro-link" onClick={(e) => { e.preventDefault(); restaurar(c.campos, `«${c.label}»`); }} title={`Deja esta sección como estaba en la ${nombreAbierta.toLowerCase()}`}><RotateCcw size={14} /> Restaurar esta sección</button>
                                         </summary>
-                                        <pre>{c.texto || '(En esta copia la sección estaba vacía.)'}</pre>
+                                        <div className="pro-lados">
+                                            <div>
+                                                <b>{abiertaEsAnterior ? nombreAbierta : nombreOtro}</b>
+                                                <p>{c.trozos.filter((t) => t.tipo !== '+').map((t, i) => (t.tipo === '-' ? <span key={i} className="pro-dif pro-dif--menos">{t.texto}</span> : <React.Fragment key={i}>{t.texto}</React.Fragment>))}{c.trozos.every((t) => t.tipo === '+') && <em>(Vacía)</em>}</p>
+                                            </div>
+                                            <div>
+                                                <b>{abiertaEsAnterior ? nombreOtro : nombreAbierta}</b>
+                                                <p>{c.trozos.filter((t) => t.tipo !== '-').map((t, i) => (t.tipo === '+' ? <span key={i} className="pro-dif pro-dif--mas">{t.texto}</span> : <React.Fragment key={i}>{t.texto}</React.Fragment>))}{c.trozos.every((t) => t.tipo === '-') && <em>(Vacía)</em>}</p>
+                                            </div>
+                                        </div>
                                     </details>
                                 ))}
-                                <button type="button" className="pro-btn pro-btn--ghost" onClick={() => restaurar(cambios.flatMap((c) => c.campos), 'todo el proyecto')}><RotateCcw size={15} /> Restaurar todas las secciones</button>
+                                <button type="button" className="pro-btn pro-btn--ghost" onClick={() => restaurar(cambios.flatMap((c) => c.campos), contra ? 'esas secciones' : 'todo el proyecto')}><RotateCcw size={15} /> {contra ? `Restaurar estas secciones como en la ${nombreAbierta.toLowerCase()}` : 'Restaurar todas las secciones'}</button>
                             </>
                         )}
                 </div>
             )}
-            {msg && <p className="pro-notice" role="status"><CheckCircle2 size={15} /> {msg}</p>}
-            {error && <p className="pro-alert" role="alert"><AlertTriangle size={15} /> {error}</p>}
+            <Aviso texto={msg} />
+            <Aviso texto={error} tipo="error" />
         </div>
     );
 };

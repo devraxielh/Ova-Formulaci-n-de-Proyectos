@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, CheckCircle2, Download, FileText, FolderOpen, Layers, Lightbulb, LogOut, MailCheck, MonitorSmartphone, Presentation, ShieldCheck } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Download, FileText, FolderOpen, Layers, Lightbulb, LogOut, MonitorSmartphone, Presentation, ShieldCheck } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 import { api } from '../services/api';
 import { nombreRol } from './Cuentas';
@@ -149,15 +149,12 @@ const Restablecer = ({ token, onDone, onNavigate }) => {
 };
 
 const Cuenta = ({ onNavigate, activation, resetToken, onResetDone }) => {
-    const { user, login, entrarInvitado, register, logout, hasContent, projects } = useProject();
+    const { user, login, entrarInvitado, logout, hasContent, projects } = useProject();
     const [olvido, setOlvido] = useState(null); // null | 'form' | 'sent' | 'nomail'
-    const [mode, setMode] = useState('login');
-    const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState(null);
     const [busy, setBusy] = useState(false);
-    const [sent, setSent] = useState(null); // { email, emailSent }
     const [resent, setResent] = useState(false);
 
     const resend = async (address) => {
@@ -175,23 +172,12 @@ const Cuenta = ({ onNavigate, activation, resetToken, onResetDone }) => {
         setError(null);
         setResent(false);
 
-        if (mode === 'register') {
-            if (!name.trim()) return setError({ message: 'Escribe tu nombre.' });
-            if (!email.trim()) return setError({ message: 'Escribe tu correo.' });
-            if (password.length < 8) return setError({ message: 'La contraseña debe tener al menos 8 caracteres.' });
-        } else if (!email.trim() || !password) {
-            return setError({ message: 'Escribe tu usuario y tu contraseña.' });
-        }
+        if (!email.trim() || !password) return setError({ message: 'Escribe tu usuario y tu contraseña.' });
 
         setBusy(true);
         try {
-            if (mode === 'register') {
-                const result = await register({ name: name.trim(), email: email.trim(), password });
-                setSent({ email: result.email, emailSent: result.emailSent });
-            } else {
-                await login({ email: email.trim(), password });
-                onNavigate('proyecto');
-            }
+            await login({ email: email.trim(), password });
+            onNavigate('proyecto');
             setPassword('');
         } catch (err) {
             setError({ message: err.message || 'No se pudo completar la solicitud.', code: err.code });
@@ -274,30 +260,6 @@ const Cuenta = ({ onNavigate, activation, resetToken, onResetDone }) => {
         );
     }
 
-    if (sent) {
-        return (
-            <AccountShell aside={<BenefitsAside />}>
-                <section className="acc-card">
-                    <span className="acc-badge-icon"><MailCheck size={24} aria-hidden="true" /></span>
-                    <h2>Activa tu cuenta</h2>
-                    {sent.emailSent ? (
-                        <p className="acc-lead">Enviamos un enlace de activación a <strong>{sent.email}</strong>. Ábrelo para activar tu cuenta; vence en 48 horas. Si no lo ves, revisa la carpeta de correo no deseado.</p>
-                    ) : (
-                        <p className="acc-lead">Tu cuenta quedó registrada, pero no pudimos enviar el correo de activación a <strong>{sent.email}</strong>. Pide al administrador que active tu cuenta.</p>
-                    )}
-                    {resent && <p className="pro-notice" role="status">Si la cuenta sigue pendiente, enviamos un enlace nuevo.</p>}
-                    {error && <p className="pro-alert" role="alert">{error.message}</p>}
-                    <div className="acc-stack">
-                        <button type="button" className="pro-btn pro-btn--primary pro-btn--block" onClick={() => { setSent(null); setMode('login'); setEmail(sent.email); }}>
-                            Ya la activé, iniciar sesión
-                        </button>
-                        <button type="button" className="pro-btn pro-btn--ghost pro-btn--block" onClick={() => resend(sent.email)}>Reenviar el enlace</button>
-                    </div>
-                </section>
-            </AccountShell>
-        );
-    }
-
     if (resetToken && !user) return <Restablecer token={resetToken} onDone={onResetDone} onNavigate={onNavigate} />;
 
     if (olvido) {
@@ -341,36 +303,26 @@ const Cuenta = ({ onNavigate, activation, resetToken, onResetDone }) => {
         );
     }
 
-    const isRegister = mode === 'register';
-
     return (
         <AccountShell aside={<BenefitsAside />}>
             <section className="acc-card">
                 {activation?.status === 'working' && <p className="pro-notice" role="status">Activando tu cuenta…</p>}
                 {activation?.status === 'error' && <p className="pro-alert" role="alert">{activation.message}</p>}
-                <h2>{isRegister ? 'Crea tu cuenta' : 'Inicia sesión'}</h2>
+                <h2>Inicia sesión</h2>
 
                 <p className="acc-lead">
-                    {isRegister
-                        ? 'Con una cuenta, tu proyecto se guarda en el servidor y puedes continuarlo desde cualquier equipo. Te enviaremos un enlace para activarla.'
-                        : 'Entra para abrir tus proyectos guardados.'}
+                    Entra para abrir tus proyectos guardados.
                     {hasContent && ' Lo que ya escribiste en este navegador se conserva y pasa a tu cuenta.'}
                 </p>
 
                 <form className="pro-form" onSubmit={submit} noValidate>
-                    {isRegister && (
-                        <div className="input-group">
-                            <label htmlFor="cuenta-nombre">Nombre completo</label>
-                            <input id="cuenta-nombre" className="input-field" type="text" autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} />
-                        </div>
-                    )}
                     <div className="input-group">
-                        <label htmlFor="cuenta-correo">{isRegister ? 'Correo electrónico' : 'Correo o usuario'}</label>
+                        <label htmlFor="cuenta-correo">Correo o usuario</label>
                         <input
                             id="cuenta-correo"
                             className="input-field"
-                            type={isRegister ? 'email' : 'text'}
-                            autoComplete={isRegister ? 'email' : 'username'}
+                            type="text"
+                            autoComplete="username"
                             autoCapitalize="none"
                             spellCheck={false}
                             value={email}
@@ -384,13 +336,11 @@ const Cuenta = ({ onNavigate, activation, resetToken, onResetDone }) => {
                             id="cuenta-clave"
                             className="input-field"
                             type="password"
-                            autoComplete={isRegister ? 'new-password' : 'current-password'}
+                            autoComplete="current-password"
                             value={password}
                             onChange={(event) => setPassword(event.target.value)}
-                            aria-describedby={isRegister ? 'cuenta-clave-ayuda' : undefined}
                         />
-                        {isRegister && <small id="cuenta-clave-ayuda">Mínimo 8 caracteres.</small>}
-                        {!isRegister && <button type="button" className="pro-link acc-olvido" onClick={() => { setOlvido('form'); setError(null); }}>¿Olvidaste tu contraseña?</button>}
+                        <button type="button" className="pro-link acc-olvido" onClick={() => { setOlvido('form'); setError(null); }}>¿Olvidaste tu contraseña?</button>
                     </div>
 
                     {error && (
@@ -407,28 +357,19 @@ const Cuenta = ({ onNavigate, activation, resetToken, onResetDone }) => {
                     {resent && <p className="pro-notice" role="status">Si la cuenta sigue pendiente, enviamos un enlace nuevo a ese correo.</p>}
 
                     <button type="submit" className="pro-btn pro-btn--primary pro-btn--block" disabled={busy}>
-                        {busy ? 'Un momento…' : isRegister ? 'Crear cuenta' : 'Iniciar sesión'}
+                        {busy ? 'Un momento…' : 'Iniciar sesión'}
                     </button>
                 </form>
 
-                {!isRegister && (
-                    <div className="acc-invitado">
-                        <span>o</span>
-                        <button type="button" className="pro-btn pro-btn--ghost pro-btn--block" disabled={busy} onClick={comoInvitado}><Presentation size={16} /> Entrar como invitado</button>
-                        <small>Sin cuenta: solo verás las presentaciones de cada módulo.</small>
-                    </div>
-                )}
+                <div className="acc-invitado">
+                    <span>o</span>
+                    <button type="button" className="pro-btn pro-btn--ghost pro-btn--block" disabled={busy} onClick={comoInvitado}><Presentation size={16} /> Entrar como invitado</button>
+                    <small>Sin cuenta: solo verás las presentaciones de cada módulo.</small>
+                </div>
 
-                {!isRegister && (
-                    <p className="pro-fine">
-                        ¿No tienes cuenta? Aquí nadie se registra por su cuenta: la crea el administrador de la plataforma o tu profesor, y te llega un correo con el acceso.
-                    </p>
-                )}
-                {isRegister && (
-                    <p className="pro-fine">
-                        Guardamos tu nombre, tu correo y el contenido de tus proyectos para que puedas continuar tu trabajo. El administrador de la plataforma puede consultarlos. No se comparten con terceros.
-                    </p>
-                )}
+                <p className="pro-fine">
+                    ¿No tienes cuenta? Aquí nadie se registra por su cuenta: la crea el administrador de la plataforma o tu profesor, y te llega un correo con el acceso.
+                </p>
             </section>
         </AccountShell>
     );

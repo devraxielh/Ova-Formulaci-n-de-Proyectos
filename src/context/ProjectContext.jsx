@@ -375,9 +375,6 @@ export const ProjectProvider = ({ children }) => {
         await loadForUser();
     }, [loadForUser]);
 
-    // El registro deja la cuenta pendiente: se activa con el enlace del correo.
-    const register = useCallback((payload) => api.register(payload), []);
-
     const verify = useCallback(async (token) => {
         const { user: current } = await api.verify(token);
         setUser(current);
@@ -466,12 +463,12 @@ export const ProjectProvider = ({ children }) => {
 
     const value = useMemo(() => ({
         user, authReady, projects, project, data, saveState, saveError, conflict, others, section, setSection, resolveConflict, sinCupo, recheck,
-        setField, login, entrarInvitado, register, verify, resetPassword, changePassword, logout, openProject, createProject, renameProject, deleteProject, clearDraft,
+        setField, login, entrarInvitado, verify, resetPassword, changePassword, logout, openProject, createProject, renameProject, deleteProject, clearDraft,
         retrySave: flush,
         flush,
         refreshProjects: async () => { const { projects: list } = await api.listProjects(); setProjects(list); return list; },
         hasContent: hasContent(data),
-    }), [user, authReady, projects, project, data, saveState, saveError, conflict, others, section, setSection, resolveConflict, sinCupo, recheck, setField, login, entrarInvitado, register, verify, resetPassword, changePassword, logout, openProject, createProject, renameProject, deleteProject, clearDraft, flush]);
+    }), [user, authReady, projects, project, data, saveState, saveError, conflict, others, section, setSection, resolveConflict, sinCupo, recheck, setField, login, entrarInvitado, verify, resetPassword, changePassword, logout, openProject, createProject, renameProject, deleteProject, clearDraft, flush]);
 
     return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;
 };

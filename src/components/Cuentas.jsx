@@ -94,7 +94,22 @@ export const Credenciales = ({ cuentas, mail, onCerrar }) => {
 
 // Lee el texto pegado o el archivo CSV: nombre, correo, rol, (para estudiantes) el correo de su profesor y el grupo.
 // Acepta coma, punto y coma o tabulador, con o sin fila de encabezados.
-export const leerLote = (texto) => {
+// Lista del profesor: nombre, correo y grupo (el grupo es opcional).
+export const leerEstudiantes = (texto) => leerFilas(texto, 3).map(([name = '', email = '', group = '']) => {
+    const correo = email.trim().toLowerCase();
+    const error = !name.trim() ? 'Falta el nombre.' : !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(correo) ? 'El correo no es válido.' : '';
+    return { name: name.trim(), email: correo, group: group.trim().replace(/\s+/g, ' ').slice(0, 60), error };
+});
+
+export const leerLote = (texto) => leerFilas(texto, 5).map(([name = '', email = '', rol = '', teacher = '', group = '']) => {
+    const role = rolDesdeTexto(rol);
+    const correo = email.trim().toLowerCase();
+    const error = !name.trim() ? 'Falta el nombre.' : !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(correo) ? 'El correo no es válido.' : !role ? `No se reconoce el rol «${rol}».` : '';
+    return { name: name.trim(), email: correo, role: role || 'student', teacher: role === 'student' ? teacher.trim().toLowerCase() : '', rolDado: Boolean(rol.trim()), group: group.trim().replace(/\s+/g, ' ').slice(0, 60), error };
+});
+
+// Texto pegado o CSV → filas de celdas (hasta `columnas`), sin la fila de encabezados si la trae.
+const leerFilas = (texto, columnas) => {
     const lineas = String(texto || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     if (!lineas.length) return [];
     // Separa una línea respetando las comillas ("Pérez, Ana" es una sola celda).
@@ -112,16 +127,11 @@ export const leerLote = (texto) => {
             } else if (ch === sep && !entreComillas) { celdas.push(actual.trim()); actual = ''; } else actual += ch;
         }
         celdas.push(actual.trim());
-        return celdas.slice(0, 5);
+        return celdas.slice(0, columnas);
     };
     const filas = lineas.map(partir);
     const conEncabezado = /nombre|name/i.test(filas[0][0] || '') || /correo|email|mail/i.test(filas[0][1] || '');
-    return (conEncabezado ? filas.slice(1) : filas).filter((f) => f.some(Boolean)).map(([name = '', email = '', rol = '', teacher = '', group = '']) => {
-        const role = rolDesdeTexto(rol);
-        const correo = email.trim().toLowerCase();
-        const error = !name.trim() ? 'Falta el nombre.' : !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(correo) ? 'El correo no es válido.' : !role ? `No se reconoce el rol «${rol}».` : '';
-        return { name: name.trim(), email: correo, role: role || 'student', teacher: role === 'student' ? teacher.trim().toLowerCase() : '', rolDado: Boolean(rol.trim()), group: group.trim().replace(/\s+/g, ' ').slice(0, 60), error };
-    });
+    return (conEncabezado ? filas.slice(1) : filas).filter((f) => f.some(Boolean));
 };
 
 /* ---------- Administrador: crear un usuario o cargar un lote ---------- */

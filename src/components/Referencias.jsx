@@ -10,6 +10,7 @@ import BuscarAntecedentes from './BuscarAntecedentes';
 import { alertasRef, verificarRef } from '../services/verificarRefs';
 import './Proyecto.css';
 import './Referencias.css';
+import { Aviso } from './Avisos';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const CONOCIDAS = new Map(REFERENCIAS_CONOCIDAS.map((ref) => [claveRef(ref), ref]));
@@ -229,13 +230,13 @@ const Referencias = ({ onNavigate }) => {
                                 <p className="ref-citas"><b>En el texto:</b> {citaParentetica(form)} · {citaNarrativa(form)}</p>
                             </div>
                         )}
-                        {error && <p className="pro-alert" role="alert">{error}</p>}
+                        <Aviso texto={error} tipo="error" />
                         <div className="ref-acciones">
                             <button type="submit" className="pro-btn pro-btn--primary">{editando ? <><CheckCircle2 size={16} /> Guardar cambios</> : <><Plus size={16} /> Agregar a mis referencias</>}</button>
                             {(editando || vista) && <button type="button" className="pro-btn pro-btn--ghost" onClick={limpiar}><X size={15} /> {editando ? 'Cancelar' : 'Limpiar'}</button>}
                         </div>
                     </form>
-                    {aviso && <p className="pro-notice" role="status">{aviso}</p>}
+                    <Aviso texto={aviso} />
 
                     <details className="ref-ayuda">
                         <summary>Cómo citar en tus párrafos</summary>

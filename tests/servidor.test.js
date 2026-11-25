@@ -864,6 +864,47 @@ test('entrar como invitado sin cuenta: sesión compartida de solo presentaciones
     assert.equal((await cliente()('/auth/guest', 'POST')).status, 200);
 });
 
+test('profesor con grupos: crea estudiantes con grupo, carga su lista por lotes y cambia grupo o permiso a varios', async () => {
+    const admin = await entrarAdmin();
+    const profe = await cuenta('profe19', 'teacher');
+    const otro = await cuenta('otroprofe19', 'teacher');
+    const t = Date.now();
+    const uno = await profe.api('/teacher/students', 'POST', { name: 'Con Grupo', email: `cg.${t}@example.test`, grupo: '  Grupo   A ', permitir: false });
+    assert.equal(uno.body.student.grupo, 'Grupo A');
+
+    // Lote: cada fila con su grupo o el de toda la lista; valida correos, repetidos y que sea profesor.
+    assert.equal((await admin('/teacher/students/batch', 'POST', { users: [{ name: 'x', email: `x.${t}@example.test` }] })).status, 403);
+    assert.equal((await profe.api('/teacher/students/batch', 'POST', { users: [] })).status, 400);
+    const lote = (await profe.api('/teacher/students/batch', 'POST', { group: 'Grupo B', permitir: true, users: [
+        { name: 'Lote Uno', email: `l1.${t}@example.test` },
+        { name: 'Lote Dos', email: `l2.${t}@example.test`, group: 'Grupo A' },
+        { name: 'Sin correo', email: 'no-es' },
+        { name: 'Repetido', email: `cg.${t}@example.test` },
+    ] })).body;
+    assert.equal(lote.creadas, 2);
+    assert.deepEqual(lote.resultados.map((x) => x.ok), [true, true, false, false]);
+    assert.ok(lote.resultados[0].clave && !lote.resultados[2].clave);
+    assert.equal(lote.students.length, 3);
+    const por = (email) => lote.students.find((x) => x.email === email);
+    assert.deepEqual([por(`l1.${t}@example.test`).grupo, por(`l1.${t}@example.test`).projectLimit], ['Grupo B', 1]);
+    assert.equal(por(`l2.${t}@example.test`).grupo, 'Grupo A');
+    await estrenar(`l1.${t}@example.test`, lote.resultados[0].clave);
+    // El administrador los ve con su grupo y su profesor.
+    const visto = (await admin('/admin/users')).body.users.find((u) => u.email === `l1.${t}@example.test`);
+    assert.deepEqual([visto.grupo, visto.teacherId], ['Grupo B', profe.id]);
+
+    // Varios a la vez: solo los suyos; valida la acción y el tope del permiso.
+    const ids = lote.students.map((x) => x.id);
+    assert.deepEqual((await otro.api('/teacher/students/bulk', 'POST', { ids, action: 'group', value: 'Ajeno' })).body.hechas, 0);
+    assert.equal((await profe.api('/teacher/students/bulk', 'POST', { ids, action: 'borrar' })).status, 400);
+    assert.equal((await profe.api('/teacher/students/bulk', 'POST', { ids, action: 'limit', value: 99 })).status, 400);
+    const g = (await profe.api('/teacher/students/bulk', 'POST', { ids: [...ids, 1], action: 'group', value: 'Grupo C' })).body;
+    assert.deepEqual([g.hechas, g.omitidas], [3, 1]);
+    assert.ok(g.students.every((x) => x.grupo === 'Grupo C'));
+    assert.ok((await profe.api('/teacher/students/bulk', 'POST', { ids, action: 'limit', value: 1 })).body.students.every((x) => x.projectLimit === 1));
+    assert.ok((await profe.api('/teacher/students/bulk', 'POST', { ids: [ids[0]], action: 'group', value: '' })).body.students.some((x) => x.grupo === ''));
+});
+
 test('carga por lotes: crea las filas buenas, explica las malas y enlaza cada estudiante con su profesor', async () => {
     const admin = await entrarAdmin();
     const t = Date.now();

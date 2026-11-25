@@ -1670,10 +1670,57 @@ app.get('/api/teacher/students', requireTeacher, (req, res) => {
 app.post('/api/teacher/students', requireTeacher, crearLimit, async (req, res) => {
     const total = db.prepare("SELECT COUNT(*) AS n FROM users WHERE teacher_id = ?").get(req.user.id).n;
     if (total >= 300) return res.status(400).json({ error: 'Llegaste al máximo de 300 estudiantes a tu cargo.' });
-    const r = await crearCuenta({ name: req.body?.name, email: req.body?.email, role: 'student', teacherId: req.user.id, projectLimit: req.body?.permitir ? 1 : 0 }, `Tu profesor, ${req.user.name},`);
+    const r = await crearCuenta({ name: req.body?.name, email: req.body?.email, role: 'student', teacherId: req.user.id, projectLimit: req.body?.permitir ? 1 : 0, grupo: req.body?.grupo }, `Tu profesor, ${req.user.name},`);
     if (r.error) return res.status(400).json({ error: r.error });
-    bitacora(req, 'Creó a un estudiante', `${r.user.name} (${r.user.email})`);
+    bitacora(req, 'Creó a un estudiante', `${r.user.name} (${r.user.email})${r.user.grupo ? `, grupo «${r.user.grupo}»` : ''}`);
     return res.status(201).json({ student: filaEstudiante(r.user), clave: r.clave, emailSent: r.emailSent });
+});
+
+// El profesor carga su propia lista: nombre, correo y grupo. Hasta 150 filas por vez y 300 estudiantes en total.
+app.post('/api/teacher/students/batch', requireTeacher, crearLimit, async (req, res) => {
+    const filas = Array.isArray(req.body?.users) ? req.body.users.slice(0, 150) : [];
+    if (!filas.length) return res.status(400).json({ error: 'No hay filas para cargar.' });
+    let total = db.prepare('SELECT COUNT(*) AS n FROM users WHERE teacher_id = ?').get(req.user.id).n;
+    const resultados = [];
+    for (const fila of filas) {
+        const base = { email: String(fila?.email || '').trim().toLowerCase(), name: String(fila?.name || '') };
+        if (total >= 300) { resultados.push({ ...base, ok: false, error: 'Llegaste al máximo de 300 estudiantes a tu cargo.' }); continue; }
+        // eslint-disable-next-line no-await-in-loop
+        const r = await crearCuenta({ name: fila?.name, email: fila?.email, role: 'student', teacherId: req.user.id, projectLimit: req.body?.permitir ? 1 : 0, grupo: fila?.group || req.body?.group }, `Tu profesor, ${req.user.name},`);
+        if (r.error) { resultados.push({ ...base, ok: false, error: r.error }); continue; }
+        total += 1;
+        resultados.push({ email: r.user.email, name: r.user.name, ok: true, clave: r.clave, emailSent: r.emailSent });
+    }
+    const creadas = resultados.filter((x) => x.ok).length;
+    if (creadas) bitacora(req, 'Cargó una lista de estudiantes', `${creadas} creadas de ${filas.length} filas`);
+    const rows = db.prepare("SELECT * FROM users WHERE role = 'student' AND teacher_id = ? ORDER BY name COLLATE NOCASE").all(req.user.id);
+    return res.json({ resultados, creadas, mail: Boolean(mailer), students: rows.map(filaEstudiante) });
+});
+
+// El mismo cambio a varios de sus estudiantes: el grupo, o el permiso de crear proyectos.
+app.post('/api/teacher/students/bulk', requireTeacher, (req, res) => {
+    const ids = [...new Set((Array.isArray(req.body?.ids) ? req.body.ids : []).map(Number).filter(Number.isInteger))].slice(0, 300);
+    if (!ids.length) return res.status(400).json({ error: 'No hay estudiantes seleccionados.' });
+    const mios = db.prepare(`SELECT * FROM users WHERE id IN (${ids.map(() => '?').join(',')}) AND role = 'student' AND teacher_id = ?`).all(...ids, req.user.id);
+    const action = String(req.body?.action || '');
+    let texto;
+    if (action === 'group') {
+        const grupo = grupoLimpio(req.body?.value);
+        const upd = db.prepare('UPDATE users SET grupo = ? WHERE id = ?');
+        db.transaction(() => mios.forEach((u) => upd.run(grupo, u.id)))();
+        texto = grupo ? `Puso en el grupo «${grupo}»` : 'Sacó del grupo';
+    } else if (action === 'limit') {
+        const limit = parseInt(req.body?.value, 10);
+        if (!Number.isInteger(limit) || limit < 0 || limit > CUPO_MAX_ESTUDIANTE) return res.status(400).json({ error: `El cupo debe estar entre 0 y ${CUPO_MAX_ESTUDIANTE}.` });
+        const upd = db.prepare('UPDATE users SET project_limit = ? WHERE id = ?');
+        db.transaction(() => mios.forEach((u) => upd.run(limit, u.id)))();
+        texto = `Puso el permiso en ${limit}`;
+    } else {
+        return res.status(400).json({ error: 'Acción no válida.' });
+    }
+    if (mios.length) bitacora(req, `${texto}: ${mios.length} ${mios.length === 1 ? 'estudiante' : 'estudiantes'}`, mios.slice(0, 12).map((u) => u.email).join(', ') + (mios.length > 12 ? '…' : ''));
+    const rows = db.prepare("SELECT * FROM users WHERE role = 'student' AND teacher_id = ? ORDER BY name COLLATE NOCASE").all(req.user.id);
+    return res.json({ hechas: mios.length, omitidas: ids.length - mios.length, students: rows.map(filaEstudiante) });
 });
 
 // Permitir (o no) que el estudiante cree proyectos: 0 = no puede; hasta CUPO_MAX_ESTUDIANTE.

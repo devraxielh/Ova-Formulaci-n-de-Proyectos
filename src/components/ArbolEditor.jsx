@@ -5,6 +5,7 @@ import { useProject, useProjectField } from '../context/ProjectContext';
 import { MAX_RAMAS, NIVELES, arbolCompleto, arbolDataUrl, arbolPng, explicacionArbol } from '../services/arbol';
 import './Proyecto.css';
 import './Arbol.css';
+import { Aviso } from './Avisos';
 
 /*
  * Editor de un árbol (del problema o de objetivos): el estudiante escribe el centro, las raíces y las ramas,
@@ -190,7 +191,7 @@ const ArbolEditor = ({ heading, cfg }) => {
                             <small>{edicion.explicacion.trim() ? 'Se usará tu texto. Bórralo para volver al párrafo automático.' : 'Si lo dejas vacío se usa este párrafo automático, con el número real de la figura. Escribe aquí para redactarlo a tu manera.'}</small>
                         </label>
                     )}
-                    {error && <p className="pro-alert" role="alert">{error}</p>}
+                    <Aviso texto={error} tipo="error" />
                     <div className="arb-acciones">
                         <button type="button" className="pro-btn pro-btn--ghost" onClick={descargar} disabled={!completo}><Download size={15} /> Descargar imagen (PNG)</button>
                     </div>

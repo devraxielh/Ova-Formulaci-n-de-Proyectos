@@ -3,6 +3,7 @@ import { AlertTriangle, Check, Loader2, Sparkles } from 'lucide-react';
 import { groq } from '../services/api';
 import { useProjectField } from '../context/ProjectContext';
 import { comparar, evaluarCoherencia, partesObjetivos, terminos } from '../services/coherencia';
+import { Aviso } from './Avisos';
 
 /*
  * Botón «Arreglar con IA» de una relación débil en «Coherencia entre secciones».
@@ -183,7 +184,7 @@ const Arreglar = ({ check, data }) => {
                 </button>
             )}
             {estado === 'aplicado' && <p className="pro-coh-ok" role="status"><Check size={14} aria-hidden="true" /> Cambio aplicado. La coherencia se volvió a calcular.</p>}
-            {error && <p className="pro-alert" role="alert"><AlertTriangle size={15} aria-hidden="true" /> {error}</p>}
+            <Aviso texto={error} tipo="error" />
             {propuesta && (
                 <div className="pro-coh-propuesta">
                     <span>Propuesta de la IA</span>

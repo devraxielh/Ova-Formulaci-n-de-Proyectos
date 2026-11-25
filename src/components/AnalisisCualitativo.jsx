@@ -4,6 +4,7 @@ import { useProject, useProjectField } from '../context/ProjectContext';
 import { groq } from '../services/api';
 import { partesObjetivos } from '../services/coherencia';
 import { COLORES, MAX_FUENTES, MAX_TEXTO, normalizar, resumenCategorias, tablaCategorias, tramos } from '../services/cualitativo';
+import { Aviso } from './Avisos';
 
 /*
  * Análisis cualitativo: se pegan las transcripciones, se marcan fragmentos con categorías
@@ -115,7 +116,7 @@ const AnalisisCualitativo = ({ onNavigate, embebido = false }) => {
                         <button type="button" className="pro-btn pro-btn--primary" onClick={agregarFuente}>Guardar transcripción</button>
                     </details>
                 )}
-                {error && <p className="pro-alert" role="alert"><AlertTriangle size={15} /> {error}</p>}
+                <Aviso texto={error} tipo="error" />
             </section>
 
             {fuente && (

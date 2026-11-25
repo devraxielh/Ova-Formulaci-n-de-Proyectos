@@ -8,6 +8,7 @@ import './Proyecto.css';
 import './Instrumentos.css';
 import AnalisisCualitativo from './AnalisisCualitativo';
 import './Analisis.css';
+import { Aviso } from './Avisos';
 
 /*
  * Análisis de datos básico: toma las respuestas de una encuesta en línea o un archivo (Excel o CSV),
@@ -365,7 +366,7 @@ const AnalisisDatos = ({ onNavigate, embebido = false }) => {
                 {publicadas.length === 0 && <p className="adm-muted">¿Aún no tienes datos? En <button type="button" className="pro-link" onClick={() => onNavigate('instrumentos')}>Instrumentos</button> puedes crear tu encuesta y aplicarla en línea.</p>}
                 <p className="adm-muted">El archivo se analiza en tu navegador y no se guarda en la plataforma: solo quedan las tablas y los gráficos que lleves a Resultados. Quita antes los nombres, cédulas o teléfonos de los participantes.</p>
                 {estado === 'cargando' && <p role="status"><Loader2 size={15} className="ins-spin" /> Leyendo los datos…</p>}
-                {error && <p className="pro-alert" role="alert"><AlertTriangle size={15} /> {error}</p>}
+                <Aviso texto={error} tipo="error" />
             </section>
 
             {fuente && fuente.tabla.filas.length >= 5 && <Cruce tabla={fuente.tabla} variables={variables} nota={fuente.nota} onAgregar={agregar} />}

@@ -530,3 +530,22 @@ label {
   .sidebar nav .nav-button,
   .sidebar--collapsed nav .nav-button { flex: 1 1 0; min-height: 1.7rem; max-height: 2.85rem; padding-block: 0; margin-bottom: 0.12rem; }
 }
+
+/* Listas desplegables del navegador: mismo aspecto que el selector con búsqueda (borde, radio y flecha propia).
+   Van con especificidad cero para que cada módulo pueda ajustar tamaño y ancho; la flecha se fija para que ninguno la tape. */
+:where(select:not([multiple])) {
+  appearance: none; -webkit-appearance: none;
+  border: 1px solid #cbd5e1; border-radius: 0.6rem; background-color: #fff;
+  font: inherit; color: #1e293b; cursor: pointer;
+  transition: border-color 0.18s, box-shadow 0.18s, background-color 0.18s;
+}
+select:not([multiple]) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.6rem center !important;
+  background-size: 1rem !important;
+  padding-right: 2.1rem !important;
+}
+:where(select:not([multiple])):hover:not(:disabled) { border-color: #94a3b8; }
+:where(select:not([multiple])):focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; border-color: #4f46e5; }
+:where(select:not([multiple])):disabled { opacity: 0.55; cursor: not-allowed; }

@@ -31,7 +31,6 @@ async function request(path, { method = 'GET', body } = {}) {
 
 export const api = {
     me: () => request('/auth/me'),
-    register: (payload) => request('/auth/register', { method: 'POST', body: payload }),
     login: (payload) => request('/auth/login', { method: 'POST', body: payload }),
     guest: () => request('/auth/guest', { method: 'POST' }),
     logout: () => request('/auth/logout', { method: 'POST' }),
@@ -104,6 +103,8 @@ export const api = {
     teacher: {
         students: () => request('/teacher/students'),
         createStudent: (payload) => request('/teacher/students', { method: 'POST', body: payload }),
+        createBatch: (users, opciones = {}) => request('/teacher/students/batch', { method: 'POST', body: { users, ...opciones } }),
+        bulk: (ids, action, value) => request('/teacher/students/bulk', { method: 'POST', body: { ids, action, value } }),
         setLimit: (id, limit) => request(`/teacher/students/${id}/limit`, { method: 'POST', body: { limit } }),
         newAccess: (id) => request(`/teacher/students/${id}/access`, { method: 'POST' }),
         project: (id) => request(`/teacher/projects/${id}`),

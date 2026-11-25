@@ -10,6 +10,7 @@ import { arbolPng } from '../services/arbol';
 import { fasesPng } from '../services/fasesGrafico';
 import { TEMAS, temaDe } from '../data/temasDiapositivas';
 import './Proyecto.css';
+import { Aviso } from './Avisos';
 
 // Mismo orden que el menú lateral.
 const MENU_ORDER = ['ideacion', 'titulo', 'pregunta', 'arbol', 'arbolobjetivos', 'planteamiento', 'objetivos', 'introduccion', 'justificacion', 'alcances', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'resumen', 'referencias'];
@@ -384,7 +385,7 @@ const MiProyecto = ({ onNavigate }) => {
                 </div>
             </section>
 
-            {error && <p className="pro-alert" role="alert">{error}</p>}
+            <Aviso texto={error} tipo="error" />
 
             <ProyectoPaneles
                 extra={user && !project.shared && (confirmDelete ? (
@@ -443,7 +444,7 @@ const MiProyecto = ({ onNavigate }) => {
                             </button>
                         </div>
                     </div>
-                    {notice && <p className="pro-notice" role="status">{notice}</p>}
+                    <Aviso texto={notice} />
 
                     {inPaper.length === 0 ? (
                         <div className="pro-empty">

@@ -6,6 +6,7 @@ import { partesObjetivos } from '../services/coherencia';
 import { FRECUENCIA, TIPOS_PREGUNTA, UBICACIONES, definicionEncuesta, opcionesDe, preguntasDe, ubicacionDe } from '../services/instrumentos';
 import './Proyecto.css';
 import './Instrumentos.css';
+import { Aviso } from './Avisos';
 
 /*
  * Generador de instrumentos: arma la encuesta o la guía de entrevista a partir de los objetivos,
@@ -202,10 +203,10 @@ const Instrumentos = ({ onNavigate, embebido = false, fila = null }) => {
                     </button>
                     <button type="button" className="pro-btn pro-btn--ghost" onClick={() => crear(false)} disabled={estado === 'generando'}><Plus size={16} /> Empezar en blanco</button>
                 </div>
-                {error && <p className="pro-alert" role="alert"><AlertTriangle size={15} /> {error}</p>}
+                <Aviso texto={error} tipo="error" />
             </section>
             )}
-            {fila && ins && error && <p className="pro-alert" role="alert"><AlertTriangle size={15} /> {error}</p>}
+            <Aviso texto={fila && ins ? error : ''} tipo="error" />
 
             {!fila && instrumentos.length > 1 && (
                 <div className="ins-tabs" role="tablist">
