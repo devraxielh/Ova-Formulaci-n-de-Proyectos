@@ -176,7 +176,7 @@ export const SLIDES = construccionPrimero([
             type: 'tabs', title: 'Movimientos', items: [
                 { id: 'h', label: '1. Hallazgo', what: 'Retoma el resultado principal en una oración.', example: 'Los resultados mostraron que el olvido fue el principal factor asociado a la inasistencia.' },
                 { id: 'i', label: '2. Interpretación', what: 'Di qué significa.', example: 'Esto sugiere que la inasistencia depende más de la organización de la cita que de la voluntad del paciente.' },
-                { id: 'c', label: '3. Comparación', what: 'Compara con los antecedentes: coincide o difiere, y por qué.', example: 'Este hallazgo coincide con Pérez y Gómez (2022), quienes reportaron que el olvido explicó el 41 % de las citas perdidas en Bogotá.' },
+                { id: 'c', label: '3. Comparación', what: 'Compara con los antecedentes: coincide o difiere, y por qué.', example: 'Este hallazgo coincide con Pérez y Gómez (2022), quienes reportaron que el olvido explicó el 38 % de las citas perdidas en Bogotá.' },
                 { id: 't', label: '4. Teoría', what: 'Explica el hallazgo con tu marco teórico.', example: 'Desde el modelo de creencias en salud (Rosenstock, 1974), la falta de recordatorios equivale a la ausencia de señales para la acción.' },
                 { id: 'im', label: '5. Implicación', what: 'Di qué se puede hacer con este conocimiento.', example: 'Implementar recordatorios automáticos podría reducir la inasistencia.' },
             ],
@@ -241,7 +241,7 @@ export const SLIDES = construccionPrimero([
         lead: ['Mira los cinco movimientos en un solo párrafo.'],
         panel: {
             type: 'example', title: 'Ejemplo', paragraphs: [
-                'Los resultados mostraron que el olvido fue el principal factor asociado a la inasistencia. Esto sugiere que la inasistencia depende en buena medida de la organización de la cita. Este hallazgo coincide con Pérez y Gómez (2022), quienes reportaron que el olvido explicó el 41 % de las citas perdidas en una IPS de Bogotá, y contrasta con Díaz (2023), que encontró el transporte como principal barrera en la zona rural de Corozal; la diferencia podría explicarse porque la mayoría de los pacientes de este estudio vive en la zona urbana. Desde el modelo de creencias en salud (Rosenstock, 1974), la falta de recordatorios equivale a la ausencia de señales para la acción. En consecuencia, implementar recordatorios automáticos podría reducir la inasistencia.',
+                'Los resultados mostraron que el olvido fue el principal factor asociado a la inasistencia. Esto sugiere que la inasistencia depende en buena medida de la organización de la cita. Este hallazgo coincide con Pérez y Gómez (2022), quienes reportaron que el olvido explicó el 38 % de las citas perdidas en una IPS de Bogotá, y contrasta con Díaz (2023), que encontró el transporte como principal barrera en la zona rural de Corozal; la diferencia podría explicarse porque la mayoría de los pacientes de este estudio vive en la zona urbana. Desde el modelo de creencias en salud (Rosenstock, 1974), la falta de recordatorios equivale a la ausencia de señales para la acción. En consecuencia, implementar recordatorios automáticos podría reducir la inasistencia.',
             ],
         },
     },

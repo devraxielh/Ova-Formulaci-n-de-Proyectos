@@ -143,12 +143,12 @@ const PARTES = [
 
 const VERBOS = [
     { id: 'explorar', label: 'Explorar', what: 'Cuando el tema es poco conocido.', example: 'Explorar · Indagar · Identificar · Reconocer' },
-    { id: 'describir', label: 'Describir', what: 'Cuando quieres mostrar cómo es algo.', example: 'Describir · Caracterizar · Diagnosticar · Cuantificar · Clasificar' },
+    { id: 'describir', label: 'Describir', what: 'Cuando quieres mostrar cómo es algo.', example: 'Describir · Caracterizar · Diagnosticar · Cuantificar · Medir · Clasificar' },
     { id: 'comparar', label: 'Comparar', what: 'Cuando hay dos o más grupos, lugares o momentos.', example: 'Comparar · Contrastar · Diferenciar' },
-    { id: 'relacionar', label: 'Relacionar', what: 'Cuando buscas si dos variables van juntas.', example: 'Establecer (la relación) · Correlacionar · Asociar' },
-    { id: 'explicar', label: 'Explicar', what: 'Cuando buscas causas o factores.', example: 'Determinar · Explicar · Analizar · Inferir' },
-    { id: 'evaluar', label: 'Evaluar', what: 'Cuando mides el efecto de algo.', example: 'Evaluar · Valorar · Medir · Verificar' },
-    { id: 'proponer', label: 'Proponer', what: 'Cuando el resultado es una propuesta o diseño.', example: 'Proponer · Diseñar · Formular · Elaborar · Validar' },
+    { id: 'relacionar', label: 'Relacionar', what: 'Cuando buscas si dos variables van juntas.', example: 'Analizar · Establecer (la relación) · Correlacionar · Asociar' },
+    { id: 'explicar', label: 'Explicar', what: 'Cuando buscas causas o factores.', example: 'Determinar · Explicar · Inferir · Predecir' },
+    { id: 'evaluar', label: 'Evaluar', what: 'Cuando mides el efecto de algo.', example: 'Evaluar · Valorar · Validar · Verificar' },
+    { id: 'proponer', label: 'Proponer', what: 'Cuando el resultado es una propuesta o diseño.', example: 'Proponer · Diseñar · Formular · Elaborar' },
 ];
 
 const ESCALERA = [
@@ -377,7 +377,7 @@ const Constructor = ({ intro, onNavigate }) => {
         setActive(target);
         document.getElementById(target === 'general' ? 'obj-general' : `obj-${target}`)?.focus();
     };
-    // La escalera es entre los específicos: cada uno sube de nivel respecto al anterior.
+    // La escalera es entre los específicos: cada uno está en el mismo nivel o más arriba que el anterior.
     const verboGeneral = firstWord(f.general).toLowerCase();
     const problemas = problemasEscalera('', list);
     const peldano = (index) => verbosEntre(rangoPeldano(index, list.length));
@@ -815,7 +815,7 @@ const Objetivos = ({ onNavigate }) => {
                     {heading}
                     <ul className="ide-bullets">
                         <li>Un objetivo general que responde tu pregunta, con el verbo de tu título.</li>
-                        <li>De dos a cuatro específicos en escalera: cada uno sube de nivel respecto al anterior.</li>
+                        <li>De dos a cuatro específicos en escalera: cada uno está en el mismo nivel o más arriba que el anterior.</li>
                         <li>Un solo verbo en infinitivo por objetivo, verificable.</li>
                         <li>Logros, no actividades; alcanzables, sin prometer resolver el problema.</li>
                     </ul>

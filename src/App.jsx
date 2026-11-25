@@ -456,16 +456,6 @@ function App() {
                     </button>
 
                     <button
-                        className={`nav-button ${activeTab === 'introduccion' ? 'active' : ''} ${doneTabs.has('introduccion') ? 'nav-button--done' : ''}`}
-                        onClick={() => handleTabChange('introduccion')}
-                        title="Introducción"
-                    >
-                        <BookOpen size={20} />
-                        <span>Introducción</span>
-                        {doneTabs.has('introduccion') && <CheckCircle2 size={16} className="nav-done-check" aria-label="completado" />}
-                    </button>
-
-                    <button
                         className={`nav-button ${activeTab === 'justificacion' ? 'active' : ''} ${doneTabs.has('justificacion') ? 'nav-button--done' : ''}`}
                         onClick={() => handleTabChange('justificacion')}
                         title="Justificación"
@@ -533,6 +523,16 @@ function App() {
                         <Flag size={20} />
                         <span>Conclusiones</span>
                         {doneTabs.has('conclusiones') && <CheckCircle2 size={16} className="nav-done-check" aria-label="completado" />}
+                    </button>
+
+                    <button
+                        className={`nav-button ${activeTab === 'introduccion' ? 'active' : ''} ${doneTabs.has('introduccion') ? 'nav-button--done' : ''}`}
+                        onClick={() => handleTabChange('introduccion')}
+                        title="Introducción"
+                    >
+                        <BookOpen size={20} />
+                        <span>Introducción</span>
+                        {doneTabs.has('introduccion') && <CheckCircle2 size={16} className="nav-done-check" aria-label="completado" />}
                     </button>
 
                     <button

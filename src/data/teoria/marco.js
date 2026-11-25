@@ -25,7 +25,7 @@ export default {
             ['Antecedente frente a teoría', 'Un antecedente es un **estudio** concreto: alguien midió algo en un lugar y obtuvo un resultado. Una teoría es una **explicación** general que vale para muchos lugares y estudios.'],
             ['La revisión es el proceso', 'La revisión de literatura no es un apartado más: es el trabajo de buscar, leer y fichar. Su producto se reparte después entre antecedentes, teorías y conceptos.'],
         ],
-        ejemplo: '«Pérez y Gómez (2022) encontraron que el olvido explicó el 41 % de las citas perdidas» es antecedente. «Las personas actúan según las barreras que perciben» es teoría. Una misma fuente puede aportar a los dos apartados.',
+        ejemplo: '«Pérez y Gómez (2022) encontraron que el olvido explicó el 38 % de las citas perdidas» es antecedente. «Las personas actúan según las barreras que perciben» es teoría. Una misma fuente puede aportar a los dos apartados.',
         ojo: 'Antes de escribir, decide a qué apartado pertenece cada ficha. Un mismo párrafo no debe aparecer en dos apartados.',
     },
 
@@ -45,7 +45,7 @@ export default {
             ['El campo que más pesa', '«Qué te aporta» es lo que diferencia un antecedente de un resumen. Si no logras escribirlo en una oración, esa fuente probablemente no pertenece a tu estudio.'],
             ['De la ficha al párrafo', 'Cada campo se convierte en una oración, en el mismo orden: quién y dónde, con qué objetivo y método, qué halló y cómo se relaciona con tu investigación.'],
         ],
-        ejemplo: 'Ficha: Pérez y Gómez (2022); IPS de Bogotá, encuesta a 380 pacientes; el olvido explicó el 41 %; aporta el cuestionario. Párrafo: «Pérez y Gómez (2022), en una IPS de Bogotá, encuestaron a 380 pacientes…».',
+        ejemplo: 'Ficha: Pérez y Gómez (2022); IPS de Bogotá, encuesta a 380 pacientes; el olvido explicó el 38 %; aporta el cuestionario. Párrafo: «Pérez y Gómez (2022), en una IPS de Bogotá, encuestaron a 380 pacientes…».',
         ojo: 'Copia el DOI o el enlace en el momento. Buscar de nuevo una fuente la víspera de la entrega es como se termina con citas sin referencia.',
     },
     'ant-ejemplos': {
@@ -435,7 +435,7 @@ export default {
             ['El más grave', 'Copiar sin citar no es un defecto de redacción, sino una falta de integridad académica que puede anular el trabajo. Los demás errores bajan la nota; este la compromete.'],
             ['Cómo revisar', 'Haz dos pasadas. En la primera, verifica que cada idea ajena tenga cita y que cada cita esté en la lista. En la segunda, que cada apartado termine conectando con tu estudio.'],
         ],
-        ejemplo: 'Solo enumerado: «Pérez y Gómez (2022) estudiaron la inasistencia en Bogotá». Corregido: añade qué encontraron (el olvido explicó el 41 %) y qué aporta (el cuestionario que adaptarás al hospital de Sincelejo).',
+        ejemplo: 'Solo enumerado: «Pérez y Gómez (2022) estudiaron la inasistencia en Bogotá». Corregido: añade qué encontraron (el olvido explicó el 38 %) y qué aporta (el cuestionario que adaptarás al hospital de Sincelejo).',
         ojo: 'Pídele a un compañero que lea tu marco y te diga de qué trata tu proyecto. Si no puede deducirlo, el marco no está conectado con el estudio.',
     },
     coherencia: {

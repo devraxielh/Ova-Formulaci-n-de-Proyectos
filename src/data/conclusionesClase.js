@@ -37,7 +37,7 @@ export const SLIDES = construccionPrimero([
         lead: ['Decide si cada fragmento es una conclusión.'],
         quiz: [
             q('«El olvido de la cita es el principal factor asociado a la inasistencia de los pacientes de consulta externa del hospital.»', ['Conclusión', 'No es conclusión'], 0, 'Responde un objetivo con lo encontrado.'),
-            q('«Según Pérez y Gómez (2022), el olvido explica el 41 % de las citas perdidas.»', ['Conclusión', 'No es conclusión'], 1, 'Cita a otro autor: eso va en la discusión.'),
+            q('«Según Pérez y Gómez (2022), el olvido explica el 38 % de las citas perdidas.»', ['Conclusión', 'No es conclusión'], 1, 'Cita a otro autor: eso va en la discusión.'),
         ],
     },
 
@@ -87,9 +87,9 @@ export const SLIDES = construccionPrimero([
         lead: ['Mira cómo cada conclusión responde su objetivo, sin citas ni datos nuevos. Ejemplo ilustrativo.'],
         panel: {
             type: 'example', title: 'Ejemplo (salud)', paragraphs: [
-                '**1.** La inasistencia a citas médicas en la consulta externa del hospital es frecuente: se pierde cerca de una de cada cinco citas, y el olvido es la causa que más reportan los pacientes.',
+                '**1.** La inasistencia a citas médicas en la consulta externa del hospital es frecuente: se pierde cerca de una de cada cinco citas.',
                 '**2.** La inasistencia es mayor en los pacientes menores de 30 años, en quienes viven en la zona rural y en quienes no recibieron recordatorio de la cita.',
-                '**3.** Se estableció que el olvido de la cita se relaciona de forma positiva y moderada con la inasistencia: a mayor olvido, más citas perdidas.',
+                '**3.** Se estableció que el olvido de la cita, la causa que más reportan los pacientes, se relaciona de forma positiva y moderada con la inasistencia: a mayor olvido, más citas perdidas.',
             ],
         },
     },

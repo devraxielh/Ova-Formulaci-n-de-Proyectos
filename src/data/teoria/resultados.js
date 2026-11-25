@@ -114,7 +114,7 @@ export default {
             ['Compara lo comparable', 'Antes de contrastar cifras, revisa que el otro estudio midiera lo mismo, en una población parecida y con un instrumento similar. Si no es así, dilo: la comparación sirve, pero con esa salvedad.'],
             ['Varios antecedentes, una idea', 'Agrupa en una sola oración los estudios que apuntan en la misma dirección y dedica más espacio al que difiere. Evita la lista de un autor por párrafo, que resume pero no discute.'],
         ],
-        ejemplo: '«El porcentaje de olvido (41 %) coincide con lo reportado por Pérez y Gómez (2022) en Bogotá y contrasta con Díaz (2023), quien halló el transporte como principal barrera en la zona rural de Corozal».',
+        ejemplo: '«El porcentaje de olvido (41 %) es cercano al 38 % reportado por Pérez y Gómez (2022) en Bogotá y contrasta con Díaz (2023), quien halló el transporte como principal barrera en la zona rural de Corozal».',
         ojo: 'Usa solo los antecedentes que ya están en tu marco referencial. Si necesitas uno nuevo para discutir, agrégalo también allá.',
     },
     'dis-diferencias': {

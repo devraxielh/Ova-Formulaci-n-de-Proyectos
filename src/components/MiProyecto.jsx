@@ -14,7 +14,7 @@ import { Aviso } from './Avisos';
 import Propagar from './Propagar';
 
 // Mismo orden que el menú lateral.
-const MENU_ORDER = ['ideacion', 'titulo', 'pregunta', 'arbol', 'arbolobjetivos', 'planteamiento', 'objetivos', 'introduccion', 'justificacion', 'alcances', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'resumen', 'referencias'];
+const MENU_ORDER = ['ideacion', 'titulo', 'pregunta', 'arbol', 'arbolobjetivos', 'planteamiento', 'objetivos', 'justificacion', 'alcances', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'introduccion', 'resumen', 'referencias'];
 
 // «hace 3 horas», «ayer», «hace 5 días»… a partir de la fecha del servidor (UTC, «AAAA-MM-DD HH:MM:SS»).
 const haceCuanto = (fecha) => {

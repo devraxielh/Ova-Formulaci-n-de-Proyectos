@@ -110,7 +110,7 @@ export const INFINITIVO = {
     'Comparación': 'Comparar', 'Compilación': 'Compilar', 'Comprobación': 'Comprobar', 'Construcción': 'Construir',
     'Definición': 'Definir', 'Demostración': 'Demostrar', 'Desarrollo': 'Desarrollar', 'Descripción': 'Describir',
     'Determinación': 'Determinar', 'Diagnóstico': 'Diagnosticar', 'Diseño': 'Diseñar', 'Establecimiento': 'Establecer',
-    'Estandarización': 'Estandarizar', 'Estudio': 'Estudiar', 'Evaluación': 'Evaluar', 'Explicación': 'Explicar',
+    'Estandarización': 'Estandarizar', 'Exploración': 'Explorar', 'Estudio': 'Estudiar', 'Evaluación': 'Evaluar', 'Explicación': 'Explicar',
     'Formulación': 'Formular', 'Generación': 'Generar', 'Identificación': 'Identificar', 'Implementación': 'Implementar',
     'Interpretación': 'Interpretar', 'Investigación': 'Investigar', 'Moderación': 'Moderar', 'Monitoreo': 'Monitorear',
     'Optimización': 'Optimizar', 'Organización': 'Organizar', 'Planificación': 'Planificar', 'Producción': 'Producir',

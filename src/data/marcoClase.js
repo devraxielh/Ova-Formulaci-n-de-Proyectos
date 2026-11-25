@@ -97,7 +97,7 @@ export const SLIDES = construccionPrimero([
         panel: {
             type: 'example', title: 'Ejemplo (salud)', paragraphs: [
                 '**Internacional.** Smith y Lee (2021), en un estudio realizado en tres clínicas de Texas con 2.400 citas programadas, buscaron identificar los factores asociados a la inasistencia. Encontraron que la tasa fue del 23 % y que los recordatorios por mensaje de texto la redujeron a la mitad. Este antecedente se relaciona con la presente investigación porque aporta una de las variables que se medirán.',
-                '**Nacional.** Pérez y Gómez (2022), en una IPS de Bogotá, encuestaron a 380 pacientes para analizar las causas de la inasistencia. El olvido de la cita explicó el 41 % de los casos. Este antecedente se relaciona con el estudio porque su cuestionario será adaptado.',
+                '**Nacional.** Pérez y Gómez (2022), en una IPS de Bogotá, encuestaron a 380 pacientes para analizar las causas de la inasistencia. El olvido de la cita explicó el 38 % de los casos. Este antecedente se relaciona con el estudio porque su cuestionario será adaptado.',
                 '**Regional.** Díaz (2023), en una tesis de la Universidad de Sucre, describió la inasistencia en un centro de salud de Corozal y halló que el transporte fue la principal barrera en la zona rural. Se relaciona con esta investigación porque muestra que el problema existe en la región, aunque no se ha estudiado en hospitales de segundo nivel.',
             ],
         },
@@ -170,7 +170,7 @@ export const SLIDES = construccionPrimero([
         panel: {
             type: 'table', title: 'Ejemplo de matriz', head: ['Autor y año', 'Ámbito', 'Método', 'Hallazgo', 'Aporte'], rows: [
                 ['Smith y Lee (2021)', 'Internacional', 'Cuantitativo, 2.400 citas', 'Inasistencia del 23 %', 'Variable: recordatorios'],
-                ['Pérez y Gómez (2022)', 'Nacional', 'Encuesta a 380 pacientes', 'Olvido: 41 %', 'Cuestionario'],
+                ['Pérez y Gómez (2022)', 'Nacional', 'Encuesta a 380 pacientes', 'Olvido: 38 %', 'Cuestionario'],
                 ['Díaz (2023)', 'Regional', 'Descriptivo, centro de salud', 'Transporte: principal barrera', 'Contexto regional'],
             ],
         },

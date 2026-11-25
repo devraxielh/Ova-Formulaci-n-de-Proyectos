@@ -7,7 +7,7 @@ import verbsData from './verbs.json';
  */
 export const ALCANCES = [
     { id: 'explorar', questionForm: '¿Cuáles son…? o ¿Cómo perciben…? sobre algo poco estudiado', method: 'revisión documental, entrevistas o grupos focales para conocer el tema', label: 'Explorar', hint: 'Conocer un tema poco estudiado', pregunta: 'Exploratoria', tipo: 'Exploratoria',
-        verbs: ['Identificación', 'Estudio', 'Investigación', 'Compilación', 'Interpretación'] },
+        verbs: ['Identificación', 'Exploración', 'Compilación', 'Interpretación'] },
     { id: 'describir', questionForm: '¿Cuáles son las características de…? o ¿Cómo es…?', method: 'encuestas, observación o registros con análisis descriptivo', label: 'Describir', hint: 'Cómo es o cómo ocurre algo', pregunta: 'Descriptiva', tipo: 'Descriptiva',
         verbs: ['Descripción', 'Caracterización', 'Diagnóstico', 'Definición', 'Categorización', 'Monitoreo'] },
     { id: 'comparar', questionForm: '¿Qué diferencias existen en… entre… y…?', method: 'comparación entre dos o más grupos, lugares o momentos', label: 'Comparar', hint: 'Diferencias entre grupos, lugares o momentos', pregunta: 'Comparativa', tipo: 'Descriptiva',
