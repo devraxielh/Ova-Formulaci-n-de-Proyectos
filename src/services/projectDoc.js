@@ -233,15 +233,11 @@ const BASE_ELEMENTOS = {
         ...titled('Antecedentes', d.marcoAntecedentes), ...titled('Marco teórico', d.marcoTeorico), ...titled('Marco Conceptual', d.marcoConceptual),
         ...titled('Marco Contextual', d.marcoContextual), ...titled('Marco legal', d.marcoLegal),
     ],
-    metodologia: (d) => {
-        // Los instrumentos armados en «Instrumentos» van completos dentro de «Instrumentos de recolección de información».
-        const propios = list(d.instrumentosGen)
-            .filter((ins) => ins && ubicacionDe(ins) === 'plan' && preguntasDe(ins).length > 0)
-            .flatMap((ins) => [{ type: 'sub', text: text(ins.titulo) || 'Instrumento de recolección' }, ...bloquesInstrumento(ins)]);
-        const descripcion = titled('Instrumentos de recolección de información', d.instrumentos, 3);
-        const instrumentos = propios.length && !descripcion.length ? [{ type: 'heading', level: 3, text: 'Instrumentos de recolección de información' }] : descripcion;
-        return [...titled('Plan de análisis de la información', d.metPlanAnalisis), ...instrumentos, ...propios];
-    },
+    // Los instrumentos armados van completos en Anexos; aquí solo se describen y se remite a su anexo.
+    metodologia: (d) => [
+        ...titled('Plan de análisis de la información', d.metPlanAnalisis),
+        ...titled('Instrumentos de recolección de información', conAnexos(d, d.instrumentos), 3),
+    ],
     fases: (d) => cuerpo(d.fases),
 };
 export const parrafosDe = (d, seccion) => (BASE_ELEMENTOS[seccion]?.(d || {}) || []).filter((b) => b.type === 'paragraph').map((b) => b.text);
@@ -280,19 +276,28 @@ export const matrizConsistencia = (d) => {
 
 const LETRAS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-// Anexos: la matriz de consistencia (automática, se puede ocultar) y los que agregue el estudiante, p. ej. el instrumento completo.
-const anexosBlocks = (d) => {
+// Anexos: la matriz de consistencia (automática, se puede ocultar), los instrumentos armados y los que agregue el estudiante.
+const partesAnexos = (d) => {
     const partes = [];
     const matriz = d.matrizOculta ? null : matrizConsistencia(d);
     if (matriz) partes.push({ titulo: 'Matriz de consistencia', blocks: [matriz] });
-    // Instrumentos que el estudiante prefirió dejar como anexo (por defecto van dentro del Plan de análisis).
     list(d.instrumentosGen).forEach((ins) => {
-        if (ins && ubicacionDe(ins) === 'anexo' && preguntasDe(ins).length > 0) partes.push({ titulo: text(ins.titulo) || 'Instrumento de recolección', blocks: bloquesInstrumento(ins) });
+        if (ins && ubicacionDe(ins) === 'anexo' && preguntasDe(ins).length > 0) partes.push({ id: ins.id, titulo: text(ins.titulo) || 'Instrumento de recolección', blocks: bloquesInstrumento(ins) });
     });
     list(d.anexos).forEach((a) => {
         if (a && text(a.contenido)) partes.push({ titulo: text(a.titulo) || 'Anexo', blocks: cuerpo(a.contenido) });
     });
-    return partes.flatMap((parte, i) => [{ type: 'heading', level: 2, text: `Anexo ${LETRAS[i] || i + 1}. ${parte.titulo}` }, ...parte.blocks]);
+    return partes;
+};
+const letraAnexo = (i) => LETRAS[i] || String(i + 1);
+const anexosBlocks = (d) => partesAnexos(d).flatMap((parte, i) => [{ type: 'heading', level: 2, text: `Anexo ${letraAnexo(i)}. ${parte.titulo}` }, ...parte.blocks]);
+
+// Cambia cada marca [[anexo:ID]] por «en el Anexo B» (o «en los anexos» si ese instrumento ya no está en Anexos).
+export const conAnexos = (d, texto) => {
+    if (!/\[\[anexo:/.test(String(texto || ''))) return texto;
+    const letras = {};
+    partesAnexos(d || {}).forEach((p, i) => { if (p.id) letras[p.id] = letraAnexo(i); });
+    return String(texto).replace(/\[\[anexo:([^\]]+)\]\]/g, (_, id) => (letras[id] ? `en el Anexo ${letras[id]}` : 'en los anexos'));
 };
 
 // Campos del proyecto que pertenecen a cada sección: sirven para restaurar una sección desde el historial.

@@ -23,11 +23,12 @@ const texto = (v) => String(v ?? '').trim();
 
 // Dónde sale el instrumento en el documento: dentro del Plan de análisis (7.5.1 Instrumentos), como anexo o en ninguna parte.
 export const UBICACIONES = [
-    { id: 'plan', label: 'Dentro del Plan de análisis de la información (Instrumentos de recolección)' },
     { id: 'anexo', label: 'Como anexo, al final del documento' },
     { id: 'no', label: 'No incluirlo en el documento' },
 ];
-export const ubicacionDe = (ins) => (['plan', 'anexo', 'no'].includes(ins?.ubicacion) ? ins.ubicacion : ins?.anexo === false ? 'no' : 'plan');
+// Los instrumentos armados van en Anexos (la opción antigua «dentro del plan» también se lleva a Anexos).
+// Solo quedan fuera si el estudiante elige no incluirlos.
+export const ubicacionDe = (ins) => (ins?.ubicacion === 'no' || (ins?.ubicacion == null && ins?.anexo === false) ? 'no' : 'anexo');
 
 // Preguntas válidas de un instrumento, con sus opciones resueltas.
 export const preguntasDe = (ins) => (Array.isArray(ins?.preguntas) ? ins.preguntas : [])

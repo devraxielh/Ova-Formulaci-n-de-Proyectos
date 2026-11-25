@@ -121,7 +121,7 @@ const Instrumentos = ({ onNavigate, embebido = false, fila = null }) => {
     };
     const crear = async (conIA) => {
         setError('');
-        const base = { id: uid(), ...(fila ? { filaId: fila.id } : {}), tipo: nuevo.tipo, aplicaA: nuevo.aplicaA.trim(), ubicacion: 'plan', titulo: `${nuevo.tipo === 'entrevista' ? 'Guía de entrevista' : 'Cuestionario'}${nuevo.aplicaA.trim() ? ` para ${nuevo.aplicaA.trim()}` : ''}`, intro: '', preguntas: [] };
+        const base = { id: uid(), ...(fila ? { filaId: fila.id } : {}), tipo: nuevo.tipo, aplicaA: nuevo.aplicaA.trim(), ubicacion: 'anexo', titulo: `${nuevo.tipo === 'entrevista' ? 'Guía de entrevista' : 'Cuestionario'}${nuevo.aplicaA.trim() ? ` para ${nuevo.aplicaA.trim()}` : ''}`, intro: '', preguntas: [] };
         if (conIA) {
             setEstado('generando');
             try {
@@ -179,7 +179,7 @@ const Instrumentos = ({ onNavigate, embebido = false, fila = null }) => {
             {(!fila || !ins) && (
             <section className="pro-card ins-nuevo">
                 <h2><ClipboardList size={20} aria-hidden="true" /> {embebido ? 'Arma el instrumento completo' : 'Crear un instrumento'}</h2>
-                <p className="adm-muted">La IA propone las preguntas a partir de tu título y tus objetivos específicos; tú las revisas y ajustas. El instrumento sale en tu documento dentro del Plan de análisis de la información. Recuerda validarlo (juicio de expertos, prueba piloto) como indica tu Metodología.</p>
+                <p className="adm-muted">La IA propone las preguntas a partir de tu título y tus objetivos específicos; tú las revisas y ajustas. El instrumento sale completo en los Anexos de tu documento, y la Metodología remite a él. Recuerda validarlo (juicio de expertos, prueba piloto) como indica tu Metodología.</p>
                 {especificos.length === 0 && <p className="pro-warn">Todavía no tienes objetivos específicos. Créalos primero para que las preguntas midan lo que tu proyecto necesita. <button type="button" className="pro-link" onClick={() => onNavigate('objetivos')}>Ir a Objetivos</button></p>}
                 <div className="ins-nuevo-form">
                     <label><span>Tipo</span>

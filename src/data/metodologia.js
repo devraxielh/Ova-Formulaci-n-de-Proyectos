@@ -234,7 +234,9 @@ export const fraseArmado = (armado) => {
     if (!preguntas.length) return '';
     const cuenta = Object.keys(TIPO_PREGUNTA).map((tipo) => [tipo, preguntas.filter((q) => q.tipo === tipo).length]).filter(([, n]) => n > 0);
     const desglose = cuenta.length > 1 ? ` (${cuenta.map(([tipo, n]) => `${n} ${TIPO_PREGUNTA[tipo][n === 1 ? 0 : 1]}`).join(', ')})` : ` ${TIPO_PREGUNTA[cuenta[0][0]][preguntas.length === 1 ? 0 : 1]}`;
-    const donde = { plan: 'se presenta completo al final de este apartado', anexo: 'se presenta completo en los anexos', no: '' }[ubicacionDe(armado)];
+    // El instrumento completo va en Anexos. La marca [[anexo:ID]] se cambia por «en el Anexo B» al armar el documento,
+    // porque la letra depende de los demás anexos.
+    const donde = ubicacionDe(armado) === 'no' ? '' : `se presenta completo ${armado.id ? `[[anexo:${armado.id}]]` : 'en los anexos'}`;
     return ` Consta de ${preguntas.length} ${preguntas.length === 1 ? 'pregunta' : 'preguntas'}${desglose}${donde ? ` y ${donde}` : ''}.`;
 };
 

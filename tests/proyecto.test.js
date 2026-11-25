@@ -132,26 +132,35 @@ test('una tabla puede ir después de un párrafo, se cita sola y las marcas [[id
     assert.equal(p[3], 'Como muestra la Tabla 1, coincide con otros estudios. Marca desconocida aquí.');
 });
 
-test('el instrumento sale dentro del Plan de análisis (7.5.1) y solo va a anexos si el estudiante lo pide', async () => {
+test('el instrumento armado va completo en Anexos y la Metodología remite a su anexo', async () => {
     const { documentoNumerado } = await import('../src/services/projectDoc.js');
-    const ins = { id: 'i1', titulo: 'Cuestionario de asistencia', intro: 'Anónimo.', preguntas: [{ id: 'q1', texto: '¿Por qué faltó?', tipo: 'opcion', opciones: ['Olvido', 'Transporte'] }, { id: 'q2', texto: 'Asisto siempre', tipo: 'likert' }] };
-    const base = { ...proyecto, metEnfoque: 'x', metPlanAnalisis: 'Estadística descriptiva.', instrumentos: 'Se usará una encuesta.' };
-    const met = (datos) => documentoNumerado(buildDocument(datos)).find((s) => s.id === 'metodologia').content;
-    const anexos = (datos) => (documentoNumerado(buildDocument(datos)).find((s) => s.id === 'anexos')?.content || []).filter((b) => b.type === 'heading').map((b) => b.text);
+    const { redactarInstrumentos } = await import('../src/data/metodologia.js');
+    const ins = { id: 'i1', filaId: 'f1', titulo: 'Cuestionario de asistencia', intro: 'Anónimo.', preguntas: [{ id: 'q1', texto: '¿Por qué faltó?', tipo: 'opcion', opciones: ['Olvido', 'Transporte'] }, { id: 'q2', texto: 'Asisto siempre', tipo: 'likert' }] };
+    const fila = { id: 'f1', tecnica: 'Encuesta', instrumento: 'cuestionario', aplicaA: 'los pacientes' };
+    const base = { ...proyecto, metEnfoque: 'x', metPlanAnalisis: 'Estadística descriptiva.' };
+    const doc = (datos) => documentoNumerado(buildDocument({ ...datos, instrumentos: redactarInstrumentos([fila], datos.instrumentosGen || []) }));
+    const met = (datos) => doc(datos).find((s) => s.id === 'metodologia').content;
+    const anexos = (datos) => (doc(datos).find((s) => s.id === 'anexos')?.content || []);
+    const titulos = (datos) => anexos(datos).filter((b) => b.type === 'heading').map((b) => b.text);
+    const textoMet = (datos) => met(datos).map((b) => (b.type === 'list' ? b.items.join(' ') : b.text || '')).join(' ');
 
-    const dentro = met({ ...base, instrumentosGen: [ins] });
-    const i = dentro.findIndex((b) => b.titulo === '3.2.1 Instrumentos de recolección de información');
-    assert.ok(i > 0);
-    assert.deepEqual(dentro.slice(i + 1, i + 5).map((b) => b.type === 'list' ? `${b.nums[0]}. ${b.items[0]}` : b.text), ['Se usará una encuesta.', 'Cuestionario de asistencia', 'Anónimo.', '1. ¿Por qué faltó?']);
-    assert.ok(dentro.some((b) => b.type === 'plain' && b.text.includes('(1) Totalmente en desacuerdo')));
-    assert.deepEqual(anexos({ ...base, instrumentosGen: [ins] }), ['Anexo A. Matriz de consistencia']);
+    // Por defecto (y con la opción antigua «plan») el instrumento va en Anexos, no dentro de la Metodología.
+    for (const ubicacion of [undefined, 'plan', 'anexo']) {
+        const datos = { ...base, instrumentosGen: [{ ...ins, ubicacion }] };
+        assert.deepEqual(titulos(datos), ['Anexo A. Matriz de consistencia', 'Anexo B. Cuestionario de asistencia']);
+        assert.ok(!met(datos).some((b) => b.text === 'Cuestionario de asistencia'));
+        assert.match(textoMet(datos), /se presenta completo en el Anexo B\./);
+        assert.ok(!textoMet(datos).includes('[[anexo:'));
+    }
+    assert.ok(anexos({ ...base, instrumentosGen: [ins] }).some((b) => b.type === 'plain' && b.text.includes('(1) Totalmente en desacuerdo')));
 
-    // Sin descripción de instrumentos en Metodología, el subtítulo se crea igual.
-    const solo = met({ ...proyecto, metEnfoque: 'x', metPlanAnalisis: 'Plan.', instrumentosGen: [ins] });
-    assert.ok(solo.some((b) => b.titulo === '3.2.1 Instrumentos de recolección de información'));
+    // Si se oculta la matriz, el instrumento pasa a ser el Anexo A y la Metodología lo dice.
+    assert.match(textoMet({ ...base, matrizOculta: true, instrumentosGen: [ins] }), /en el Anexo A\./);
 
-    assert.deepEqual(anexos({ ...base, instrumentosGen: [{ ...ins, ubicacion: 'anexo' }] }), ['Anexo A. Matriz de consistencia', 'Anexo B. Cuestionario de asistencia']);
-    assert.ok(!met({ ...base, instrumentosGen: [{ ...ins, ubicacion: 'no' }] }).some((b) => b.text === 'Cuestionario de asistencia'));
+    // «No incluirlo»: ni en Anexos ni mencionado.
+    const fuera = { ...base, instrumentosGen: [{ ...ins, ubicacion: 'no' }] };
+    assert.deepEqual(titulos(fuera), ['Anexo A. Matriz de consistencia']);
+    assert.ok(!/se presenta completo/.test(textoMet(fuera)));
 });
 
 test('diapositivas de sustentación: siguen los ítems de la plantilla, con resumen de la IA o las primeras frases', async () => {
@@ -206,8 +215,9 @@ test('la fila de instrumentos se redacta con el instrumento armado que tiene aso
     const armado = { id: 'a1', filaId: 'f1', titulo: 'Cuestionario', preguntas: [
         { id: 'q1', texto: 'Edad', tipo: 'numero' }, { id: 'q2', texto: 'Olvido la cita', tipo: 'likert' }, { id: 'q3', texto: 'Llego tarde', tipo: 'likert' }, { id: 'q4', texto: '', tipo: 'abierta' },
     ] };
-    assert.equal(fraseArmado(armado), ' Consta de 3 preguntas (2 de escala tipo Likert, 1 numérica) y se presenta completo al final de este apartado.');
-    assert.equal(fraseArmado({ ...armado, ubicacion: 'anexo', preguntas: [{ id: 'q', texto: '¿Qué opina?', tipo: 'abierta' }] }), ' Consta de 1 pregunta abierta y se presenta completo en los anexos.');
+    assert.equal(fraseArmado(armado), ' Consta de 3 preguntas (2 de escala tipo Likert, 1 numérica) y se presenta completo [[anexo:a1]].');
+    assert.equal(fraseArmado({ ...armado, id: undefined, preguntas: [{ id: 'q', texto: '¿Qué opina?', tipo: 'abierta' }] }), ' Consta de 1 pregunta abierta y se presenta completo en los anexos.');
+    assert.equal(fraseArmado({ ...armado, ubicacion: 'no' }), ' Consta de 3 preguntas (2 de escala tipo Likert, 1 numérica).');
     assert.equal(fraseArmado(null), '');
 
     const texto = redactarInstrumentos(filas, [armado]);

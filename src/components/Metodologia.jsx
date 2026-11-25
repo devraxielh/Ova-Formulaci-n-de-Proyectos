@@ -20,6 +20,7 @@ import { preguntasDe } from '../services/instrumentos';
 import { Generica } from './deck/Contenido';
 import ValidacionModal from './ValidacionModal';
 import MuestreoModal from './MuestreoModal';
+import { conAnexos } from '../services/projectDoc';
 import { VALIDACION_DETALLE } from '../data/validacion';
 import './Titulo.css';
 import './Planteamiento.css';
@@ -1150,7 +1151,7 @@ const Constructor = ({ intro, onNavigate }) => {
                 <aside className="pla-side" aria-label="Tu metodología">
                     <p className="ide-synth-label">Así queda tu metodología</p>
                     <div className="pla-preview mar-preview" aria-live="polite">
-                        {[['enfoque', partes.metEnfoque], ['tipo', partes.metTipo], ['diseno', partes.metDiseno], ['poblacion', partes.poblacionSugerida], ['analisis', partes.metPlanAnalisis], ['instrumentos', partes.instrumentos]].map(([key, text]) => (clean(text) ? (
+                        {[['enfoque', partes.metEnfoque], ['tipo', partes.metTipo], ['diseno', partes.metDiseno], ['poblacion', partes.poblacionSugerida], ['analisis', partes.metPlanAnalisis], ['instrumentos', conAnexos(s.data, partes.instrumentos)]].map(([key, text]) => (clean(text) ? (
                             <section key={key} data-active={tab === key}>
                                 <h4>{SUBTITULOS.find((x) => x.key === key).label}</h4>
                                 {text.split('\n').filter(Boolean).map((line) => <p key={line}>{line.replace(/\*\*/g, '').replace(/^- /, '• ')}</p>)}
