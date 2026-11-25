@@ -6,7 +6,7 @@
  */
 import { estimatePageNumbersWith } from 'docx/layout';
 import {
-    AlignmentType, BorderStyle, Document, Header, HeadingLevel, ImageRun, LineRuleType, Math as Ecuacion, MathFraction, MathRun, Packer, PageBreak, PageNumber,
+    AlignmentType, Bookmark, BorderStyle, Document, InternalHyperlink, LeaderType, PageReference, Tab, TabStopType, Header, HeadingLevel, ImageRun, LineRuleType, Math as Ecuacion, MathFraction, MathRun, Packer, PageBreak, PageNumber,
     Paragraph, SequentialIdentifier, ShadingType, Table, TableCell, TableOfContents, TableRow, TextRun, WidthType,
 } from 'docx';
 import { documentoNumerado } from './projectDoc.js';
@@ -48,11 +48,29 @@ const celda = (text, { bold = false, top = false, bottom = false, size = 20, fil
     children: [new Paragraph({ spacing: { line: 240, before: 0, after: 0 }, alignment: center ? AlignmentType.CENTER : AlignmentType.LEFT, children: [new TextRun({ text: String(text ?? ''), bold, size })] })],
 });
 
-// Rótulo APA: «Tabla N» o «Figura N» en negrita y, debajo, el título en cursiva. El número es un campo de Word (entra en las listas).
-const rotulo = (tipo, titulo) => new Paragraph({
-    style: 'Caption',
-    keepNext: true,
-    children: [new TextRun({ text: `${tipo} `, bold: true }), new SequentialIdentifier(tipo), new TextRun({ text: ` ${titulo || ''}`, italics: true })],
+// Rótulo APA: «Tabla N» o «Figura N» en negrita y, a continuación, el título en cursiva. El número es un campo de Word.
+// Cada rótulo numerado lleva un marcador: las listas de tablas y de figuras enlazan a él y toman su página.
+const anclaDe = (numero) => (numero ? `lista_${String(numero).toLowerCase().replace(/\s+/g, '_')}` : '');
+const rotulo = (tipo, titulo, numero) => {
+    const partes = [new TextRun({ text: `${tipo} `, bold: true }), new SequentialIdentifier(tipo), new TextRun({ text: ` ${titulo || ''}`, italics: true })];
+    return new Paragraph({
+        style: 'Caption',
+        keepNext: true,
+        children: numero ? [new Bookmark({ id: anclaDe(numero), children: partes })] : partes,
+    });
+};
+// Ancho del texto en la página (carta, márgenes de 2,5 cm): donde va el número de página de cada entrada.
+const ANCHO_TEXTO = 12240 - 1418 * 2;
+// Una entrada de la lista de tablas o de figuras: «Tabla 1. Título ........ 12», con enlace al rótulo.
+const entradaLista = (b) => new Paragraph({
+    spacing: { before: 0, after: 120, line: 276 },
+    indent: { left: 0, hanging: 0 },
+    tabStops: [{ type: TabStopType.RIGHT, position: ANCHO_TEXTO, leader: LeaderType.DOT }],
+    children: [
+        new InternalHyperlink({ anchor: anclaDe(b.rotulo), children: [new TextRun({ text: `${b.rotulo}. ` }), new TextRun({ text: String(b.caption || ''), italics: true })] }),
+        new TextRun({ children: [new Tab()] }),
+        new PageReference(anclaDe(b.rotulo)),
+    ],
 });
 const nota = (texto) => new Paragraph({ spacing: { before: 60, after: 240, line: 240 }, alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'Nota. ', italics: true, size: 20 }), new TextRun({ text: texto, size: 20 })] });
 
@@ -65,7 +83,7 @@ const tabla = (block) => {
         ...(block.foot ? [new TableRow({ children: block.foot.map((c) => celda(c, { bold: true, top: true, bottom: true, size })) })] : []),
     ];
     return [
-        ...(block.caption ? [rotulo('Tabla', block.caption)] : []),
+        ...(block.caption ? [rotulo('Tabla', block.caption, block.rotulo)] : []),
         new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: filas }),
         nota(block.nota || 'Elaboración propia.'),
     ];
@@ -88,7 +106,7 @@ const gantt = (block) => {
         ...block.rows.map((r) => new TableRow({ children: [celdaG(r.actividad || r.fase), ...cols.map((c) => celdaG('', { fill: c >= r.inicio && c <= r.fin ? '4F46E5' : undefined }))] })),
     ];
     return [
-        rotulo('Figura', block.caption),
+        rotulo('Figura', block.caption, block.rotulo),
         new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: filas }),
         nota(`Las columnas corresponden a cada ${block.unidad.toLowerCase()} del proyecto. Elaboración propia.`),
     ];
@@ -103,7 +121,7 @@ const figura = (block, imagenes) => {
     const h0 = block.h || img?.h || 400;
     const escala = Math.min(1, MAX_W / w0, MAX_H / h0);
     return [
-        rotulo('Figura', block.caption),
+        rotulo('Figura', block.caption, block.rotulo),
         img
             ? new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 60, after: 60, line: 240 }, children: [new ImageRun({ type: img.type, data: img.data, transformation: { width: Math.round(w0 * escala), height: Math.round(h0 * escala) } })] })
             : centrado('[No se pudo incluir la imagen]'),
@@ -194,21 +212,25 @@ export const crearDocx = (name, author, sections, extra = {}) => {
     ] : []);
     const dedicatoria = [...pagina('Dedicatoria', extra.dedicatoria), ...pagina('Agradecimientos', extra.agradecimientos)];
 
-    const hayTablas = cuerpo.some((s) => s.content.some((b) => b.type === 'table' && b.caption));
-    const hayFiguras = cuerpo.some((s) => s.content.some((b) => b.type === 'figure' || b.type === 'gantt'));
+    // Tablas y figuras numeradas del cuerpo, en orden (las de anexos no llevan número y no entran en las listas).
+    const rotulados = cuerpo.flatMap((sec) => sec.content).filter((b) => b.rotulo && ((b.type === 'table' && b.caption) || b.type === 'figure' || b.type === 'gantt'));
+    const hayTablas = rotulados.some((b) => b.type === 'table');
+    const hayFiguras = rotulados.some((b) => b.type !== 'table');
     const bloques = (b) => bloque(b, extra.imagenes);
     const indice = [
         centrado('Tabla de contenido', { bold: true }),
         new TableOfContents('Tabla de contenido', { hyperlink: true, headingStyleRange: '1-3' }),
         salto(),
+        // Las listas se escriben con sus entradas (no como campo para que Word las llene al actualizar):
+        // cada entrada enlaza a su rótulo y su página la calcula la estimación de páginas.
         ...(hayTablas ? [
             centrado('Lista de tablas', { bold: true }),
-            new TableOfContents('Lista de tablas', { hyperlink: true, captionLabelIncludingNumbers: 'Tabla' }),
+            ...rotulados.filter((b) => b.type === 'table').map(entradaLista),
             salto(),
         ] : []),
         ...(hayFiguras ? [
             centrado('Lista de figuras', { bold: true }),
-            new TableOfContents('Lista de figuras', { hyperlink: true, captionLabelIncludingNumbers: 'Figura' }),
+            ...rotulados.filter((b) => b.type !== 'table').map(entradaLista),
             salto(),
         ] : []),
     ];
