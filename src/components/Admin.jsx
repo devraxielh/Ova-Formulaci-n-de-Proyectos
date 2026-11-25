@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowLeft, ArrowUp, Ban, CheckCircle2, ChevronLeft, ChevronRight, Download, FileText, KeyRound, Mail, Pencil, RefreshCw, Search, UserCheck, RotateCcw, Trash2, UserPlus, Users, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Ban, CheckCircle2, ChevronLeft, ChevronRight, Download, FileText, KeyRound, Mail, Pencil, RefreshCw, Search, UserCheck, ArrowRightLeft, Copy, RotateCcw, Trash2, UserPlus, Users, X } from 'lucide-react';
 import { api } from '../services/api';
 import { buildDocument } from '../services/projectDoc';
 import { DocumentPaper } from './ProjectDocument';
@@ -68,6 +68,8 @@ const haceCuanto = (value) => {
     const m = Math.round(d / 30);
     return m < 12 ? `Hace ${m} ${m === 1 ? 'mes' : 'meses'}` : date.toLocaleDateString('es-CO', { month: 'short', year: 'numeric' });
 };
+const fechaCorta = (dia) => new Date(`${dia}T12:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' });
+const suma = (serie, campo) => serie.reduce((t, d) => t + (d[campo] || 0), 0);
 const sinTildes = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 const StatusBadge = ({ status }) => <span className="adm-badge" data-status={status}>{STATUS[status] || status}</span>;
@@ -166,6 +168,10 @@ const Admin = () => {
     const [papelera, setPapelera] = useState([]); // cuentas eliminadas que aún se pueden restaurar
     const [historial, setHistorial] = useState(null); // cambios hechos a la cuenta de la ficha abierta
     const [bQuery, setBQuery] = useState(''); // búsqueda en el registro de cambios
+    const [mover, setMover] = useState(null); // { modo: 'traspasar' | 'duplicar', userId, keep, name } en la vista de un proyecto
+    const [uso, setUso] = useState(null); // datos de la pestaña Uso
+    const [usoDias, setUsoDias] = useRecordado('usoDias', 30);
+    const [barra, setBarra] = useState(null); // día señalado en la gráfica de uso
     const [users, setUsers] = useState([]);
     const [projects, setProjects] = useState(null); // null = todavía no se han pedido
     const [mailReady, setMailReady] = useState(true);
@@ -230,6 +236,7 @@ const Admin = () => {
         const espera = setTimeout(() => { api.admin.log(bQuery.trim()).then((r) => setBitacora(r.log)).catch((err) => avisar(err.message, 'error')); }, bQuery ? 300 : 0);
         return () => clearTimeout(espera);
     }, [vista, bQuery]);
+    useEffect(() => { if (vista === 'uso') { setUso(null); api.admin.usage(usoDias).then(setUso).catch((err) => avisar(err.message, 'error')); } }, [vista, usoDias]);
     useEffect(() => { if (vista === 'papelera') api.admin.trash().then((r) => setPapelera(r.trash)).catch((err) => avisar(err.message, 'error')); }, [vista]);
     // Ficha abierta: lo que se le ha hecho a esa cuenta, según el registro de cambios.
     const correoFicha = selected?.user?.email || '';
@@ -421,6 +428,26 @@ const Admin = () => {
             setNotice(c ? `Se borró definitivamente la cuenta de ${c.name}.` : 'La papelera quedó vacía.');
         });
     };
+    // Proyectos: cambiar de dueño o duplicar como plantilla.
+    const aplicarMover = (event) => {
+        event.preventDefault();
+        const pr = openProject.project;
+        const destino = users.find((u) => String(u.id) === String(mover.userId));
+        if (!destino) return undefined;
+        return accion(async () => {
+            if (mover.modo === 'traspasar') {
+                await api.admin.transferProject(pr.id, destino.id, mover.keep);
+                setNotice(`«${pr.name}» ahora es de ${destino.name}.${mover.keep ? ` ${openProject.owner?.name || 'El dueño anterior'} queda como invitado.` : ''}`);
+                setOpenProject(await api.admin.project(pr.id));
+            } else {
+                const r = await api.admin.duplicateProject(pr.id, destino.id, mover.name.trim());
+                setNotice(`Se creó «${r.project.name}» en la cuenta de ${destino.name}, con el contenido y las figuras.`);
+            }
+            setMover(null);
+            setProjects(null);
+            load();
+        });
+    };
     const exportarRegistro = () => descargar('registro-projectsia.csv', csv([['Cuándo', 'Quién', 'Qué hizo', 'Detalle'], ...(bitacora || []).map((b) => [new Date(b.createdAt).toLocaleString('es-CO'), b.actor, b.action, b.detail])]));
     const resend = (user) => accion(async () => {
         await api.admin.resend(user.id);
@@ -480,6 +507,7 @@ const Admin = () => {
         try { setSelected(await api.admin.user(id)); } catch (err) { setError(err.message); }
     };
     const viewProject = async (id) => {
+        setMover(null);
         try { setOpenProject(await api.admin.project(id)); } catch (err) { setError(err.message); }
     };
 
@@ -505,8 +533,31 @@ const Admin = () => {
                                 {openProject.owner?.name} · {openProject.owner?.email} · {filled} de {pasos.length} secciones · Actualizado {formatDate(openProject.project.updatedAt)}
                             </p>
                         </div>
-                        <span className="adm-readonly">Solo lectura</span>
+                        <span className="adm-proyecto-acciones">
+                            <button type="button" className="pro-btn pro-btn--ghost adm-sm" aria-expanded={mover?.modo === 'traspasar'} onClick={() => setMover(mover?.modo === 'traspasar' ? null : { modo: 'traspasar', userId: '', keep: true, name: '' })}><ArrowRightLeft size={15} /> Traspasar</button>
+                            <button type="button" className="pro-btn pro-btn--ghost adm-sm" aria-expanded={mover?.modo === 'duplicar'} onClick={() => setMover(mover?.modo === 'duplicar' ? null : { modo: 'duplicar', userId: openProject.owner?.id || '', keep: false, name: `${openProject.project.name} (copia)` })}><Copy size={15} /> Duplicar</button>
+                            <span className="adm-readonly">Solo lectura</span>
+                        </span>
                     </div>
+                    {mover && (
+                        <form className="adm-mover" onSubmit={aplicarMover}>
+                            <b>{mover.modo === 'traspasar' ? 'Traspasar el proyecto a otra cuenta' : 'Duplicar el proyecto como plantilla'}</b>
+                            <p className="adm-muted">{mover.modo === 'traspasar'
+                                ? 'Cambia el dueño. El proyecto es el mismo: conserva su contenido, historial, figuras, encuestas e invitados.'
+                                : 'Crea un proyecto nuevo con el mismo contenido y las mismas figuras. No copia el historial, los invitados ni las encuestas con sus respuestas.'}</p>
+                            <div className="adm-mover-campos">
+                                <div className="cue-campo"><span>{mover.modo === 'traspasar' ? 'Nuevo dueño' : 'Cuenta donde se crea'}</span>
+                                    <Selector buscar etiqueta="Cuenta de destino" vacio="Elegir cuenta…" value={mover.userId} onChange={(v) => setMover({ ...mover, userId: v })} opciones={users.filter((u) => mover.modo === 'duplicar' || u.id !== openProject.owner?.id).map((u) => ({ value: u.id, label: u.name, nota: `${u.email} · ${nombreRol(u.role)}${u.grupo ? ` · ${u.grupo}` : ''}` }))} />
+                                </div>
+                                {mover.modo === 'duplicar' && <label className="cue-campo"><span>Nombre del proyecto nuevo</span><input className="input-field" maxLength={120} value={mover.name} onChange={(e) => setMover({ ...mover, name: e.target.value })} /></label>}
+                                {mover.modo === 'traspasar' && <label className="cue-check"><input type="checkbox" checked={mover.keep} onChange={(e) => setMover({ ...mover, keep: e.target.checked })} /> {openProject.owner?.name || 'El dueño anterior'} sigue pudiendo abrirlo, como invitado</label>}
+                            </div>
+                            <div className="adm-mover-botones">
+                                <button type="submit" className="pro-btn pro-btn--primary adm-sm" disabled={busy || !mover.userId}>{busy ? 'Un momento…' : mover.modo === 'traspasar' ? 'Traspasar' : 'Crear la copia'}</button>
+                                <button type="button" className="pro-btn pro-btn--ghost adm-sm" onClick={() => setMover(null)}>Cancelar</button>
+                            </div>
+                        </form>
+                    )}
                     {filled === 0
                         ? <p className="adm-muted">Este proyecto todavía está vacío.</p>
                         : <DocumentPaper sections={sections} fallbackTitle={openProject.project.name} author={String(openProject.project.data?.integrantes || '').trim() || openProject.owner?.name} fileUrl={(fid) => `/api/projects/${openProject.project.id}/files/${fid}`} />}
@@ -684,9 +735,10 @@ const Admin = () => {
                     <button type="button" role="tab" aria-selected={vista === 'proyectos'} onClick={() => setVista('proyectos')}>Proyectos <span className="adm-count">{projects ? projects.length : resumen.proyectos}</span></button>
                     <button type="button" role="tab" aria-selected={vista === 'grupos'} onClick={() => setVista('grupos')}>Grupos <span className="adm-count">{grupos.length}</span></button>
                     <button type="button" role="tab" aria-selected={vista === 'papelera'} onClick={() => setVista('papelera')}>Papelera {papelera.length > 0 && <span className="adm-count">{papelera.length}</span>}</button>
+                    <button type="button" role="tab" aria-selected={vista === 'uso'} onClick={() => setVista('uso')}>Uso</button>
                     <button type="button" role="tab" aria-selected={vista === 'sistema'} onClick={() => setVista('sistema')}>Sistema</button>
                 </div>
-                {vista !== 'sistema' && vista !== 'papelera' && (
+                {vista !== 'sistema' && vista !== 'papelera' && vista !== 'uso' && (
                     <button type="button" className="pro-btn pro-btn--ghost adm-sm" onClick={() => (vista === 'proyectos' ? loadProjects() : load())} disabled={loading}><RefreshCw size={15} /> Actualizar</button>
                 )}
             </div>
@@ -994,6 +1046,93 @@ const Admin = () => {
                 </section>
             )}
 
+            {vista === 'uso' && (
+                <>
+                    <section className="pro-card adm-panel">
+                        <div className="adm-papelera-cabeza adm-bitacora-cabeza">
+                            <div>
+                                <h2>Cuentas activas por día</h2>
+                                <p className="adm-muted">Cuántas cuentas distintas entraron, guardaron, usaron la IA o buscaron cada día.{uso?.desde ? ` El conteo empezó el ${fechaCorta(uso.desde)}: los días anteriores aparecen en cero.` : ' Todavía no hay datos: el conteo empieza desde ahora.'}</p>
+                            </div>
+                            <div className="pro-modes adm-uso-dias" role="tablist" aria-label="Periodo">
+                                {[7, 30, 90].map((n) => <button key={n} type="button" role="tab" aria-selected={usoDias === n} onClick={() => setUsoDias(n)}>{n} días</button>)}
+                            </div>
+                        </div>
+                        {uso === null && <p className="adm-muted">Cargando…</p>}
+                        {uso && (() => {
+                            const maximo = Math.max(1, ...uso.serie.map((d) => d.activos));
+                            const tope = maximo <= 4 ? 4 : Math.ceil(maximo / 4) * 4;
+                            const visto = barra ? uso.serie.find((d) => d.day === barra) : null;
+                            const cadaCuanto = Math.ceil(uso.serie.length / 8);
+                            return (
+                                <>
+                                    <dl className="adm-resumen adm-resumen--uso">
+                                        <div><dt>Cuentas activas en el periodo</dt><dd>{uso.activosPeriodo} <small>de {uso.cuentas}</small></dd></div>
+                                        <div><dt>Guardados</dt><dd>{suma(uso.serie, 'guardado')}</dd></div>
+                                        <div><dt>Usos de la IA</dt><dd>{suma(uso.serie, 'ia')}</dd></div>
+                                        <div><dt>Búsquedas</dt><dd>{suma(uso.serie, 'articulos') + suma(uso.serie, 'teorias') + suma(uso.serie, 'normas')}</dd></div>
+                                        <div><dt>Normas: consultas de hoy</dt><dd>{uso.normas.configurada ? <>{uso.normas.consultasHoy} <small>{uso.normas.restantes === null ? `de ${uso.normas.limite} al día` : `· quedan ${uso.normas.restantes}`}</small></> : <small>Sin configurar</small>}</dd></div>
+                                    </dl>
+                                    <figure className="adm-grafica" onMouseLeave={() => setBarra(null)}>
+                                        <div className="adm-grafica-eje" aria-hidden="true">{[tope, tope * 0.75, tope * 0.5, tope * 0.25, 0].map((v) => <span key={v}>{v}</span>)}</div>
+                                        <div className="adm-grafica-lienzo" role="img" aria-label={`Cuentas activas por día en los últimos ${uso.dias} días. Máximo: ${maximo}.`}>
+                                            {uso.serie.map((d, i) => (
+                                                <button key={d.day} type="button" className="adm-col" data-vista={barra === d.day || undefined} onMouseEnter={() => setBarra(d.day)} onFocus={() => setBarra(d.day)} onBlur={() => setBarra(null)} aria-label={`${fechaCorta(d.day)}: ${d.activos} ${d.activos === 1 ? 'cuenta activa' : 'cuentas activas'}`}>
+                                                    <i style={{ height: `${(d.activos / tope) * 100}%` }} />
+                                                    {((i % cadaCuanto === 0 && uso.serie.length - 1 - i >= cadaCuanto * 0.6) || i === uso.serie.length - 1) && <span>{fechaCorta(d.day)}</span>}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <figcaption className="adm-grafica-nota" aria-live="polite">
+                                            {visto
+                                                ? <><b>{fechaCorta(visto.day)}</b> · {visto.activos} {visto.activos === 1 ? 'cuenta activa' : 'cuentas activas'} · {visto.ingreso} ingresos · {visto.guardado} guardados · {visto.ia} usos de la IA · {visto.articulos + visto.teorias + visto.normas} búsquedas</>
+                                                : 'Pasa el cursor por una barra (o recórrelas con el tabulador) para ver el detalle de ese día.'}
+                                        </figcaption>
+                                    </figure>
+                                    <details className="adm-uso-tabla">
+                                        <summary>Ver los días como tabla</summary>
+                                        <div className="adm-table-wrap">
+                                            <table className="adm-table">
+                                                <thead><tr><th scope="col">Día</th><th scope="col" className="adm-num">Cuentas activas</th><th scope="col" className="adm-num">Ingresos</th><th scope="col" className="adm-num">Guardados</th><th scope="col" className="adm-num">IA</th><th scope="col" className="adm-num">Artículos</th><th scope="col" className="adm-num">Teorías</th><th scope="col" className="adm-num">Normas</th></tr></thead>
+                                                <tbody>{[...uso.serie].reverse().map((d) => <tr key={d.day}><td>{fechaCorta(d.day)}</td><td className="adm-num">{d.activos}</td><td className="adm-num">{d.ingreso}</td><td className="adm-num">{d.guardado}</td><td className="adm-num">{d.ia}</td><td className="adm-num">{d.articulos}</td><td className="adm-num">{d.teorias}</td><td className="adm-num">{d.normas}</td></tr>)}</tbody>
+                                            </table>
+                                        </div>
+                                    </details>
+                                </>
+                            );
+                        })()}
+                    </section>
+                    {uso && (
+                        <>
+                            <section className="pro-card adm-panel">
+                                <div className="adm-bitacora-cabeza"><h2>Uso por grupo</h2><p className="adm-muted">Lo que hicieron las cuentas de cada grupo en los últimos {uso.dias} días.</p></div>
+                                <div className="adm-table-wrap">
+                                    <table className="adm-table adm-table--grupos">
+                                        <thead><tr><th scope="col">Grupo</th><th scope="col" className="adm-num">Cuentas activas</th><th scope="col" className="adm-num">Ingresos</th><th scope="col" className="adm-num">Guardados</th><th scope="col" className="adm-num">IA</th><th scope="col" className="adm-num">Artículos</th><th scope="col" className="adm-num">Teorías</th><th scope="col" className="adm-num">Normas</th></tr></thead>
+                                        <tbody>
+                                            {uso.grupos.length === 0 && <tr><td colSpan={8} className="adm-empty"><b>Sin actividad registrada</b><span>Cuando las cuentas entren y trabajen, aquí verás el uso de cada grupo.</span></td></tr>}
+                                            {uso.grupos.map((g) => <tr key={g.grupo || '-'}><td>{g.grupo ? <button type="button" className="adm-user-link" onClick={() => verUsuarios({ grupo: g.grupo })}><b>{g.grupo}</b></button> : <span className="adm-muted">Sin grupo</span>}</td><td className="adm-num">{g.cuentas}</td><td className="adm-num">{g.ingreso}</td><td className="adm-num">{g.guardado}</td><td className="adm-num">{g.ia}</td><td className="adm-num">{g.articulos}</td><td className="adm-num">{g.teorias}</td><td className="adm-num">{g.normas}</td></tr>)}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+                            <section className="pro-card adm-panel">
+                                <div className="adm-bitacora-cabeza"><h2>Cuentas que más la usan</h2><p className="adm-muted">Las diez con más actividad en el periodo.</p></div>
+                                <div className="adm-table-wrap">
+                                    <table className="adm-table adm-table--grupos">
+                                        <thead><tr><th scope="col">Cuenta</th><th scope="col" className="adm-num">Días con actividad</th><th scope="col" className="adm-num">Guardados</th><th scope="col" className="adm-num">IA</th><th scope="col" className="adm-num">Acciones en total</th></tr></thead>
+                                        <tbody>
+                                            {uso.top.length === 0 && <tr><td colSpan={5} className="adm-empty"><b>Sin actividad registrada</b></td></tr>}
+                                            {uso.top.map((t) => <tr key={t.id}><td><button type="button" className="adm-user-link" onClick={() => viewUser(t.id)}><b>{t.name}</b><small>{t.email}{t.grupo ? ` · ${t.grupo}` : ''}</small></button></td><td className="adm-num">{t.dias}</td><td className="adm-num">{t.guardado}</td><td className="adm-num">{t.ia}</td><td className="adm-num">{t.total}</td></tr>)}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+                        </>
+                    )}
+                </>
+            )}
+
             {vista === 'sistema' && (
                 <>
                     {!mailReady && (
@@ -1001,7 +1140,7 @@ const Admin = () => {
                             El envío de correo no está configurado en el servidor: las cuentas nuevas no reciben el correo con su acceso. Entrega tú la contraseña temporal que aparece al crearlas.
                         </p>
                     )}
-                    <AdminEstado fijo />
+                    <AdminEstado fijo onRestaurada={() => { setProjects(null); setSelected(null); load(); api.admin.log().then((r) => setBitacora(r.log)).catch(() => {}); }} />
                     <section className="pro-card adm-panel adm-bitacora">
                         <div className="adm-bitacora-cabeza">
                             <h2>Registro de cambios</h2>

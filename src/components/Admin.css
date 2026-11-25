@@ -273,3 +273,52 @@ span.adm-user-link { cursor: default; }
   .adm-historial li { grid-template-columns: minmax(0, 1fr); }
   .adm-historial time { grid-row: auto; }
 }
+
+/* Proyecto abierto: traspasar y duplicar */
+.adm-proyecto-acciones { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.adm-mover { display: grid; gap: 0.6rem; margin: 0.9rem 0 0.2rem; padding: 0.9rem 1rem; border-radius: 0.75rem; background: #f8fafc; border: 1px solid var(--pro-line); }
+.adm-mover > b { color: var(--pro-ink); }
+.adm-mover > p { margin: 0; max-width: 72ch; }
+.adm-mover-campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, max-content)); gap: 0.7rem 1.25rem; align-items: end; }
+.adm-mover-campos .sel { min-width: 18rem; }
+.adm-mover-campos .input-field { min-width: 18rem; }
+.adm-mover-campos .cue-check { padding-bottom: 0.55rem; }
+.adm-mover-botones { display: flex; gap: 0.4rem; }
+
+/* Sistema: restaurar una copia */
+.adm-backups li button.pro-link { font-size: inherit; }
+.adm-restaurar { display: grid; gap: 0.6rem; margin: 0.4rem 0 0.9rem; padding: 0.9rem 1rem; border-radius: 0.75rem; background: #fef2f2; border: 1px solid #fecaca; }
+.adm-restaurar > b { display: flex; align-items: center; gap: 0.4rem; color: #991b1b; }
+.adm-restaurar > p { margin: 0; color: #7f1d1d !important; font-size: 0.9rem; line-height: 1.5; }
+.adm-restaurar label { display: grid; gap: 0.25rem; max-width: 20rem; }
+.adm-restaurar label > span { font-size: 0.84rem; font-weight: 600; color: #7f1d1d; }
+.adm-restaurar > div { display: flex; gap: 0.4rem; }
+
+/* Uso: una sola serie (cuentas activas por día), barras finas en el color de la app */
+.adm .adm-uso-dias { display: inline-flex; margin: 0; flex: none; }
+.adm-uso-dias button { padding: 0.4rem 0.8rem; white-space: nowrap; }
+.adm-resumen--uso { margin-bottom: 1.1rem; border-radius: 0.75rem; }
+.adm-resumen--uso dd small { font-size: 0.82rem; font-weight: 500; color: #64748b; }
+.adm-grafica { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 0.6rem; }
+.adm-grafica-eje { display: flex; flex-direction: column; justify-content: space-between; height: 11rem; font-size: 0.75rem; color: #64748b; text-align: right; font-variant-numeric: tabular-nums; line-height: 1; }
+.adm-grafica-lienzo {
+  position: relative; display: flex; align-items: stretch; gap: 2px; height: 11rem; margin-bottom: 1.5rem;
+  border-bottom: 1px solid #cbd5e1;
+  background: linear-gradient(to bottom, #eef2f6 1px, transparent 1px) 0 0 / 100% 25%;
+}
+.adm-col { position: relative; flex: 1 1 0; min-width: 0; display: flex; align-items: flex-end; justify-content: center; padding: 0; border: 0; background: none; cursor: default; }
+.adm-col i { display: block; width: 100%; max-width: 1.5rem; min-height: 0; border-radius: 4px 4px 0 0; background: #4f46e5; transition: background-color 0.15s; }
+.adm-col[data-vista] { background: #f1f5f9; }
+.adm-col[data-vista] i { background: #3730a3; }
+.adm-col:focus-visible { outline: 2px solid #4f46e5; outline-offset: 1px; }
+.adm-col span { position: absolute; top: calc(100% + 0.4rem); left: 50%; transform: translateX(-50%); font-size: 0.72rem; color: #64748b; white-space: nowrap; }
+.adm-grafica-nota { grid-column: 2; font-size: 0.86rem; color: var(--pro-body); min-height: 1.4rem; font-variant-numeric: tabular-nums; }
+.adm-grafica-nota b { color: var(--pro-ink); }
+.adm-uso-tabla { margin-top: 0.8rem; }
+.adm-uso-tabla summary { cursor: pointer; font-size: 0.88rem; font-weight: 600; color: var(--pro-primary-strong); width: fit-content; }
+.adm-uso-tabla .adm-table-wrap { max-height: 22rem; overflow-y: auto; margin-top: 0.6rem; }
+@media (max-width: 760px) {
+  .adm-col span { display: none; }
+  .adm-grafica-lienzo { margin-bottom: 0.6rem; }
+  .adm-mover-campos .sel, .adm-mover-campos .input-field { min-width: 0; width: 100%; }
+}

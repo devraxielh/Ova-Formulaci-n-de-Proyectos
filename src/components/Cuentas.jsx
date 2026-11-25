@@ -40,11 +40,20 @@ export const descargar = (nombre, contenido) => {
 // Cuentas recién creadas con su contraseña temporal. Solo se ve aquí: al cerrar no se puede recuperar.
 export const Credenciales = ({ cuentas, mail, onCerrar }) => {
     if (!cuentas?.length) return null;
-    const buenas = cuentas.filter((c) => c.ok !== false);
+    const buenas = cuentas.filter((c) => c.ok !== false && !c.actualizada);
+    const actualizadas = cuentas.filter((c) => c.actualizada);
+    const cambiadas = actualizadas.filter((c) => c.cambios?.length);
     const malas = cuentas.filter((c) => c.ok === false);
     return (
         <section className="cue-credenciales" role="status">
-            <h3><KeyRound size={17} aria-hidden="true" /> {buenas.length === 1 ? 'Cuenta creada' : `${buenas.length} cuentas creadas`}</h3>
+            <h3><KeyRound size={17} aria-hidden="true" /> {buenas.length === 0 && actualizadas.length > 0 ? 'Lista aplicada' : buenas.length === 1 ? 'Cuenta creada' : `${buenas.length} cuentas creadas`}</h3>
+            {actualizadas.length > 0 && (
+                <p>
+                    <b>{cambiadas.length} {cambiadas.length === 1 ? 'cuenta actualizada' : 'cuentas actualizadas'}</b>
+                    {cambiadas.length > 0 && <> ({['grupo', 'profesor', 'sin profesor', 'rol'].map((k) => [k, cambiadas.filter((c) => c.cambios.includes(k)).length]).filter(([, n]) => n).map(([k, n]) => `${n} de ${k}`).join(', ')})</>}
+                    {actualizadas.length > cambiadas.length && <>; {actualizadas.length - cambiadas.length} ya estaban así y no cambiaron</>}. Sus contraseñas no se tocan.
+                </p>
+            )}
             {buenas.length > 0 && (
                 <>
                     <p>
@@ -109,7 +118,7 @@ export const leerLote = (texto) => {
         const role = rolDesdeTexto(rol);
         const correo = email.trim().toLowerCase();
         const error = !name.trim() ? 'Falta el nombre.' : !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(correo) ? 'El correo no es válido.' : !role ? `No se reconoce el rol «${rol}».` : '';
-        return { name: name.trim(), email: correo, role: role || 'student', teacher: role === 'student' ? teacher.trim().toLowerCase() : '', group: group.trim().replace(/\s+/g, ' ').slice(0, 60), error };
+        return { name: name.trim(), email: correo, role: role || 'student', teacher: role === 'student' ? teacher.trim().toLowerCase() : '', rolDado: Boolean(rol.trim()), group: group.trim().replace(/\s+/g, ' ').slice(0, 60), error };
     });
 };
 
@@ -119,7 +128,8 @@ export const CrearCuentas = ({ profesores, grupos = [], onCreadas }) => {
     const [modo, setModo] = useState('uno');
     const [form, setForm] = useState({ name: '', email: '', role: 'student', teacherId: '', grupo: '' });
     const [lote, setLote] = useState('');
-    const [grupoLote, setGrupoLote] = useState(''); // grupo para las filas del lote que no traen el suyo
+    const [grupoLote, setGrupoLote] = useState('');
+    const [actualizar, setActualizar] = useState(false); // las cuentas que ya existen se actualizan en vez de dar error // grupo para las filas del lote que no traen el suyo
     const [busy, setBusy] = useState(false);
     const setError = (texto) => avisar(texto, 'error');
     const [creadas, setCreadas] = useState(null); // { cuentas, mail }
@@ -140,9 +150,10 @@ export const CrearCuentas = ({ profesores, grupos = [], onCreadas }) => {
     const cargarLote = async () => {
         setBusy(true);
         try {
-            const r = await api.admin.createBatch(validas.map(({ name, email, role, teacher, group }) => ({ name, email, role, teacher, group: group || grupoLote.trim() })));
+            // Al actualizar, el rol solo viaja si la fila lo trae escrito: una celda vacía no debe volver estudiante a un profesor.
+            const r = await api.admin.createBatch(validas.map(({ name, email, role, rolDado, teacher, group }) => ({ name, email, role: actualizar && !rolDado ? '' : role, teacher, group: group || grupoLote.trim() })), { update: actualizar });
             setCreadas({ cuentas: r.resultados, mail: r.mail });
-            if (r.creadas) { setLote(''); onCreadas(); }
+            if (r.creadas || r.actualizadas) { setLote(''); onCreadas(); }
         } catch (err) { setError(err.message); } finally { setBusy(false); }
     };
     const leerArchivo = async (event) => {
@@ -192,6 +203,7 @@ export const CrearCuentas = ({ profesores, grupos = [], onCreadas }) => {
                         <button type="button" className="pro-link" onClick={() => descargar('plantilla-usuarios.csv', csv([['nombre', 'correo', 'rol', 'correo del profesor', 'grupo'], ['Carlos Ruiz', 'carlos.ruiz@correo.edu.co', 'profesor', ''], ['Ana Pérez', 'ana.perez@correo.edu.co', 'estudiante', 'carlos.ruiz@correo.edu.co'], ['Luisa Díaz', 'luisa.diaz@correo.edu.co', 'investigador', '']]))}>Descargar plantilla</button>
                     </div>
                     <label className="cue-grupo-lote"><span>Grupo para todo el lote (opcional)</span><input className="input-field" maxLength={60} list="cue-grupos" value={grupoLote} onChange={(e) => setGrupoLote(e.target.value)} placeholder="Se pone a las filas que no traen grupo" /></label>
+                    <label className="cue-check cue-actualizar"><input type="checkbox" checked={actualizar} onChange={(e) => setActualizar(e.target.checked)} /> <span><b>Actualizar las cuentas que ya existen</b> en vez de dar error: se les cambia el rol, el profesor o el grupo que traiga su fila. Lo que la fila deja vacío no se toca, y «ninguno» en la columna del profesor se lo quita. El nombre y la contraseña no cambian.</span></label>
                     <textarea className="textarea-field cue-texto" rows={6} value={lote} onChange={(e) => setLote(e.target.value)} placeholder={'Carlos Ruiz, carlos.ruiz@correo.edu.co, profesor\nAna Pérez, ana.perez@correo.edu.co, estudiante, carlos.ruiz@correo.edu.co'} spellCheck={false} aria-label="Lista de usuarios" />
                     {filas.length > 0 && (
                         <>
@@ -214,7 +226,7 @@ export const CrearCuentas = ({ profesores, grupos = [], onCreadas }) => {
                                     </tbody>
                                 </table>
                             </div>
-                            <button type="button" className="pro-btn pro-btn--primary" disabled={busy || validas.length === 0} onClick={cargarLote}><Upload size={15} /> {busy ? 'Creando cuentas…' : `Crear ${Math.min(300, validas.length)} ${validas.length === 1 ? 'cuenta' : 'cuentas'}`}</button>
+                            <button type="button" className="pro-btn pro-btn--primary" disabled={busy || validas.length === 0} onClick={cargarLote}><Upload size={15} /> {busy ? 'Aplicando…' : actualizar ? `Crear o actualizar ${Math.min(300, validas.length)} ${validas.length === 1 ? 'cuenta' : 'cuentas'}` : `Crear ${Math.min(300, validas.length)} ${validas.length === 1 ? 'cuenta' : 'cuentas'}`}</button>
                         </>
                     )}
                 </div>

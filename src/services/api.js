@@ -79,7 +79,7 @@ export const api = {
         resend: (id) => request(`/admin/users/${id}/resend`, { method: 'POST' }),
         // Cuentas: solo el administrador las crea (una a una o por lotes), asigna el rol y renueva el acceso.
         createUser: (payload) => request('/admin/users', { method: 'POST', body: payload }),
-        createBatch: (users) => request('/admin/users/batch', { method: 'POST', body: { users } }),
+        createBatch: (users, opciones = {}) => request('/admin/users/batch', { method: 'POST', body: { users, ...opciones } }),
         setRole: (id, role, teacherId) => request(`/admin/users/${id}/role`, { method: 'POST', body: { role, teacherId } }),
         newAccess: (id) => request(`/admin/users/${id}/access`, { method: 'POST' }),
         updateUser: (id, payload) => request(`/admin/users/${id}`, { method: 'PUT', body: payload }),
@@ -89,6 +89,12 @@ export const api = {
         log: (q = '') => (q ? request('/admin/log', { method: 'POST', body: { q } }) : request('/admin/log')),
         // Papelera: cuentas eliminadas que todavía se pueden restaurar.
         trash: () => request('/admin/trash'),
+        // Copias: restaurar una (pide escribir RESTAURAR y la contraseña del administrador).
+        restoreBackup: (name, password) => request(`/admin/backups/${encodeURIComponent(name)}/restore`, { method: 'POST', body: { confirm: 'RESTAURAR', password } }),
+        // Proyectos: cambiar de dueño o duplicar como plantilla.
+        transferProject: (id, userId, keepAccess) => request(`/admin/projects/${id}/transfer`, { method: 'POST', body: { userId, keepAccess } }),
+        duplicateProject: (id, userId, name) => request(`/admin/projects/${id}/duplicate`, { method: 'POST', body: { userId, name } }),
+        usage: (days = 30) => request(`/admin/usage?days=${days}`),
         restore: (id) => request(`/admin/trash/${id}/restore`, { method: 'POST' }),
         purge: (id) => request(id ? `/admin/trash/${id}` : '/admin/trash', { method: 'DELETE' }),
         renameGroup: (from, to) => request('/admin/groups/rename', { method: 'POST', body: { from, to } }),

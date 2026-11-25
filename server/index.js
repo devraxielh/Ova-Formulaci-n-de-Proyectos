@@ -376,6 +376,20 @@ const archivarCuenta = (target, actor) => {
         .run(Date.now(), String(actor || '').slice(0, 80), target.id, target.name, target.email, target.role, target.grupo || '', proyectos.length, JSON.stringify(copia));
 };
 
+// Uso por día: cuántas veces cada cuenta entró, guardó, usó la IA o buscó. Un contador por (día, cuenta, tipo),
+// sin guardar qué se escribió. Sirve para la pestaña «Uso» de la administración.
+db.exec(`CREATE TABLE IF NOT EXISTS usage_daily (
+    day TEXT NOT NULL,
+    user_id INTEGER NOT NULL DEFAULT 0,
+    kind TEXT NOT NULL,
+    n INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (day, user_id, kind)
+)`);
+const diaDe = (ms = Date.now()) => new Date(ms - 5 * 3600000).toISOString().slice(0, 10); // día en hora de Colombia
+const sumarUso = db.prepare('INSERT INTO usage_daily (day, user_id, kind, n) VALUES (?, ?, ?, 1) ON CONFLICT(day, user_id, kind) DO UPDATE SET n = n + 1');
+const contarUso = (kind, userId) => { try { sumarUso.run(diaDe(), Number(userId) || 0, kind); } catch { /* contar nunca debe tumbar la solicitud */ } };
+try { db.prepare('DELETE FROM usage_daily WHERE day < ?').run(diaDe(Date.now() - 400 * 86400000)); } catch { /* se limpia en el próximo arranque */ }
+
 const bitacora = (req, action, detail = '') => {
     try {
         db.prepare('INSERT INTO admin_log (created_at, actor_id, actor, action, detail) VALUES (?, ?, ?, ?, ?)')
@@ -409,6 +423,14 @@ const alertar = async (tipo, asunto, texto) => {
 
 /* ---------- Copias de seguridad ---------- */
 
+// Copias «de antes de restaurar»: se crean justo antes de restaurar otra, por si hay que deshacerlo. Se guardan 5.
+const PREVIA_RE = /^projectsia-antes-de-restaurar-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.db\.gz$/;
+const listSafety = () => {
+    try {
+        return fs.readdirSync(BACKUP_DIR).filter((f) => PREVIA_RE.test(f)).sort().reverse()
+            .map((name) => ({ name, size: fs.statSync(path.join(BACKUP_DIR, name)).size }));
+    } catch { return []; }
+};
 const backupName = (date = new Date()) => `projectsia-${date.toISOString().slice(0, 10)}.db.gz`;
 
 const listBackups = () => {
@@ -585,6 +607,7 @@ app.post('/api/auth/login', authLimit, loginLimit, (req, res) => {
         return res.status(403).json({ error: 'Tu cuenta está bloqueada. Comunícate con el administrador.', code: 'blocked' });
     }
     createSession(res, user.id);
+    contarUso('ingreso', user.id);
     return res.json({ user: publicUser(user) });
 });
 
@@ -777,7 +800,7 @@ app.put('/api/projects/:id', requireUser, memberProject, (req, res) => {
     }
     if (data === null) return res.status(400).json({ error: 'El contenido del proyecto no es válido o es demasiado grande.' });
     if (data !== req.project.data || name !== req.project.name) {
-        if (data !== req.project.data) saveVersion(req.project, req.user.id);
+        if (data !== req.project.data) { saveVersion(req.project, req.user.id); contarUso('guardado', req.user.id); }
         db.prepare("UPDATE projects SET name = ?, data = ?, key_meta = ?, version = version + 1, updated_at = datetime('now') WHERE id = ?").run(name, data, meta, req.project.id);
     }
     const row = db.prepare('SELECT id, name, created_at, updated_at, version FROM projects WHERE id = ?').get(req.project.id);
@@ -1215,6 +1238,91 @@ app.post('/api/admin/groups/rename', requireAdmin, (req, res) => {
     return res.json({ cuentas: n, unido, grupo: to });
 });
 
+// Traspasar un proyecto a otra cuenta (cambia el dueño; no se copia nada). El dueño anterior puede quedar invitado.
+app.post('/api/admin/projects/:id/transfer', requireAdmin, (req, res) => {
+    const row = db.prepare('SELECT * FROM projects WHERE id = ?').get(Number(req.params.id));
+    if (!row) return res.status(404).json({ error: 'No se encontró el proyecto.' });
+    const nuevo = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(Number(req.body?.userId));
+    if (!nuevo) return res.status(400).json({ error: 'La cuenta de destino no existe.' });
+    if (nuevo.id === row.user_id) return res.status(400).json({ error: 'El proyecto ya es de esa cuenta.' });
+    const anterior = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(row.user_id);
+    db.transaction(() => {
+        db.prepare('UPDATE projects SET user_id = ? WHERE id = ?').run(nuevo.id, row.id);
+        db.prepare('DELETE FROM project_members WHERE project_id = ? AND email = ?').run(row.id, nuevo.email); // el dueño no figura como invitado
+        if (req.body?.keepAccess && anterior && String(anterior.email).includes('@')) db.prepare('INSERT OR IGNORE INTO project_members (project_id, email) VALUES (?, ?)').run(row.id, anterior.email);
+    })();
+    bitacora(req, 'Traspasó un proyecto', `«${row.name}» (#${row.id}): de ${anterior?.email || 'cuenta eliminada'} a ${nuevo.email}${req.body?.keepAccess ? '; el anterior queda invitado' : ''}`);
+    return res.json({ project: projectRow(db.prepare('SELECT * FROM projects WHERE id = ?').get(row.id)), owner: nuevo });
+});
+
+// Duplicar un proyecto en otra cuenta (o en la misma), como plantilla: copia el contenido y las figuras;
+// no copia el historial de versiones, los invitados ni las encuestas con sus respuestas.
+app.post('/api/admin/projects/:id/duplicate', requireAdmin, (req, res) => {
+    const row = db.prepare('SELECT * FROM projects WHERE id = ?').get(Number(req.params.id));
+    if (!row) return res.status(404).json({ error: 'No se encontró el proyecto.' });
+    const destino = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(Number(req.body?.userId) || row.user_id);
+    if (!destino) return res.status(400).json({ error: 'La cuenta de destino no existe.' });
+    const nombre = cleanName(req.body?.name || `${row.name} (copia)`);
+    let nuevoId;
+    db.transaction(() => {
+        nuevoId = Number(db.prepare('INSERT INTO projects (user_id, name, data, key_meta) VALUES (?, ?, ?, ?)').run(destino.id, nombre, row.data, '{}').lastInsertRowid);
+        // Las figuras se copian con otro número: se corrige ese número donde el contenido las menciona.
+        const mapa = new Map();
+        const copiar = db.prepare('INSERT INTO project_files (project_id, mime, data) VALUES (?, ?, ?)');
+        db.prepare('SELECT id, mime, data FROM project_files WHERE project_id = ?').all(row.id).forEach((f) => mapa.set(f.id, Number(copiar.run(nuevoId, f.mime, f.data).lastInsertRowid)));
+        if (mapa.size) {
+            const cambiar = (v) => {
+                if (Array.isArray(v)) return v.map(cambiar);
+                if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, k === 'fileId' && mapa.has(Number(x)) ? mapa.get(Number(x)) : cambiar(x)]));
+                return v;
+            };
+            let datos = null;
+            try { datos = JSON.stringify(cambiar(JSON.parse(row.data))); } catch { /* contenido ilegible: se deja igual */ }
+            if (datos) db.prepare('UPDATE projects SET data = ? WHERE id = ?').run(datos, nuevoId);
+        }
+    })();
+    bitacora(req, 'Duplicó un proyecto', `«${row.name}» (#${row.id}) → «${nombre}» (#${nuevoId}) para ${destino.email}`);
+    return res.status(201).json({ project: projectRow(db.prepare('SELECT * FROM projects WHERE id = ?').get(nuevoId), false), owner: destino });
+});
+
+// Uso de la plataforma en los últimos días: actividad por día, por tipo, por grupo y las cuentas que más la usan.
+const TIPOS_USO = ['ingreso', 'guardado', 'ia', 'articulos', 'teorias', 'normas'];
+app.get('/api/admin/usage', requireAdmin, (req, res) => {
+    const dias = Math.min(90, Math.max(7, parseInt(req.query.days, 10) || 30));
+    const desde = diaDe(Date.now() - (dias - 1) * 86400000);
+    const porDia = new Map();
+    for (let i = dias - 1; i >= 0; i -= 1) porDia.set(diaDe(Date.now() - i * 86400000), { day: diaDe(Date.now() - i * 86400000), activos: 0, ...Object.fromEntries(TIPOS_USO.map((t) => [t, 0])) });
+    db.prepare('SELECT day, kind, SUM(n) AS n FROM usage_daily WHERE day >= ? GROUP BY day, kind').all(desde).forEach((r) => { const d = porDia.get(r.day); if (d && TIPOS_USO.includes(r.kind)) d[r.kind] = r.n; });
+    db.prepare('SELECT day, COUNT(DISTINCT user_id) AS n FROM usage_daily WHERE day >= ? AND user_id > 0 GROUP BY day').all(desde).forEach((r) => { const d = porDia.get(r.day); if (d) d.activos = r.n; });
+    const grupos = new Map();
+    db.prepare(`SELECT u.grupo AS grupo, d.kind AS kind, SUM(d.n) AS n, COUNT(DISTINCT d.user_id) AS cuentas
+                FROM usage_daily d JOIN users u ON u.id = d.user_id WHERE d.day >= ? GROUP BY u.grupo, d.kind`).all(desde).forEach((r) => {
+        const g = grupos.get(r.grupo || '') || { grupo: r.grupo || '', cuentas: 0, ...Object.fromEntries(TIPOS_USO.map((t) => [t, 0])) };
+        if (TIPOS_USO.includes(r.kind)) g[r.kind] = r.n;
+        g.cuentas = Math.max(g.cuentas, r.cuentas);
+        grupos.set(r.grupo || '', g);
+    });
+    const top = db.prepare(`SELECT u.id, u.name, u.email, u.grupo, SUM(d.n) AS total, SUM(CASE WHEN d.kind = 'ia' THEN d.n ELSE 0 END) AS ia,
+                                   SUM(CASE WHEN d.kind = 'guardado' THEN d.n ELSE 0 END) AS guardado, COUNT(DISTINCT d.day) AS dias
+                            FROM usage_daily d JOIN users u ON u.id = d.user_id WHERE d.day >= ? GROUP BY u.id ORDER BY total DESC LIMIT 10`).all(desde);
+    const hoy = diaDe();
+    res.json({
+        dias,
+        desde: db.prepare('SELECT MIN(day) AS d FROM usage_daily').get().d || null,
+        serie: [...porDia.values()],
+        grupos: [...grupos.values()].sort((a, b) => (b.ia + b.guardado) - (a.ia + a.guardado)),
+        top,
+        activosPeriodo: db.prepare('SELECT COUNT(DISTINCT user_id) AS n FROM usage_daily WHERE day >= ? AND user_id > 0').get(desde).n,
+        cuentas: db.prepare("SELECT COUNT(*) AS n FROM users WHERE role != 'admin'").get().n,
+        normas: {
+            configurada: Boolean(RULEX_API_KEY),
+            consultasHoy: db.prepare("SELECT COALESCE(SUM(n), 0) AS n FROM usage_daily WHERE day = ? AND kind = 'normas_consulta'").get(hoy).n,
+            restantes: normasRestantes,
+            limite: 150,
+        },
+    });
+});
+
 // Papelera: cuentas eliminadas en los últimos 30 días.
 const filaPapelera = (r) => ({ id: r.id, deletedAt: r.deleted_at, deletedBy: r.deleted_by, name: r.name, email: r.email, role: r.role, grupo: r.grupo, projects: r.projects, venceEn: Math.max(0, Math.ceil((r.deleted_at + PAPELERA_DIAS * 86400000 - Date.now()) / 86400000)) });
 app.get('/api/admin/trash', requireAdmin, (_req, res) => {
@@ -1413,6 +1521,33 @@ app.post('/api/admin/users/batch', requireAdmin, crearLimit, async (req, res) =>
         const role = String(fila?.role || 'student');
         let teacherId = null;
         const correoProfesor = String(fila?.teacher || '').trim().toLowerCase();
+        // Con «actualizar»: si la cuenta ya existe, se le cambia lo que la fila traiga (rol, profesor, grupo); lo vacío no se toca.
+        const existente = req.body?.update ? db.prepare('SELECT * FROM users WHERE email = ?').get(email) : null;
+        if (existente) {
+            const base = { email, name: existente.name };
+            if (existente.role === 'admin') { resultados.push({ ...base, ok: false, error: 'Es un administrador: no se cambia por lote.' }); continue; }
+            const rolNuevo = fila?.role && ROLES.includes(String(fila.role)) && fila.role !== 'admin' ? String(fila.role) : existente.role;
+            const cambios = [];
+            let profesorId = rolNuevo === 'student' ? existente.teacher_id : null;
+            if (rolNuevo === 'student' && correoProfesor) {
+                const quitar = ['ninguno', 'sin profesor', '-'].includes(correoProfesor);
+                const prof = quitar ? null : db.prepare("SELECT id FROM users WHERE email = ? AND role = 'teacher'").get(correoProfesor);
+                if (!quitar && !prof) { resultados.push({ ...base, ok: false, error: `No existe un profesor con el correo ${correoProfesor}.` }); continue; }
+                if ((prof ? prof.id : null) !== (existente.teacher_id || null)) cambios.push(prof ? 'profesor' : 'sin profesor');
+                profesorId = prof ? prof.id : null;
+            }
+            const grupoDado = fila?.group ?? req.body?.group;
+            const grupo = grupoDado === undefined || String(grupoDado).trim() === '' ? (existente.grupo || '') : grupoLimpio(grupoDado);
+            if (grupo !== (existente.grupo || '')) cambios.push('grupo');
+            if (rolNuevo !== existente.role) cambios.push('rol');
+            if (cambios.length) {
+                const cupo = rolNuevo !== 'student' && !Number(existente.project_limit) ? CUPO_AUTONOMO : Number(existente.project_limit) || 0;
+                db.prepare('UPDATE users SET role = ?, teacher_id = ?, grupo = ?, project_limit = ? WHERE id = ?').run(rolNuevo, profesorId, grupo, cupo, existente.id);
+                if (existente.role === 'teacher' && rolNuevo !== 'teacher') db.prepare('UPDATE users SET teacher_id = NULL WHERE teacher_id = ?').run(existente.id);
+            }
+            resultados.push({ ...base, role: rolNuevo, ok: true, actualizada: true, cambios });
+            continue;
+        }
         if (role === 'student' && correoProfesor) {
             const prof = db.prepare("SELECT id FROM users WHERE email = ? AND role = 'teacher'").get(correoProfesor);
             if (!prof) { resultados.push({ email, name: String(fila?.name || ''), ok: false, error: `No existe un profesor con el correo ${correoProfesor}.` }); continue; }
@@ -1422,9 +1557,10 @@ app.post('/api/admin/users/batch', requireAdmin, crearLimit, async (req, res) =>
         const r = await crearCuenta({ name: fila?.name, email, role, teacherId, grupo: fila?.group ?? req.body?.group }, 'El administrador');
         resultados.push(r.error ? { email, name: String(fila?.name || ''), ok: false, error: r.error } : { email: r.user.email, name: r.user.name, role, ok: true, clave: r.clave, emailSent: r.emailSent });
     }
-    const creadas = resultados.filter((x) => x.ok).length;
-    if (creadas) bitacora(req, 'Cargó un lote de cuentas', `${creadas} creadas de ${filas.length} filas`);
-    return res.json({ resultados, creadas, mail: Boolean(mailer) });
+    const creadas = resultados.filter((x) => x.ok && !x.actualizada).length;
+    const actualizadas = resultados.filter((x) => x.actualizada && x.cambios.length).length;
+    if (creadas || actualizadas) bitacora(req, 'Cargó un lote de cuentas', `${creadas} creadas y ${actualizadas} actualizadas de ${filas.length} filas`);
+    return res.json({ resultados, creadas, actualizadas, mail: Boolean(mailer) });
 });
 
 // Cambiar el rol (y el profesor a cargo, si es estudiante). Solo el administrador.
@@ -1531,6 +1667,7 @@ app.get('/api/admin/estado', requireAdmin, (_req, res) => {
         mail: Boolean(mailer),
         ai: { configured: Boolean(GROQ_API_KEY), fails: aiState.fails, lastOk: aiState.lastOk, lastError: aiState.lastError },
         backups: listBackups(),
+        safety: listSafety(),
         errors: errors.map((e) => ({ id: e.id, kind: e.kind, message: e.message, detail: e.detail, createdAt: e.created_at, user: e.user || '' })),
     });
 });
@@ -1541,8 +1678,81 @@ app.post('/api/admin/backups', requireAdmin, async (_req, res) => {
     return res.status(201).json({ backup: result, backups: listBackups() });
 });
 
+// Restaurar una copia: deja usuarios, proyectos, versiones, figuras y encuestas como estaban ese día.
+// Exige escribir RESTAURAR y la contraseña del administrador; antes guarda una copia del estado actual.
+// No se reinicia el servidor: los datos se cambian dentro de una sola transacción (si algo falla, no cambia nada).
+const TABLAS_RESTAURAR = ['users', 'projects', 'project_members', 'project_versions', 'project_files', 'surveys', 'survey_responses', 'deleted_users'];
+let restaurando = false;
+app.post('/api/admin/backups/:name/restore', requireAdmin, rateLimit({ name: 'restaurar', limit: 6, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    const found = [...listBackups(), ...listSafety()].find((b) => b.name === req.params.name);
+    if (!found) return res.status(404).json({ error: 'No se encontró esa copia.' });
+    if (String(req.body?.confirm || '') !== 'RESTAURAR') return res.status(400).json({ error: 'Escribe RESTAURAR para confirmar.' });
+    const yo = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(req.user.id);
+    if (!verifyPassword(String(req.body?.password || ''), yo.password_hash)) return res.status(401).json({ error: 'La contraseña no coincide.' });
+    if (restaurando || backupRunning) return res.status(409).json({ error: 'Hay una copia o una restauración en curso. Inténtalo en un momento.' });
+    restaurando = true;
+    const tmp = path.join(BACKUP_DIR, 'restaurar.db');
+    const previaTmp = path.join(BACKUP_DIR, 'previa.db');
+    try {
+        fs.writeFileSync(tmp, zlib.gunzipSync(fs.readFileSync(path.join(BACKUP_DIR, found.name))), { mode: 0o600 });
+        // 1. La copia debe ser una base de PROJECTSIA sana, con al menos un administrador.
+        let sana = false;
+        let tablas = [];
+        const origen = new Database(tmp, { readonly: true });
+        try {
+            tablas = origen.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((t) => t.name);
+            sana = origen.pragma('integrity_check', { simple: true }) === 'ok' && tablas.includes('users') && tablas.includes('projects')
+                && origen.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'admin'").get().n > 0;
+        } catch { sana = false; } finally { origen.close(); }
+        if (!sana) return res.status(400).json({ error: 'Esa copia está dañada o no es de esta aplicación. No se cambió nada.' });
+
+        // 2. Copia del estado actual, por si hay que volver atrás.
+        await db.backup(previaTmp);
+        // El nombre lleva la hora al segundo; si ya existe uno igual (dos restauraciones seguidas), se usa el segundo siguiente.
+        const nombrePrevia = (ms) => `projectsia-antes-de-restaurar-${new Date(ms).toISOString().slice(0, 19).replace(/:/g, '-')}.db.gz`;
+        let cuando = Date.now();
+        while (fs.existsSync(path.join(BACKUP_DIR, nombrePrevia(cuando)))) cuando += 1000;
+        const previa = nombrePrevia(cuando);
+        fs.writeFileSync(path.join(BACKUP_DIR, previa), zlib.gzipSync(fs.readFileSync(previaTmp)), { mode: 0o600 });
+        fs.rmSync(previaTmp, { force: true });
+        listSafety().slice(5).forEach((old) => fs.rmSync(path.join(BACKUP_DIR, old.name), { force: true }));
+
+        // 3. Cambio de los datos, todo o nada.
+        const actor = { id: req.user.id, name: req.user.name };
+        db.pragma('foreign_keys = OFF');
+        db.exec(`ATTACH DATABASE '${tmp.replace(/'/g, "''")}' AS copia`);
+        try {
+            db.transaction(() => {
+                TABLAS_RESTAURAR.filter((t) => tablas.includes(t)).forEach((t) => {
+                    const enCopia = db.prepare(`PRAGMA copia.table_info(${t})`).all().map((c) => c.name);
+                    const cols = columnasDe(t).filter((c) => enCopia.includes(c)).join(', ');
+                    db.exec(`DELETE FROM main.${t}`);
+                    db.exec(`INSERT INTO main.${t} (${cols}) SELECT ${cols} FROM copia.${t}`);
+                });
+                // Las sesiones y enlaces de cuentas que ya no existen se van; las demás siguen abiertas.
+                db.exec('DELETE FROM sessions WHERE user_id NOT IN (SELECT id FROM users)');
+                db.exec('DELETE FROM email_tokens WHERE user_id NOT IN (SELECT id FROM users)');
+                if (db.pragma('foreign_key_check').length) throw new Error('La copia tiene datos que no encajan entre sí.');
+            })();
+        } finally {
+            db.exec('DETACH DATABASE copia');
+            db.pragma('foreign_keys = ON');
+        }
+        bitacora({ user: actor }, 'Restauró una copia de seguridad', `${found.name}; el estado anterior quedó en ${previa}`);
+        const cuenta = (t) => db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n;
+        return res.json({ ok: true, usuarios: cuenta('users'), proyectos: cuenta('projects'), previa, backups: listBackups(), safety: listSafety() });
+    } catch (error) {
+        logError('backup', 'No se pudo restaurar la copia de seguridad', error?.message);
+        return res.status(500).json({ error: 'No se pudo restaurar la copia. Los datos quedaron como estaban.' });
+    } finally {
+        restaurando = false;
+        fs.rmSync(tmp, { force: true });
+        fs.rmSync(previaTmp, { force: true });
+    }
+});
+
 app.get('/api/admin/backups/:name', requireAdmin, (req, res) => {
-    const found = listBackups().find((b) => b.name === req.params.name);
+    const found = [...listBackups(), ...listSafety()].find((b) => b.name === req.params.name);
     if (!found) return res.status(404).json({ error: 'No se encontró esa copia.' });
     res.setHeader('Content-Type', 'application/gzip');
     res.setHeader('Content-Disposition', `attachment; filename="${found.name}"`);
@@ -1660,6 +1870,7 @@ app.get('/api/buscar/articulos', requireUser, searchLimit, async (req, res) => {
     const desde = /^(19|20)\d{2}$/.test(String(req.query.desde)) ? String(req.query.desde) : '1950';
     const idioma = /^[a-z]{2}$/.test(String(req.query.idioma || '')) ? String(req.query.idioma) : '';
     if (q.length < 3) return res.status(400).json({ error: 'Escribe al menos una palabra para buscar.' });
+    contarUso('articulos', req.user.id);
     try {
         const r = await FUENTES_ARTICULOS[fuente]({ q, desde, idioma });
         if (r.code === 'no_key') return res.status(503).json({ error: 'La búsqueda por el servidor no está configurada.', code: 'no_key' });
@@ -1719,6 +1930,7 @@ const obrasDeTeoria = async ({ ingles, nombre, autor }, concepto) => {
 
 app.post('/api/buscar/teorias', requireUser, searchLimit, async (req, res) => {
     if (!OPENALEX_API_KEY) return res.status(503).json({ error: 'La búsqueda de teorías no está configurada.', code: 'no_key' });
+    contarUso('teorias', req.user.id);
     const teorias = (Array.isArray(req.body?.teorias) ? req.body.teorias : []).slice(0, 6)
         .map((t) => ({ ingles: paraFiltro(t?.ingles), nombre: paraFiltro(t?.nombre), autor: paraFiltro(t?.autor).split(' ').at(-1) || '' }))
         .filter((t) => (t.ingles || t.nombre).length >= 3);
@@ -1754,7 +1966,9 @@ app.get('/api/buscar/normas', requireUser, searchLimit, async (req, res) => {
     if (!RULEX_API_KEY) return res.status(503).json({ error: 'La búsqueda de normas no está configurada.', code: 'no_key' });
     const clave = `${fuente}|${q.toLowerCase()}`;
     const guardada = NORMAS_CACHE.get(clave);
+    contarUso('normas', req.user.id);
     if (guardada && guardada.hasta > Date.now()) return res.json({ ...guardada.datos, restantes: normasRestantes });
+    contarUso('normas_consulta', 0); // consulta real al proveedor: es la que gasta el cupo diario
     try {
         const r = await fetch('https://rulex.org/api/data/query', {
             method: 'POST',
@@ -1805,6 +2019,7 @@ app.post('/api/ai/chat', aiLimit, async (req, res) => {
 
     const messages = Array.isArray(req.body?.messages) ? req.body.messages : null;
     if (!messages || messages.length === 0 || messages.length > 12) return res.status(400).json({ error: 'Solicitud de IA no válida.' });
+    contarUso('ia', req.user?.id);
 
     let total = 0;
     const clean = [];

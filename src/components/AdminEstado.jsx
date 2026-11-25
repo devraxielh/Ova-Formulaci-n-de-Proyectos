@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Activity, AlertTriangle, CheckCircle2, DatabaseBackup, Download, RefreshCw, Trash2 } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle2, DatabaseBackup, Download, RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
 import { api } from '../services/api';
 import { avisar, confirmar } from './Avisos';
 
@@ -9,11 +9,12 @@ const fecha = (ms) => (ms ? new Date(ms).toLocaleString('es-CO', { day: 'numeric
 const peso = (bytes) => (bytes > 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
 const TIPO = { navegador: 'Navegador', servidor: 'Servidor', ia: 'IA', backup: 'Copia', correo: 'Correo', buscar: 'Búsqueda' };
 
-const AdminEstado = ({ fijo = false }) => {
+const AdminEstado = ({ fijo = false, onRestaurada }) => {
     const [estado, setEstado] = useState(null);
     const [desplegado, setAbierto] = useState(false);
     const abierto = fijo || desplegado; // en la pestaña «Sistema» se muestra siempre completo
     const [busy, setBusy] = useState(false);
+    const [restaurar, setRestaurar] = useState(null); // { name, palabra, clave } de la copia que se va a restaurar
     const setMsg = (texto) => avisar(texto);
     const setError = (texto) => avisar(texto, 'error');
 
@@ -38,6 +39,35 @@ const AdminEstado = ({ fijo = false }) => {
             setBusy(false);
         }
     };
+    const restaurarCopia = async (event) => {
+        event.preventDefault();
+        setBusy(true);
+        try {
+            const r = await api.admin.restoreBackup(restaurar.name, restaurar.clave);
+            setEstado((prev) => ({ ...prev, backups: r.backups, safety: r.safety }));
+            setRestaurar(null);
+            avisar(`Copia restaurada: ${r.usuarios} cuentas y ${r.proyectos} proyectos. El estado anterior quedó guardado, por si hay que volver.`);
+            onRestaurada?.();
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setBusy(false);
+        }
+    };
+    // Las copias diarias llevan el día; las «de antes de restaurar», la hora exacta (guardada en UTC: se muestra en hora local).
+    const fechaCopia = (name) => {
+        if (!name.includes('antes-de-restaurar')) return name.slice(11, 21);
+        const m = name.match(/(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})/);
+        const d = m ? new Date(`${m[1]}T${m[2]}:${m[3]}:${m[4]}Z`) : null;
+        return d && !Number.isNaN(d.getTime()) ? d.toLocaleString('es-CO', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : name;
+    };
+    const filaCopia = (b) => (
+        <li key={b.name}>
+            <span>{fechaCopia(b.name)}</span><small>{peso(b.size)}</small>
+            <a className="pro-link" href={api.admin.backupUrl(b.name)} download><Download size={14} /> Descargar</a>
+            <button type="button" className="pro-link" disabled={busy} onClick={() => setRestaurar({ name: b.name, palabra: '', clave: '' })}><RotateCcw size={14} /> Restaurar</button>
+        </li>
+    );
     const limpiar = async () => {
         if (!(await confirmar({ texto: '¿Borrar el registro de errores?', detalle: 'Solo se borra la lista; no afecta a los proyectos.', aceptar: 'Borrar', peligro: true }))) return;
         try { await api.admin.clearErrors(); setEstado((prev) => ({ ...prev, errors: [] })); } catch (err) { setError(err.message); }
@@ -61,12 +91,29 @@ const AdminEstado = ({ fijo = false }) => {
                         <div className="adm-estado-acciones">
                             <button type="button" className="pro-btn pro-btn--ghost" onClick={copiar} disabled={busy}><RefreshCw size={15} /> {busy ? 'Creando…' : 'Crear una copia ahora'}</button>
                         </div>
+                        {restaurar && (
+                            <form className="adm-restaurar" onSubmit={restaurarCopia}>
+                                <b><AlertTriangle size={16} aria-hidden="true" /> Restaurar la copia del {fechaCopia(restaurar.name)}</b>
+                                <p>Las cuentas, los proyectos, las figuras y las encuestas vuelven a como estaban en esa copia: <strong>se pierde todo lo hecho después</strong>. Antes se guarda el estado actual en una copia aparte, para poder deshacerlo.</p>
+                                <label><span>Escribe RESTAURAR</span><input className="input-field" value={restaurar.palabra} onChange={(e) => setRestaurar({ ...restaurar, palabra: e.target.value })} autoComplete="off" spellCheck={false} autoFocus /></label>
+                                <label><span>Tu contraseña de administrador</span><input className="input-field" type="password" value={restaurar.clave} onChange={(e) => setRestaurar({ ...restaurar, clave: e.target.value })} autoComplete="current-password" /></label>
+                                <div>
+                                    <button type="submit" className="pro-btn pro-btn--danger adm-sm" disabled={busy || restaurar.palabra !== 'RESTAURAR' || !restaurar.clave}>{busy ? 'Restaurando…' : 'Restaurar esta copia'}</button>
+                                    <button type="button" className="pro-btn pro-btn--ghost adm-sm" disabled={busy} onClick={() => setRestaurar(null)}>Cancelar</button>
+                                </div>
+                            </form>
+                        )}
                         <ul className="adm-backups">
-                            {estado.backups.slice(0, 8).map((b) => (
-                                <li key={b.name}><span>{b.name.slice(11, 21)}</span><small>{peso(b.size)}</small><a className="pro-link" href={api.admin.backupUrl(b.name)} download><Download size={14} /> Descargar</a></li>
-                            ))}
+                            {estado.backups.slice(0, 8).map(filaCopia)}
                             {estado.backups.length === 0 && <li><small>Todavía no hay copias; la primera se crea un minuto después de iniciar el servidor.</small></li>}
                         </ul>
+                        {estado.safety?.length > 0 && (
+                            <>
+                                <h3><RotateCcw size={16} aria-hidden="true" /> Estados guardados antes de restaurar</h3>
+                                <p className="adm-muted">Cada vez que restauras una copia se guarda cómo estaba todo justo antes. Sirven para deshacer una restauración. Se conservan las últimas 5.</p>
+                                <ul className="adm-backups">{estado.safety.map(filaCopia)}</ul>
+                            </>
+                        )}
                     </div>
                     <div>
                         <h3><Activity size={16} aria-hidden="true" /> Servicios</h3>

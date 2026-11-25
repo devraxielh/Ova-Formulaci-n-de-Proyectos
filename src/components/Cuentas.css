@@ -52,3 +52,8 @@
 
 .cue-grupo-lote { display: grid; gap: 0.25rem; max-width: 24rem; }
 .cue-grupo-lote > span { font-size: 0.82rem; font-weight: 600; color: #475569; }
+
+.cue-actualizar { align-items: flex-start !important; max-width: 62rem; line-height: 1.5; }
+.cue-actualizar input { margin-top: 0.25rem; flex: none; }
+.cue-actualizar b { color: #1e293b; }
+.cue-credenciales > p { margin: 0 0 0.6rem; }

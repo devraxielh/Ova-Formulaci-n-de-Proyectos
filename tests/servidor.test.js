@@ -599,6 +599,185 @@ test('papelera: una cuenta eliminada se restaura con su contraseña, proyectos, 
     assert.equal(fila.ownerGrupo, '');
 });
 
+test('lote que actualiza: cambia grupo, profesor y rol de cuentas que ya existen, sin tocar lo que la fila deja vacío', async () => {
+    const admin = await entrarAdmin();
+    const t = Date.now();
+    const profeA = await cuenta('profeA15', 'teacher');
+    const profeB = await cuenta('profeB15', 'teacher');
+    const correos = [0, 1, 2].map((i) => `l${i}.${t}@example.test`);
+    await admin('/admin/users/batch', 'POST', { users: correos.map((email, i) => ({ name: `Lote ${i}`, email, role: 'student', teacher: profeA.email, group: 'Viejo' })) });
+    const ver = async (email) => (await admin('/admin/users')).body.users.find((u) => u.email === email);
+    const antes = await ver(correos[0]);
+
+    // Sin «actualizar», las que ya existen siguen dando error (no se cambia nada por accidente).
+    const sin = (await admin('/admin/users/batch', 'POST', { users: [{ name: 'x', email: correos[0], role: 'student', group: 'Nuevo' }] })).body;
+    assert.equal(sin.resultados[0].ok, false);
+    assert.equal((await ver(correos[0])).grupo, 'Viejo');
+
+    const r = (await admin('/admin/users/batch', 'POST', { update: true, users: [
+        { name: 'No importa', email: correos[0], role: '', teacher: '', group: 'Nuevo' },            // solo grupo
+        { name: '', email: correos[1].toUpperCase(), role: '', teacher: profeB.email, group: '' },   // solo profesor
+        { name: '', email: correos[2], role: 'researcher', teacher: '', group: '' },                // solo rol
+        { name: '', email: correos[0], role: '', teacher: 'nadie@example.test', group: '' },         // profesor inexistente
+        { name: '', email: 'admin', role: 'student', teacher: '', group: 'X' },                      // administrador: intocable
+        { name: 'Recién llegada', email: `nueva.${t}@example.test`, role: 'student', teacher: profeB.email, group: 'Nuevo' }, // no existe: se crea
+    ] })).body;
+    assert.deepEqual(r.resultados.map((x) => [x.ok, Boolean(x.actualizada)]), [[true, true], [true, true], [true, true], [false, false], [false, false], [true, false]]);
+    assert.equal(r.creadas, 1);
+    assert.equal(r.actualizadas, 3);
+    assert.deepEqual(r.resultados[0].cambios, ['grupo']);
+    assert.ok(r.resultados.slice(0, 5).every((x) => !x.clave) && r.resultados[5].clave); // solo la nueva trae contraseña
+
+    const a = await ver(correos[0]);
+    assert.deepEqual([a.grupo, a.teacherId, a.role, a.name], ['Nuevo', profeA.id, 'student', antes.name]);
+    const b = await ver(correos[1]);
+    assert.deepEqual([b.grupo, b.teacherId], ['Viejo', profeB.id]);
+    const c = await ver(correos[2]);
+    assert.deepEqual([c.role, c.teacherId, c.grupo, c.projectLimit], ['researcher', null, 'Viejo', 10]);
+    assert.equal((await admin('/auth/me')).body.user.role, 'admin');
+    // «ninguno» quita el profesor; repetir la misma fila ya no cambia nada.
+    const q = (await admin('/admin/users/batch', 'POST', { update: true, users: [{ email: correos[1], role: '', teacher: 'ninguno', group: '' }, { email: correos[0], role: '', teacher: '', group: 'Nuevo' }] })).body;
+    assert.equal((await ver(correos[1])).teacherId, null);
+    assert.deepEqual(q.resultados[1].cambios, []);
+    assert.equal(q.actualizadas, 1);
+});
+
+test('proyectos: traspasar a otra cuenta y duplicar como plantilla, con sus figuras', async () => {
+    const admin = await entrarAdmin();
+    const ana = await cuenta('ana16');
+    const luis = await cuenta('luis16');
+    const p = (await ana.api('/projects', 'POST', { name: 'Original', data: { titulo: 'Con figura' } })).body.project;
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+    const f = (await ana.api(`/projects/${p.id}/files`, 'POST', { mime: 'image/png', data: png.toString('base64') })).body.file;
+    await ana.api(`/projects/${p.id}`, 'PUT', { patch: { elementos: [{ id: 'e1', tipo: 'figura', titulo: 'Mapa', fileId: f.id }, { id: 'e2', tipo: 'tabla', filas: [[String(f.id)]] }] } });
+
+    // Duplicar: solo el administrador; otro proyecto, otro número de figura, y el contenido apunta a la figura nueva.
+    assert.equal((await ana.api(`/admin/projects/${p.id}/duplicate`, 'POST', { userId: luis.id })).status, 403);
+    assert.equal((await admin('/admin/projects/999999/duplicate', 'POST', { userId: luis.id })).status, 404);
+    assert.equal((await admin(`/admin/projects/${p.id}/duplicate`, 'POST', { userId: 999999 })).status, 400);
+    const copia = await admin(`/admin/projects/${p.id}/duplicate`, 'POST', { userId: luis.id, name: 'Plantilla del curso' });
+    assert.equal(copia.status, 201);
+    const delCopia = (await luis.api(`/projects/${copia.body.project.id}`)).body.project;
+    assert.equal(delCopia.name, 'Plantilla del curso');
+    assert.equal(delCopia.data.titulo, 'Con figura');
+    const nuevaFigura = delCopia.data.elementos[0].fileId;
+    assert.notEqual(nuevaFigura, f.id);
+    assert.equal(delCopia.data.elementos[1].filas[0][0], String(f.id)); // un número igual en una tabla no se toca
+    assert.deepEqual([...new Uint8Array((await luis.api(`/projects/${delCopia.id}/files/${nuevaFigura}`)).body)], [...png]);
+    assert.equal((await luis.api(`/projects/${delCopia.id}/files/${f.id}`)).status, 404); // la figura original no es suya
+    assert.equal((await luis.api(`/projects/${delCopia.id}/versions`)).body.versions.length, 0);
+    // Cambiar la copia no cambia el original.
+    await luis.api(`/projects/${delCopia.id}`, 'PUT', { patch: { titulo: 'Otro' } });
+    assert.equal((await ana.api(`/projects/${p.id}`)).body.project.data.titulo, 'Con figura');
+    // Sin cuenta de destino, la copia queda en la del mismo dueño.
+    const misma = await admin(`/admin/projects/${p.id}/duplicate`, 'POST', {});
+    assert.equal(misma.body.owner.id, ana.id);
+    assert.equal(misma.body.project.name, 'Original (copia)');
+
+    // Traspasar: el dueño pasa a ser Luis; Ana queda invitada solo si se pide.
+    assert.equal((await luis.api(`/admin/projects/${p.id}/transfer`, 'POST', { userId: luis.id })).status, 403);
+    assert.equal((await admin(`/admin/projects/${p.id}/transfer`, 'POST', { userId: ana.id })).status, 400);
+    assert.equal((await admin(`/admin/projects/${p.id}/transfer`, 'POST', { userId: 999999 })).status, 400);
+    await ana.api(`/projects/${p.id}/members`, 'POST', { email: luis.email }); // Luis era invitado
+    const tr = await admin(`/admin/projects/${p.id}/transfer`, 'POST', { userId: luis.id, keepAccess: true });
+    assert.equal(tr.body.owner.id, luis.id);
+    assert.equal((await ana.api(`/projects/${p.id}`)).status, 200); // sigue como invitada
+    assert.equal((await ana.api(`/projects/${p.id}`, 'DELETE')).status, 403); // pero ya no es la dueña
+    const miembros = (await luis.api(`/projects/${p.id}/members`)).body.members;
+    assert.ok(miembros.find((m) => m.email === luis.email).owner);
+    assert.equal(miembros.filter((m) => m.email === luis.email).length, 1);
+    assert.equal((await luis.api(`/projects/${p.id}/files/${f.id}`)).status, 200);
+    // Sin conservar acceso, el dueño anterior ya no lo ve.
+    await admin(`/admin/projects/${p.id}/transfer`, 'POST', { userId: ana.id });
+    assert.equal((await luis.api(`/projects/${p.id}`)).status, 404);
+    assert.ok((await admin('/admin/log', 'POST', { q: 'Traspasó' })).body.log.length >= 2);
+});
+
+test('uso: se cuentan ingresos, guardados y búsquedas por día y por grupo, solo para el administrador', async () => {
+    const admin = await entrarAdmin();
+    const antes = (await admin('/admin/usage?days=7')).body;
+    const hoyAntes = antes.serie.at(-1);
+    const ana = await cuenta('ana17');
+    await admin(`/admin/users/${ana.id}`, 'PUT', { grupo: 'Grupo Uso' });
+    const p = (await ana.api('/projects', 'POST', { name: 'Uso', data: {} })).body.project;
+    await ana.api(`/projects/${p.id}`, 'PUT', { patch: { titulo: 'Uno' } });
+    await ana.api(`/projects/${p.id}`, 'PUT', { patch: { titulo: 'Dos' } });
+    await ana.api(`/projects/${p.id}`, 'PUT', { patch: { titulo: 'Dos' } }); // sin cambios: no cuenta
+    await ana.api('/buscar/articulos?q=citas%20medicas');
+    assert.equal((await ana.api('/admin/usage')).status, 403);
+    const u = (await admin('/admin/usage?days=7')).body;
+    assert.equal(u.serie.length, 7);
+    const hoy = u.serie.at(-1);
+    assert.equal(hoy.guardado - hoyAntes.guardado, 2);
+    assert.equal(hoy.ingreso - hoyAntes.ingreso, 1);
+    assert.equal(hoy.articulos - hoyAntes.articulos, 1);
+    assert.equal(hoy.activos - hoyAntes.activos, 1);
+    const g = u.grupos.find((x) => x.grupo === 'Grupo Uso');
+    assert.deepEqual([g.cuentas, g.guardado, g.ingreso], [1, 2, 1]);
+    assert.ok(u.top.some((x) => x.email === ana.email && x.guardado === 2));
+    assert.equal(u.normas.limite, 150);
+    assert.equal((await admin('/admin/usage?days=9999')).body.serie.length, 90);
+});
+
+test('restaurar una copia de seguridad: pide RESTAURAR y la contraseña, guarda el estado actual y devuelve los datos de ese día', async () => {
+    // Servidor aparte, para no devolver en el tiempo a las demás pruebas.
+    const puerto = PORT + 2;
+    const dir = path.join(tmp, 'restaurar');
+    const hijo = spawn(process.execPath, ['index.js'], { cwd: path.join(root, 'server'), env: { ...process.env, PORT: String(puerto), DB_PATH: path.join(dir, 'r.db'), BACKUP_DIR: path.join(dir, 'copias'), NODE_ENV: 'test', OPENALEX_API_KEY: '', SEMANTIC_SCHOLAR_API_KEY: '', SMTP_HOST: '', GROQ_API_KEY: '', RULEX_API_KEY: '', ADMIN_INITIAL_PASSWORD: 'inicial-de-prueba' } });
+    try {
+        const base = `http://127.0.0.1:${puerto}/api`;
+        for (let i = 0; i < 50; i += 1) { try { if ((await fetch(`${base}/health`)).ok) break; } catch { /* arrancando */ } await new Promise((r) => setTimeout(r, 100)); }
+        const nav = () => { let cookie = ''; return async (ruta, method = 'GET', body) => { const res = await fetch(base + ruta, { method, headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) }, body: method === 'GET' ? undefined : JSON.stringify(body || {}) }); const set = res.headers.get('set-cookie'); if (set) cookie = set.split(';')[0]; return { status: res.status, body: await res.json().catch(() => ({})) }; }; };
+        const admin = nav();
+        const claveAdmin = clave();
+        await admin('/auth/login', 'POST', { email: 'admin', password: 'inicial-de-prueba' });
+        await admin('/auth/password', 'POST', { current: 'inicial-de-prueba', next: claveAdmin });
+        const crear = async (nombre) => { const r = await admin('/admin/users', 'POST', { name: nombre, email: `${nombre}@example.test`, role: 'researcher' }); const api = nav(); await api('/auth/login', 'POST', { email: `${nombre}@example.test`, password: r.body.clave }); const mia = clave(); await api('/auth/password', 'POST', { current: r.body.clave, next: mia }); return { api, id: r.body.user.id, password: mia }; };
+
+        // Estado del «día de la copia»: una cuenta con un proyecto.
+        const ana = await crear('ana');
+        const p = (await ana.api('/projects', 'POST', { name: 'Tesis', data: { titulo: 'Como estaba' } })).body.project;
+        const copia = (await admin('/admin/backups', 'POST')).body.backup.name;
+
+        // Después de la copia: se daña el proyecto y se crea otra cuenta.
+        await ana.api(`/projects/${p.id}`, 'PUT', { patch: { titulo: 'Dañado' } });
+        const luis = await crear('luis');
+        assert.equal((await admin('/admin/users')).body.users.length, 3); // admin + ana + luis
+
+        // No se restaura sin la palabra, sin la contraseña, sin ser administrador, ni una copia que no existe.
+        assert.equal((await luis.api(`/admin/backups/${copia}/restore`, 'POST', { confirm: 'RESTAURAR', password: luis.password })).status, 403);
+        assert.equal((await admin(`/admin/backups/${copia}/restore`, 'POST', { confirm: 'restaurar', password: claveAdmin })).status, 400);
+        assert.equal((await admin(`/admin/backups/${copia}/restore`, 'POST', { confirm: 'RESTAURAR', password: 'no-es' })).status, 401);
+        assert.equal((await admin('/admin/backups/projectsia-1999-01-01.db.gz/restore', 'POST', { confirm: 'RESTAURAR', password: claveAdmin })).status, 404);
+        assert.equal((await admin('/admin/users')).body.users.length, 3);
+        assert.equal((await ana.api(`/projects/${p.id}`)).body.project.data.titulo, 'Dañado');
+
+        const r = await admin(`/admin/backups/${copia}/restore`, 'POST', { confirm: 'RESTAURAR', password: claveAdmin });
+        assert.equal(r.status, 200);
+        assert.equal(r.body.usuarios, 2); // admin + ana, como el día de la copia
+        assert.match(r.body.previa, /^projectsia-antes-de-restaurar-/);
+        assert.equal(r.body.safety.length, 1);
+
+        // El administrador sigue dentro; Ana volvió con su proyecto como estaba y entra con su contraseña; Luis ya no existe.
+        const usuarios = (await admin('/admin/users')).body.users;
+        assert.deepEqual(usuarios.map((u) => u.email).sort(), ['admin', 'ana@example.test']);
+        const anaOtraVez = ana.api; // su sesión sigue abierta: su cuenta existe en la copia
+        assert.equal((await nav()('/auth/login', 'POST', { email: 'ana@example.test', password: ana.password })).status, 200);
+        assert.equal((await anaOtraVez(`/projects/${p.id}`)).body.project.data.titulo, 'Como estaba');
+        assert.equal((await luis.api('/auth/me')).body.user, null);
+        assert.ok((await admin('/admin/log')).body.log.some((l) => l.action === 'Restauró una copia de seguridad'));
+        // Se puede seguir trabajando (la base no quedó bloqueada) y deshacer: restaurar la copia «de antes».
+        assert.equal((await anaOtraVez(`/projects/${p.id}`, 'PUT', { patch: { titulo: 'Sigue viva' } })).status, 200);
+        const vuelta = await admin(`/admin/backups/${r.body.previa}/restore`, 'POST', { confirm: 'RESTAURAR', password: claveAdmin });
+        assert.equal(vuelta.status, 200);
+        assert.deepEqual((await admin('/admin/users')).body.users.map((u) => u.email).sort(), ['admin', 'ana@example.test', 'luis@example.test']);
+        assert.equal((await anaOtraVez(`/projects/${p.id}`)).body.project.data.titulo, 'Dañado');
+        assert.equal(vuelta.body.safety.length, 2);
+    } finally {
+        hijo.kill();
+    }
+});
+
 test('carga por lotes: crea las filas buenas, explica las malas y enlaza cada estudiante con su profesor', async () => {
     const admin = await entrarAdmin();
     const t = Date.now();
