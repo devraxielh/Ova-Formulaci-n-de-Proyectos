@@ -1,0 +1,47 @@
+/* Avisos emergentes y confirmaciones (Avisos.jsx): pila abajo a la derecha. */
+.avi-pila {
+  position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 1300;
+  display: grid; gap: 0.6rem; width: min(24rem, calc(100vw - 2rem)); pointer-events: none;
+}
+.avi {
+  pointer-events: auto;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 0.7rem;
+  padding: 0.8rem 0.85rem 0.8rem 0.95rem;
+  background: #fff; color: #1e293b; border: 1px solid #e2e8f0; border-radius: 0.8rem;
+  box-shadow: 0 14px 32px -10px rgb(15 23 42 / 0.28), 0 2px 6px rgb(15 23 42 / 0.06);
+  font-size: 0.9rem; line-height: 1.45;
+  animation: avi-entra 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes avi-entra { from { opacity: 0; transform: translateY(10px); } }
+@media (prefers-reduced-motion: reduce) { .avi { animation: none; } }
+.avi > svg { margin-top: 0.1rem; }
+.avi--ok > svg { color: #047857; }
+.avi--error { border-color: #fecaca; background: #fef2f2; }
+.avi--error > svg { color: #b91c1c; }
+.avi--pregunta > svg { color: #4f46e5; }
+.avi--pregunta[data-peligro] > svg { color: #b91c1c; }
+.avi-texto { display: grid; gap: 0.15rem; overflow-wrap: anywhere; }
+.avi-texto b { font-weight: 600; }
+.avi-texto span { color: #475569; }
+.avi--ok .avi-texto span, .avi--error .avi-texto span { color: inherit; }
+.avi-cerrar {
+  display: grid; place-items: center; width: 1.6rem; height: 1.6rem; margin: -0.15rem -0.2rem 0 0;
+  border: 0; border-radius: 0.4rem; background: none; color: #64748b; cursor: pointer;
+}
+.avi-cerrar:hover { background: rgb(15 23 42 / 0.07); color: #1e293b; }
+.avi button:focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; }
+
+.avi--pregunta { grid-template-columns: auto minmax(0, 1fr); }
+.avi-botones { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 0.45rem; margin-top: 0.15rem; }
+.avi-botones button {
+  font: inherit; font-size: 0.86rem; font-weight: 600; cursor: pointer;
+  padding: 0.4rem 0.85rem; border-radius: 0.5rem; border: 1px solid #cbd5e1; background: #fff; color: #1e293b;
+  transition: background-color 0.18s;
+}
+.avi-botones button:hover { background: #f1f5f9; }
+.avi-botones .avi-si { border-color: #4f46e5; background: #4f46e5; color: #fff; }
+.avi-botones .avi-si:hover { background: #4338ca; }
+.avi--pregunta[data-peligro] .avi-si { border-color: #b91c1c; background: #b91c1c; }
+.avi--pregunta[data-peligro] .avi-si:hover { background: #991b1b; }
+
+@media (max-width: 560px) { .avi-pila { right: 1rem; left: 1rem; bottom: 1rem; width: auto; } }

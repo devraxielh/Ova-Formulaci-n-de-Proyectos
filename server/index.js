@@ -998,7 +998,22 @@ app.get('/api/admin/users/:id', requireAdmin, (req, res) => {
     const projects = db.prepare('SELECT id, name, data, created_at, updated_at FROM projects WHERE user_id = ? ORDER BY updated_at DESC, id DESC').all(row.id);
     return res.json({
         user: adminUserRow(row),
-        projects: projects.map((project) => ({ ...projectRow(project, false), coherencia: coherenciaDe(project.data) })),
+        projects: projects.map((project) => ({ ...projectRow(project, false), ...resumenProyecto(project.data), coherencia: coherenciaDe(project.data) })),
+    });
+});
+
+// Todos los proyectos de la plataforma, con su dueño, avance y coherencia (para la pestaña «Proyectos»).
+app.get('/api/admin/projects', requireAdmin, (_req, res) => {
+    const rows = db.prepare(`
+        SELECT p.id, p.name, p.data, p.created_at, p.updated_at, u.id AS owner_id, u.name AS owner, u.email AS owner_email, u.role AS owner_role,
+               (SELECT COUNT(*) FROM project_members m WHERE m.project_id = p.id) AS miembros
+        FROM projects p JOIN users u ON u.id = p.user_id ORDER BY p.updated_at DESC, p.id DESC LIMIT 2000`).all();
+    res.json({
+        projects: rows.map((r) => ({
+            id: r.id, name: r.name, createdAt: r.created_at, updatedAt: r.updated_at,
+            ownerId: r.owner_id, owner: r.owner, ownerEmail: r.owner_email, ownerRole: r.owner_role, miembros: r.miembros,
+            ...resumenProyecto(r.data), coherencia: coherenciaDe(r.data),
+        })),
     });
 });
 

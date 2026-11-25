@@ -1,0 +1,45 @@
+/* Lista desplegable con buscador (Selector.jsx). */
+.sel {
+  display: inline-flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  min-width: 10.5rem; max-width: 100%; min-height: 2.6rem; padding: 0.5rem 0.7rem 0.5rem 0.85rem;
+  border: 1px solid #cbd5e1; border-radius: 0.6rem; background: #fff;
+  font: inherit; font-size: 0.92rem; font-weight: 500; color: #1e293b; text-align: left; cursor: pointer;
+  transition: border-color 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.18s;
+}
+.sel > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sel > svg { flex: none; color: #64748b; transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1); }
+.sel[data-vacio] > span { color: #64748b; font-weight: 400; }
+.sel:hover:not(:disabled) { border-color: #94a3b8; background: #f8fafc; }
+.sel[aria-expanded='true'] { border-color: #4f46e5; box-shadow: 0 0 0 3px rgb(79 70 229 / 0.14); }
+.sel[aria-expanded='true'] > svg { transform: rotate(180deg); color: #4f46e5; }
+.sel:focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; }
+.sel:disabled { opacity: 0.55; cursor: not-allowed; }
+.sel--compacto { min-height: 2.1rem; padding: 0.3rem 0.5rem 0.3rem 0.7rem; font-size: 0.86rem; }
+
+.sel-panel {
+  position: fixed; z-index: 1200; max-width: calc(100vw - 16px);
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 0.75rem;
+  box-shadow: 0 12px 28px -8px rgb(15 23 42 / 0.22), 0 2px 6px rgb(15 23 42 / 0.06);
+  font-family: inherit; font-size: 0.9rem; color: #1e293b; overflow: hidden;
+  animation: sel-abrir 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sel-panel:focus { outline: none; }
+@keyframes sel-abrir { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .sel-panel { animation: none; } }
+
+.sel-buscar { display: flex; align-items: center; gap: 0.45rem; padding: 0.55rem 0.75rem; border-bottom: 1px solid #e2e8f0; color: #64748b; }
+.sel-buscar input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font: inherit; color: #1e293b; }
+.sel-buscar input::placeholder { color: #64748b; }
+
+.sel-panel ul { list-style: none; margin: 0; padding: 0.3rem; max-height: 16rem; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+.sel-panel li {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+  padding: 0.45rem 0.6rem; border-radius: 0.45rem; cursor: pointer;
+}
+.sel-panel li > span { display: grid; min-width: 0; }
+.sel-panel li b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sel-panel li small { font-size: 0.78rem; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sel-panel li[data-activo] { background: #eef2ff; }
+.sel-panel li[aria-selected='true'] b { font-weight: 600; color: #3730a3; }
+.sel-panel li > svg { flex: none; color: #4f46e5; }
+.sel-panel li.sel-nada { cursor: default; color: #64748b; font-size: 0.86rem; padding: 0.7rem 0.6rem; }

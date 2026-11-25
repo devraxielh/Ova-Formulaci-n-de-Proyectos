@@ -73,6 +73,7 @@ export const api = {
         clearErrors: () => request('/admin/errors', { method: 'DELETE' }),
         user: (id) => request(`/admin/users/${id}`),
         project: (id) => request(`/admin/projects/${id}`),
+        projects: () => request('/admin/projects'),
         setLimit: (id, limit) => request(`/admin/users/${id}/limit`, { method: 'POST', body: { limit } }),
         setStatus: (id, status) => request(`/admin/users/${id}/status`, { method: 'POST', body: { status } }),
         resend: (id) => request(`/admin/users/${id}/resend`, { method: 'POST' }),

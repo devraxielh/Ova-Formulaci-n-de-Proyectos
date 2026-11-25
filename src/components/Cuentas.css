@@ -3,8 +3,9 @@
 .cue-cabeza { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem; }
 .cue-cabeza h2 { display: flex; align-items: center; gap: 0.45rem; margin: 0; }
 .cue-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.7rem; align-items: end; }
-.cue-form label { display: grid; gap: 0.25rem; }
-.cue-form label > span { font-size: 0.82rem; font-weight: 600; color: #475569; }
+.cue-form label, .cue-campo { display: grid; gap: 0.25rem; }
+.cue-campo .sel { width: 100%; }
+.cue-form label > span, .cue-campo > span { font-size: 0.82rem; font-weight: 600; color: #475569; }
 .cue-form .cue-nota { grid-column: 1 / -1; margin: 0; font-size: 0.84rem; color: #64748b; }
 .cue-form > button { justify-self: start; }
 .cue-check { display: flex !important; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: #334155; }

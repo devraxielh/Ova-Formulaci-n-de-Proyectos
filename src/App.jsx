@@ -4,6 +4,7 @@ import { Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, 
 import { useProject } from './context/ProjectContext';
 import { CAMPOS_SECCION, SECTIONS, buildDocument } from './services/projectDoc';
 import { api } from './services/api';
+import Avisos from './components/Avisos';
 import './components/Proyecto.css';
 
 // Cada página se descarga solo cuando se abre: la primera carga del sitio es mucho más liviana.
@@ -309,6 +310,7 @@ function App() {
 
     return (
         <div className="app-container">
+            <Avisos />
             {/* Mobile Header */}
             <header className="mobile-header">
                 <button

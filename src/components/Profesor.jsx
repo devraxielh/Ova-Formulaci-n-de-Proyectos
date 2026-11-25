@@ -5,6 +5,7 @@ import { buildDocument } from '../services/projectDoc';
 import { DocumentPaper } from './ProjectDocument';
 import Coherencia from './Coherencia';
 import { Credenciales } from './Cuentas';
+import { avisar, confirmar } from './Avisos';
 import './Proyecto.css';
 import './Cuentas.css';
 
@@ -25,15 +26,14 @@ const Profesor = () => {
     const [mail, setMail] = useState(true);
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
-    const [error, setError] = useState('');
-    const [notice, setNotice] = useState('');
+    const setError = (texto) => avisar(texto, 'error');
+    const setNotice = (texto) => avisar(texto);
     const [form, setForm] = useState({ name: '', email: '', permitir: true });
     const [creadas, setCreadas] = useState(null);
     const [abierto, setAbierto] = useState(null); // { project, owner }
 
     const load = useCallback(async () => {
         setLoading(true);
-        setError('');
         try {
             const r = await api.teacher.students();
             setStudents(r.students);
@@ -47,8 +47,6 @@ const Profesor = () => {
     const crear = async (event) => {
         event.preventDefault();
         setBusy(true);
-        setError('');
-        setNotice('');
         try {
             const r = await api.teacher.createStudent(form);
             setStudents((prev) => [...prev, r.student].sort((a, b) => a.name.localeCompare(b.name, 'es')));
@@ -58,7 +56,6 @@ const Profesor = () => {
     };
     const cambiarCupo = async (s, limit) => {
         setBusy(true);
-        setError('');
         try {
             const r = await api.teacher.setLimit(s.id, limit);
             reemplazar(r.student);
@@ -66,16 +63,14 @@ const Profesor = () => {
         } catch (err) { setError(err.message); } finally { setBusy(false); }
     };
     const nuevoAcceso = async (s) => {
-        if (!window.confirm(`¿Dar una contraseña nueva a ${s.name}? La anterior deja de servir.`)) return;
+        if (!(await confirmar({ texto: `¿Dar una contraseña nueva a ${s.name}?`, detalle: 'La anterior deja de servir y se cierran sus sesiones.', aceptar: 'Dar contraseña nueva' }))) return;
         setBusy(true);
-        setError('');
         try {
             const r = await api.teacher.newAccess(s.id);
             setCreadas({ cuentas: [{ name: s.name, email: s.email, clave: r.clave, emailSent: r.emailSent }], mail: r.emailSent });
         } catch (err) { setError(err.message); } finally { setBusy(false); }
     };
     const abrir = async (id) => {
-        setError('');
         try { setAbierto(await api.teacher.project(id)); } catch (err) { setError(err.message); }
     };
 
@@ -107,9 +102,6 @@ const Profesor = () => {
 
     return (
         <div className="pro-page">
-            {error && <p className="pro-alert" role="alert">{error}</p>}
-            {notice && <p className="pro-notice" role="status">{notice}</p>}
-
             <section className="pro-card cue">
                 <div className="cue-cabeza">
                     <h2><UserPlus size={19} aria-hidden="true" /> Crear un estudiante</h2>

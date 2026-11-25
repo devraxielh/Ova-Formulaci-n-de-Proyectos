@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Activity, AlertTriangle, CheckCircle2, DatabaseBackup, Download, RefreshCw, Trash2 } from 'lucide-react';
 import { api } from '../services/api';
+import { avisar, confirmar } from './Avisos';
 
 /* Estado del sistema para el administrador: copias de seguridad, IA, correo y errores recientes. */
 
@@ -8,12 +9,13 @@ const fecha = (ms) => (ms ? new Date(ms).toLocaleString('es-CO', { day: 'numeric
 const peso = (bytes) => (bytes > 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
 const TIPO = { navegador: 'Navegador', servidor: 'Servidor', ia: 'IA', backup: 'Copia', correo: 'Correo', buscar: 'Búsqueda' };
 
-const AdminEstado = () => {
+const AdminEstado = ({ fijo = false }) => {
     const [estado, setEstado] = useState(null);
-    const [abierto, setAbierto] = useState(false);
+    const [desplegado, setAbierto] = useState(false);
+    const abierto = fijo || desplegado; // en la pestaña «Sistema» se muestra siempre completo
     const [busy, setBusy] = useState(false);
-    const [msg, setMsg] = useState('');
-    const [error, setError] = useState('');
+    const setMsg = (texto) => avisar(texto);
+    const setError = (texto) => avisar(texto, 'error');
 
     const cargar = useCallback(async () => {
         try { setEstado(await api.admin.estado()); } catch (err) { setError(err.message); }
@@ -26,8 +28,6 @@ const AdminEstado = () => {
     const iaBien = estado.ai.configured && estado.ai.fails < 3;
     const copiar = async () => {
         setBusy(true);
-        setMsg('');
-        setError('');
         try {
             const r = await api.admin.backupNow();
             setEstado((prev) => ({ ...prev, backups: r.backups }));
@@ -39,12 +39,13 @@ const AdminEstado = () => {
         }
     };
     const limpiar = async () => {
+        if (!(await confirmar({ texto: '¿Borrar el registro de errores?', detalle: 'Solo se borra la lista; no afecta a los proyectos.', aceptar: 'Borrar', peligro: true }))) return;
         try { await api.admin.clearErrors(); setEstado((prev) => ({ ...prev, errors: [] })); } catch (err) { setError(err.message); }
     };
 
     return (
-        <section className="pro-card adm-estado">
-            <button type="button" className="adm-estado-head" onClick={() => setAbierto(!abierto)} aria-expanded={abierto}>
+        <section className="pro-card adm-estado" data-fijo={fijo || undefined}>
+            <button type="button" className="adm-estado-head" onClick={() => setAbierto(!abierto)} aria-expanded={abierto} disabled={fijo}>
                 <Activity size={18} aria-hidden="true" />
                 <b>Estado del sistema</b>
                 <span data-ok={copiaHoy}>{copiaHoy ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />} Copia de hoy</span>
@@ -86,8 +87,6 @@ const AdminEstado = () => {
                     </div>
                 </div>
             )}
-            {msg && <p className="pro-notice" role="status">{msg}</p>}
-            {error && <p className="pro-alert" role="alert">{error}</p>}
         </section>
     );
 };

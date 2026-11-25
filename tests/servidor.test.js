@@ -361,6 +361,13 @@ test('roles: el administrador crea y asigna; el profesor crea a sus estudiantes,
     assert.equal((await profe.api(`/teacher/projects/${p.id}`)).body.project.data.titulo, 'Título del estudiante');
     assert.equal((await otroProfe.api(`/teacher/projects/${p.id}`)).status, 404);
     assert.equal((await otroProfe.api('/teacher/students')).body.students.length, 0);
+    // El administrador ve todos los proyectos con su dueño; nadie más entra a esa lista.
+    const todos = (await admin('/admin/projects')).body.projects;
+    const fila = todos.find((x) => x.id === p.id);
+    assert.equal(fila.titulo, 'Título del estudiante');
+    assert.equal(fila.ownerRole, 'student');
+    assert.equal(fila.ownerEmail, correo);
+    assert.equal((await profe.api('/admin/projects')).status, 403);
     // Supervisar es leer: el profesor no puede escribir en el proyecto del estudiante.
     assert.equal((await profe.api(`/projects/${p.id}`, 'PUT', { patch: { titulo: 'Del profesor' } })).status, 404);
 

@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { CheckCircle2, Download, KeyRound, Upload, UserPlus, XCircle } from 'lucide-react';
 import { api } from '../services/api';
+import Selector from './Selector';
+import { avisar } from './Avisos';
 import './Cuentas.css';
 
 /*
@@ -25,8 +27,8 @@ const rolDesdeTexto = (texto) => {
     return '';
 };
 
-const csv = (filas) => filas.map((f) => f.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
-const descargar = (nombre, contenido) => {
+export const csv = (filas) => filas.map((f) => f.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+export const descargar = (nombre, contenido) => {
     const url = URL.createObjectURL(new Blob([`﻿${contenido}`], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a');
     a.href = url;
@@ -118,7 +120,7 @@ export const CrearCuentas = ({ profesores, onCreadas }) => {
     const [form, setForm] = useState({ name: '', email: '', role: 'student', teacherId: '' });
     const [lote, setLote] = useState('');
     const [busy, setBusy] = useState(false);
-    const [error, setError] = useState('');
+    const setError = (texto) => avisar(texto, 'error');
     const [creadas, setCreadas] = useState(null); // { cuentas, mail }
     const filas = useMemo(() => leerLote(lote), [lote]);
     const validas = filas.filter((f) => !f.error);
@@ -127,7 +129,6 @@ export const CrearCuentas = ({ profesores, onCreadas }) => {
     const crearUno = async (event) => {
         event.preventDefault();
         setBusy(true);
-        setError('');
         try {
             const r = await api.admin.createUser({ ...form, teacherId: form.role === 'student' ? Number(form.teacherId) || null : null });
             setCreadas({ cuentas: [{ name: r.user.name, email: r.user.email, clave: r.clave, emailSent: r.emailSent }], mail: r.emailSent });
@@ -137,7 +138,6 @@ export const CrearCuentas = ({ profesores, onCreadas }) => {
     };
     const cargarLote = async () => {
         setBusy(true);
-        setError('');
         try {
             const r = await api.admin.createBatch(validas.map(({ name, email, role, teacher }) => ({ name, email, role, teacher })));
             setCreadas({ cuentas: r.resultados, mail: r.mail });
@@ -162,25 +162,19 @@ export const CrearCuentas = ({ profesores, onCreadas }) => {
                 </div>
             </div>
             <p className="adm-muted">Nadie se registra por su cuenta: tú creas a profesores, investigadores y estudiantes, y cada profesor puede crear a los suyos.</p>
-            {error && <p className="pro-alert" role="alert">{error}</p>}
             {creadas && <Credenciales cuentas={creadas.cuentas} mail={creadas.mail} onCerrar={() => setCreadas(null)} />}
 
             {modo === 'uno' && (
                 <form className="cue-form" onSubmit={crearUno}>
                     <label><span>Nombre completo</span><input className="input-field" required maxLength={80} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ej: Ana Pérez Gómez" /></label>
                     <label><span>Correo (será su usuario)</span><input className="input-field" type="email" required maxLength={160} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="ana@correo.edu.co" /></label>
-                    <label><span>Rol</span>
-                        <select className="input-field" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                            {ROLES.map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
-                        </select>
-                    </label>
+                    <div className="cue-campo"><span>Rol</span>
+                        <Selector etiqueta="Rol" buscar={false} value={form.role} onChange={(v) => setForm({ ...form, role: v })} opciones={ROLES.map((r) => ({ value: r.id, label: r.nombre }))} />
+                    </div>
                     {form.role === 'student' && (
-                        <label><span>Profesor a cargo</span>
-                            <select className="input-field" value={form.teacherId} onChange={(e) => setForm({ ...form, teacherId: e.target.value })}>
-                                <option value="">Sin profesor por ahora</option>
-                                {profesores.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                            </select>
-                        </label>
+                        <div className="cue-campo"><span>Profesor a cargo</span>
+                            <Selector buscar etiqueta="Profesor a cargo" value={form.teacherId} onChange={(v) => setForm({ ...form, teacherId: String(v) })} opciones={[{ value: '', label: 'Sin profesor por ahora' }, ...profesores.map((p) => ({ value: p.id, label: p.name, nota: p.email }))]} />
+                        </div>
                     )}
                     <p className="cue-nota">{ROLES.find((r) => r.id === form.role).nota}</p>
                     <button type="submit" className="pro-btn pro-btn--primary" disabled={busy}><UserPlus size={15} /> {busy ? 'Creando…' : 'Crear usuario'}</button>
