@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, CheckCircle2, Download, FileText, FolderOpen, Layers, Lightbulb, LogOut, MailCheck, MonitorSmartphone, ShieldCheck } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Download, FileText, FolderOpen, Layers, Lightbulb, LogOut, MailCheck, MonitorSmartphone, Presentation, ShieldCheck } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 import { api } from '../services/api';
 import { nombreRol } from './Cuentas';
@@ -149,7 +149,7 @@ const Restablecer = ({ token, onDone, onNavigate }) => {
 };
 
 const Cuenta = ({ onNavigate, activation, resetToken, onResetDone }) => {
-    const { user, login, register, logout, hasContent, projects } = useProject();
+    const { user, login, entrarInvitado, register, logout, hasContent, projects } = useProject();
     const [olvido, setOlvido] = useState(null); // null | 'form' | 'sent' | 'nomail'
     const [mode, setMode] = useState('login');
     const [name, setName] = useState('');
@@ -201,6 +201,19 @@ const Cuenta = ({ onNavigate, activation, resetToken, onResetDone }) => {
         return undefined;
     };
 
+    const comoInvitado = async () => {
+        setError(null);
+        setBusy(true);
+        try {
+            await entrarInvitado();
+            onNavigate('ideacion');
+        } catch (err) {
+            setError({ message: err.message || 'No se pudo entrar como invitado.' });
+        } finally {
+            setBusy(false);
+        }
+    };
+
     const signOut = async () => {
         setError(null);
         setBusy(true);
@@ -244,9 +257,18 @@ const Cuenta = ({ onNavigate, activation, resetToken, onResetDone }) => {
                         <p className="pro-notice" role="status"><CheckCircle2 size={16} style={{ verticalAlign: '-3px' }} /> Tu cuenta quedó activada. Ya puedes guardar tu proyecto.</p>
                     )}
                     {error && <p className="pro-alert" role="alert">{error.message}</p>}
-                    <h2>Cambiar contraseña</h2>
-                    <p className="acc-lead">Usa una contraseña que no uses en otros sitios. Al cambiarla se cierran tus otras sesiones.</p>
-                    <CambioClave forced={user.mustChangePassword} />
+                    {user.comun ? (
+                        <>
+                            <h2>Entraste como invitado</h2>
+                            <p className="acc-lead">Puedes ver las presentaciones de todos los módulos. Para construir tu proyecto, guardar tu avance y usar el asistente necesitas una cuenta propia: pídela a tu profesor o al administrador.</p>
+                        </>
+                    ) : (
+                        <>
+                            <h2>Cambiar contraseña</h2>
+                            <p className="acc-lead">Usa una contraseña que no uses en otros sitios. Al cambiarla se cierran tus otras sesiones.</p>
+                            <CambioClave forced={user.mustChangePassword} />
+                        </>
+                    )}
                 </section>
             </AccountShell>
         );
@@ -388,6 +410,14 @@ const Cuenta = ({ onNavigate, activation, resetToken, onResetDone }) => {
                         {busy ? 'Un momento…' : isRegister ? 'Crear cuenta' : 'Iniciar sesión'}
                     </button>
                 </form>
+
+                {!isRegister && (
+                    <div className="acc-invitado">
+                        <span>o</span>
+                        <button type="button" className="pro-btn pro-btn--ghost pro-btn--block" disabled={busy} onClick={comoInvitado}><Presentation size={16} /> Entrar como invitado</button>
+                        <small>Sin cuenta: solo verás las presentaciones de cada módulo.</small>
+                    </div>
+                )}
 
                 {!isRegister && (
                     <p className="pro-fine">

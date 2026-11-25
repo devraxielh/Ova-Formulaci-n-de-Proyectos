@@ -824,6 +824,46 @@ test('invitado: entra y no puede nada más que mirar (sin proyectos, IA ni búsq
     assert.equal((await admin('/admin/users')).body.users.find((u) => u.email === lote.resultados[0].email).projectLimit, 0);
 });
 
+test('entrar como invitado sin cuenta: sesión compartida de solo presentaciones, que el administrador puede cerrar', async () => {
+    const admin = await entrarAdmin();
+    const a = cliente();
+    const b = cliente();
+    const entra = await a('/auth/guest', 'POST');
+    assert.equal(entra.status, 200);
+    assert.deepEqual([entra.body.user.role, entra.body.user.comun, entra.body.user.mustChangePassword, entra.body.user.projectLimit], ['guest', true, false, 0]);
+    assert.equal((await b('/auth/guest', 'POST')).status, 200); // dos visitas a la vez, cada una con su sesión
+
+    // Lo mismo que cualquier invitado: nada de proyectos, IA ni búsquedas.
+    assert.deepEqual((await a('/projects')).body.projects, []);
+    assert.equal((await a('/projects', 'POST', { name: 'x', data: {} })).body.code, 'guest');
+    assert.equal((await a('/ai/chat', 'POST', { messages: [{ role: 'user', content: 'hola' }] })).status, 403);
+    // No tiene contraseña: ni se cambia, ni sirve para entrar por el formulario.
+    assert.equal((await a('/auth/password', 'POST', { current: 'x', next: 'Clave-nueva-123' })).status, 400);
+    assert.equal((await cliente()('/auth/login', 'POST', { email: 'invitado', password: '' })).status, 401);
+    // Cerrar una sesión no cierra la de la otra visita.
+    assert.equal((await a('/auth/logout', 'POST')).status, 200);
+    assert.equal((await a('/auth/me')).body.user, null);
+    assert.equal((await b('/auth/me')).body.user.role, 'guest');
+
+    // El administrador la ve como una sola cuenta, no la puede modificar ni eliminar…
+    const fila = (await admin('/admin/users')).body.users.find((u) => u.email === 'invitado');
+    assert.equal(fila.comun, true);
+    assert.equal((await admin(`/admin/users/${fila.id}`, 'PUT', { name: 'Otro' })).status, 400);
+    assert.equal((await admin(`/admin/users/${fila.id}`, 'DELETE')).status, 400);
+    assert.equal((await admin(`/admin/users/${fila.id}/role`, 'POST', { role: 'researcher' })).status, 400);
+    assert.equal((await admin(`/admin/users/${fila.id}/access`, 'POST')).status, 400);
+    assert.deepEqual((await admin('/admin/users/bulk', 'POST', { ids: [fila.id], action: 'delete' })).body, { hechas: 0, omitidas: 1 });
+    assert.deepEqual((await admin('/admin/users/bulk', 'POST', { ids: [fila.id], action: 'role', value: 'researcher' })).body, { hechas: 0, omitidas: 1 });
+    // …pero sí cerrar esa entrada: al bloquearla se van las visitas y el botón deja de servir; al activarla, vuelve.
+    assert.equal((await admin(`/admin/users/${fila.id}/status`, 'POST', { status: 'blocked' })).status, 200);
+    assert.equal((await b('/auth/me')).body.user, null);
+    const cerrado = await cliente()('/auth/guest', 'POST');
+    assert.equal(cerrado.status, 403);
+    assert.equal(cerrado.body.code, 'guest_off');
+    assert.equal((await admin(`/admin/users/${fila.id}/status`, 'POST', { status: 'active' })).status, 200);
+    assert.equal((await cliente()('/auth/guest', 'POST')).status, 200);
+});
+
 test('carga por lotes: crea las filas buenas, explica las malas y enlaza cada estudiante con su profesor', async () => {
     const admin = await entrarAdmin();
     const t = Date.now();

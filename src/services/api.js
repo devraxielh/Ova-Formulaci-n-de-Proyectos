@@ -33,6 +33,7 @@ export const api = {
     me: () => request('/auth/me'),
     register: (payload) => request('/auth/register', { method: 'POST', body: payload }),
     login: (payload) => request('/auth/login', { method: 'POST', body: payload }),
+    guest: () => request('/auth/guest', { method: 'POST' }),
     logout: () => request('/auth/logout', { method: 'POST' }),
     verify: (token) => request('/auth/verify', { method: 'POST', body: { token } }),
     resend: (email) => request('/auth/resend', { method: 'POST', body: { email } }),

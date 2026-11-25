@@ -237,6 +237,11 @@ const createSession = (res, userId) => {
     setSessionCookie(res, token, SESSION_DAYS * 86400);
 };
 
+// «Entrar como invitado» (sin cuenta propia): todas esas visitas usan esta cuenta compartida, con rol de invitado.
+// No tiene contraseña utilizable y no se puede modificar; para cerrar esa puerta, el administrador la bloquea.
+const INVITADO_COMUN = 'invitado';
+const esInvitadoComun = (u) => u?.email === INVITADO_COMUN;
+
 const publicUser = (user) => ({
     id: user.id,
     email: user.email,
@@ -244,6 +249,7 @@ const publicUser = (user) => ({
     role: user.role,
     mustChangePassword: Boolean(user.must_change_password),
     projectLimit: user.role === 'admin' ? MAX_PROJECTS : Number(user.project_limit) || 0,
+    ...(user.email === INVITADO_COMUN ? { comun: true } : {}), // la cuenta compartida del botón «Entrar como invitado»
 });
 
 const ROLES = ['admin', 'teacher', 'student', 'researcher', 'guest'];
@@ -567,6 +573,25 @@ const perAccount = (req) => `${req.ip}|${String(req.body?.email || '').trim().to
 const loginLimit = rateLimit({ name: 'login', limit: 10, windowMs: 15 * 60 * 1000, key: perAccount });
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
+// Entrar como invitado, sin cuenta: abre una sesión de la cuenta compartida (solo presentaciones).
+const cuentaInvitada = () => {
+    let u = db.prepare('SELECT * FROM users WHERE email = ?').get(INVITADO_COMUN);
+    if (!u) {
+        db.prepare(`INSERT INTO users (email, name, password_hash, role, status, must_change_password, project_limit)
+                    VALUES (?, 'Invitado', ?, 'guest', 'active', 0, 0)`).run(INVITADO_COMUN, hashPassword(crypto.randomBytes(24).toString('hex')));
+        u = db.prepare('SELECT * FROM users WHERE email = ?').get(INVITADO_COMUN);
+    }
+    return u;
+};
+app.post('/api/auth/guest', authLimit, rateLimit({ name: 'invitado', limit: 40, windowMs: 10 * 60 * 1000 }), (_req, res) => {
+    const u = cuentaInvitada();
+    if (u.status !== 'active' || u.role !== 'guest') return res.status(403).json({ error: 'La entrada como invitado está desactivada. Pide una cuenta al administrador.', code: 'guest_off' });
+    createSession(res, u.id);
+    contarUso('ingreso', u.id);
+    db.prepare('DELETE FROM sessions WHERE user_id = ? AND expires_at < ?').run(u.id, Date.now());
+    return res.json({ user: publicUser(u) });
+});
+
 // El registro por cuenta propia está cerrado: las cuentas las crea el administrador (o el profesor, las de sus estudiantes).
 app.post('/api/auth/register', authLimit, (_req, res) => res.status(403).json({
     error: 'El registro está cerrado. Pide tu cuenta al administrador o a tu profesor.', code: 'registro_cerrado',
@@ -656,6 +681,7 @@ app.post('/api/auth/logout', (req, res) => {
 app.get('/api/auth/me', (req, res) => res.json({ user: req.user ? publicUser(req.user) : null }));
 
 app.post('/api/auth/password', requireUser, authLimit, (req, res) => {
+    if (esInvitadoComun(req.user)) return res.status(400).json({ error: 'La cuenta de invitado es compartida: no tiene contraseña.' });
     const current = String(req.body?.current || '');
     const next = String(req.body?.next || '');
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
@@ -1053,6 +1079,7 @@ const adminUserRow = (row) => ({
     lastActivity: row.last_activity,
     teacherId: row.teacher_id || null,
     grupo: row.grupo || '',
+    ...(row.email === INVITADO_COMUN ? { comun: true } : {}),
     teacherName: row.teacher_id ? (db.prepare('SELECT name FROM users WHERE id = ?').get(row.teacher_id)?.name || '') : '',
     mustChangePassword: Boolean(row.must_change_password),
 });
@@ -1121,6 +1148,7 @@ app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
     const target = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(req.params.id));
     if (!target) return res.status(404).json({ error: 'No se encontró el usuario.' });
     if (target.role === 'admin') return res.status(400).json({ error: 'El administrador cambia sus datos desde su cuenta.' });
+    if (esInvitadoComun(target)) return res.status(400).json({ error: 'Es la cuenta compartida de «Entrar como invitado»: no se modifica. Para cerrar esa entrada, bloquéala.' });
     const name = String(req.body?.name ?? target.name).trim().replace(/\s+/g, ' ').slice(0, 80);
     const email = String(req.body?.email ?? target.email).trim().toLowerCase().slice(0, 160);
     const grupo = req.body?.grupo === undefined ? (target.grupo || '') : grupoLimpio(req.body.grupo);
@@ -1156,6 +1184,7 @@ app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
     const target = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(req.params.id));
     if (!target) return res.status(404).json({ error: 'No se encontró el usuario.' });
     if (target.role === 'admin') return res.status(400).json({ error: 'No se puede eliminar a un administrador.' });
+    if (esInvitadoComun(target)) return res.status(400).json({ error: 'Es la cuenta compartida de «Entrar como invitado»: no se modifica. Para cerrar esa entrada, bloquéala.' });
     const proyectos = db.prepare('SELECT COUNT(*) AS n FROM projects WHERE user_id = ?').get(target.id).n;
     if (proyectos > 0 && !(await runBackup())) return res.status(500).json({ error: 'No se pudo crear la copia de seguridad previa, así que la cuenta no se eliminó. Inténtalo de nuevo.' });
     borrarCuenta(target, req.user.name);
@@ -1173,7 +1202,8 @@ app.post('/api/admin/users/bulk', requireAdmin, async (req, res) => {
     const value = req.body?.value;
     if (!ids.length) return res.status(400).json({ error: 'No hay cuentas seleccionadas.' });
     const marcas = ids.map(() => '?').join(',');
-    const cuentas = db.prepare(`SELECT * FROM users WHERE id IN (${marcas}) AND role != 'admin'`).all(...ids);
+    // La cuenta compartida de invitados solo entra en el lote para bloquearla o activarla.
+    const cuentas = db.prepare(`SELECT * FROM users WHERE id IN (${marcas}) AND role != 'admin'`).all(...ids).filter((u) => !esInvitadoComun(u) || action === 'status');
     let aplica = cuentas;
     let hacer;
     let texto;
@@ -1541,7 +1571,7 @@ app.post('/api/admin/users/batch', requireAdmin, crearLimit, async (req, res) =>
         const existente = req.body?.update ? db.prepare('SELECT * FROM users WHERE email = ?').get(email) : null;
         if (existente) {
             const base = { email, name: existente.name };
-            if (existente.role === 'admin') { resultados.push({ ...base, ok: false, error: 'Es un administrador: no se cambia por lote.' }); continue; }
+            if (existente.role === 'admin' || esInvitadoComun(existente)) { resultados.push({ ...base, ok: false, error: 'Esa cuenta no se cambia por lote.' }); continue; }
             const rolNuevo = fila?.role && ROLES.includes(String(fila.role)) && fila.role !== 'admin' ? String(fila.role) : existente.role;
             const cambios = [];
             let profesorId = rolNuevo === 'student' ? existente.teacher_id : null;
@@ -1586,6 +1616,7 @@ app.post('/api/admin/users/:id/role', requireAdmin, (req, res) => {
     const target = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(req.params.id));
     if (!target) return res.status(404).json({ error: 'No se encontró el usuario.' });
     if (target.role === 'admin') return res.status(400).json({ error: 'No se puede cambiar el rol de un administrador.' });
+    if (esInvitadoComun(target)) return res.status(400).json({ error: 'Es la cuenta compartida de «Entrar como invitado»: no se modifica. Para cerrar esa entrada, bloquéala.' });
     let teacherId = null;
     if (role === 'student' && req.body?.teacherId) {
         const prof = db.prepare("SELECT id FROM users WHERE id = ? AND role = 'teacher'").get(Number(req.body.teacherId));
@@ -1606,6 +1637,7 @@ app.post('/api/admin/users/:id/access', requireAdmin, crearLimit, async (req, re
     const target = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(req.params.id));
     if (!target) return res.status(404).json({ error: 'No se encontró el usuario.' });
     if (target.role === 'admin') return res.status(400).json({ error: 'El administrador cambia su contraseña desde su cuenta.' });
+    if (esInvitadoComun(target)) return res.status(400).json({ error: 'Es la cuenta compartida de «Entrar como invitado»: no se modifica. Para cerrar esa entrada, bloquéala.' });
     bitacora(req, 'Dio una contraseña nueva', `${target.name} (${target.email})`);
     return res.json(await renovarAcceso(target, 'El administrador'));
 });

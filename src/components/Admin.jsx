@@ -570,7 +570,7 @@ const Admin = () => {
     /* ---------- Ficha de un usuario ---------- */
     if (selected) {
         const { user, projects: suyos } = selected;
-        const esAdmin = user.role === 'admin';
+        const esAdmin = user.role === 'admin' || Boolean(user.comun); // tampoco se modifica la cuenta compartida de invitados
         const susEstudiantes = user.role === 'teacher' ? users.filter((u) => u.teacherId === user.id) : [];
         return (
             <div className="pro-page">
@@ -629,6 +629,12 @@ const Admin = () => {
                             </div>
                             <p className="adm-muted">{ROLES.find((r) => r.id === user.role)?.nota}</p>
                         </div>
+                    )}
+                    {user.comun && (
+                        <footer className="adm-ficha-acciones">
+                            <p className="adm-muted" style={{ margin: 0, flex: '1 1 20rem' }}>Es la cuenta que usan quienes presionan «Entrar como invitado» en el ingreso. No tiene contraseña ni se modifica; si la bloqueas, ese botón deja de funcionar.</p>
+                            <StatusActions user={user} onChange={changeStatus} onResend={resend} busy={busy} />
+                        </footer>
                     )}
                     {!esAdmin && (
                         <footer className="adm-ficha-acciones">
@@ -840,7 +846,7 @@ const Admin = () => {
                                             <td>
                                                 <button type="button" className="adm-user-link" onClick={() => viewUser(user.id)}>
                                                     <b>{user.name}</b>
-                                                    <small>{user.email}</small>
+                                                    <small>{user.comun ? 'Cuenta compartida del botón «Entrar como invitado»' : user.email}</small>
                                                     {user.grupo && <small className="adm-grupo">{user.grupo}</small>}
                                                 </button>
                                             </td>
