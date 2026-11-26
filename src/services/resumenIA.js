@@ -62,6 +62,39 @@ export const revisarParte = (texto, fuente) => {
     return { ok: true, texto: parte };
 };
 
+// Lee la respuesta de la IA: una línea por parte, «[1] …», «[2] …», en el orden en que se pidieron.
+// No se usa JSON: al copiar comillas del texto del estudiante, la IA devolvía JSON inválido y la solicitud fallaba.
+export const leerPartes = (contenido, pedir) => {
+    const texto = String(contenido ?? '');
+    const marcas = [...texto.matchAll(/\[(\d+)\]/g)].filter((m) => Number(m[1]) >= 1 && Number(m[1]) <= pedir.length);
+    const partes = {};
+    marcas.forEach((m, k) => {
+        const clave = pedir[Number(m[1]) - 1];
+        const fin = k + 1 < marcas.length ? marcas[k + 1].index : texto.length;
+        const cuerpo = texto.slice(m.index + m[0].length, fin).trim();
+        if (clave && cuerpo && !partes[clave]) partes[clave] = cuerpo;
+    });
+    return partes;
+};
+
+// Borrador de respaldo (cuando la IA falla o trae algo que no se puede usar): se arma con frases del propio estudiante,
+// así que hay que quitarle los arranques dobles («mostraron que se identificó que…») y dejarlo corto.
+export const pulirBorrador = (texto, maximo = 55) => {
+    let limpio = t(texto).replace(CITA, '')
+        .replace(/\b(que|:)\s+se\s+(identificó|constató|encontró|determinó|estableció|evidenció|observó|halló|comprobó|caracterizó)\s+que\b/gi, '$1')
+        .replace(/\s+([.,;:])/g, '$1');
+    const palabras = limpio.split(/\s+/).filter(Boolean);
+    if (palabras.length > maximo) {
+        // Se corta en el último punto, punto y coma o «además» que quepa; si no hay, en la última coma.
+        const cabe = palabras.slice(0, maximo).join(' ');
+        const corte = Math.max(cabe.lastIndexOf('. '), cabe.lastIndexOf('; '), cabe.lastIndexOf('; además'));
+        limpio = corte > 40 ? cabe.slice(0, corte) : cabe.slice(0, Math.max(cabe.lastIndexOf(','), 0) || cabe.length);
+    }
+    limpio = limpio.replace(/[\s,;:]+$/, '');
+    if (!limpio) return '';
+    return /[.?!]$/.test(limpio) ? limpio : `${limpio}.`;
+};
+
 // Instrucción y datos para la IA: solo las partes que tienen sección de origen.
 export const mensajesResumen = (fuentes, titulo = '') => {
     const pedir = PARTES_IA.filter((p) => fuentes[p]);
@@ -74,8 +107,8 @@ export const mensajesResumen = (fuentes, titulo = '') => {
     return {
         pedir,
         messages: [
-            { role: 'system', content: 'Eres editor académico. Redactas el resumen (abstract) de un proyecto de investigación a partir de lo que el estudiante ya escribió en cada sección. Resumes; no agregas nada. Reglas: español claro y formal, oraciones cortas, impersonal con «se»; sin citas de autores, sin viñetas, sin títulos, sin abreviaturas sin explicar; usa SOLO cifras que aparezcan en el texto de esa sección, copiadas igual; no inventes datos, lugares ni resultados; si la sección no dice algo, no lo digas. Cada parte tiene como máximo 45 palabras y entre todas no pasan de 200. Respondes solo JSON válido.' },
-            { role: 'user', content: `${t(titulo) ? `TÍTULO DEL PROYECTO: ${t(titulo)}\n\n` : ''}${pedir.map((p) => `=== ${ORIGEN[p].nombre.toUpperCase()} (texto del estudiante) ===\n${fuentes[p]}`).join('\n\n')}\n\nRedacta estas partes del resumen:\n${pedir.map((p) => `- "${p}": ${reglas[p]}`).join('\n')}\n\nResponde exactamente con este JSON: {${pedir.map((p) => `"${p}": "…"`).join(', ')}}` },
+            { role: 'system', content: 'Eres editor académico. Redactas el resumen (abstract) de un proyecto de investigación a partir de lo que el estudiante ya escribió en cada sección. Resumes; no agregas nada. Reglas: español claro y formal, oraciones cortas, impersonal con «se»; sin citas de autores, sin viñetas, sin títulos, sin abreviaturas sin explicar; usa SOLO cifras que aparezcan en el texto de esa sección, copiadas igual; no inventes datos, lugares ni resultados; si la sección no dice algo, no lo digas. Cada parte tiene como máximo 45 palabras y entre todas no pasan de 200. Respondes solo con las líneas numeradas que se te piden, sin nada antes ni después.' },
+            { role: 'user', content: `${t(titulo) ? `TÍTULO DEL PROYECTO: ${t(titulo)}\n\n` : ''}${pedir.map((p) => `=== ${ORIGEN[p].nombre.toUpperCase()} (texto del estudiante) ===\n${fuentes[p]}`).join('\n\n')}\n\nRedacta estas partes del resumen:\n${pedir.map((p, i) => `[${i + 1}] ${ORIGEN[p].nombre}: ${reglas[p]}`).join('\n')}\n\nResponde exactamente con ${pedir.length === 1 ? 'esta línea' : `estas ${pedir.length} líneas`}, cada una en un solo párrafo y empezando por su número entre corchetes:\n${pedir.map((_, i) => `[${i + 1}] …`).join('\n')}` },
         ],
     };
 };

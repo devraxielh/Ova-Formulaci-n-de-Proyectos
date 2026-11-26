@@ -1087,10 +1087,12 @@ test('grupos con profesor, cuota de IA y estado de los servicios', async () => {
 test('auditoría: IA solo con sesión, cuota por respuestas, contraseña temporal, grupos coherentes, encuestas y restauración', async () => {
     const http = await import('node:http');
     let falla = false;
+    let jsonRoto = 0;
     const ia = http.createServer((req, res) => {
         req.resume();
         req.on('end', () => {
             res.setHeader('Content-Type', 'application/json');
+            if (jsonRoto > 0) { jsonRoto -= 1; res.statusCode = 400; return res.end(JSON.stringify({ error: { message: 'Failed to generate JSON. Please adjust your prompt.' } })); }
             if (falla) { res.statusCode = 500; return res.end(JSON.stringify({ error: { message: 'se cayó' } })); }
             return res.end(JSON.stringify({ choices: [{ message: { content: 'hola' } }] }));
         });
@@ -1118,6 +1120,11 @@ test('auditoría: IA solo con sesión, cuota por respuestas, contraseña tempora
         const cuenta = async (id) => (await admin('/admin/users')).body.users.find((u) => u.id === id);
         const grupo = async (name) => (await admin('/admin/groups')).body.groups.find((g) => g.name === name);
         const pedir = (api, messages = [{ role: 'user', content: 'hola' }]) => api('/ai/chat', 'POST', { messages });
+
+        /* IA en modo JSON: si el proveedor responde 400 por un JSON inválido, el servidor reintenta una vez. */
+        jsonRoto = 1;
+        const conJson = await admin('/ai/chat', 'POST', { messages: [{ role: 'user', content: 'hola' }], response_format: { type: 'json_object' } });
+        assert.deepEqual([conJson.status, jsonRoto], [200, 0]);
 
         /* IA: sin sesión no hay IA; una cookie rota no tumba nada. */
         assert.equal((await pedir(nav())).status, 401);

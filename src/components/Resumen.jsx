@@ -6,7 +6,7 @@ import { useProject, useProjectField } from '../context/ProjectContext';
 import { useAutoGuardar } from '../hooks/useAutoGuardar';
 import { DECLARACION_EXONERACION, DECLARACION_ORIGINALIDAD } from '../services/projectDoc';
 import { groq } from '../services/api';
-import { ORIGEN, PARTES_IA, fuentesResumen, mensajesResumen, revisarParte } from '../services/resumenIA';
+import { ORIGEN, PARTES_IA, fuentesResumen, leerPartes, mensajesResumen, pulirBorrador, revisarParte } from '../services/resumenIA';
 import { avisar, confirmar } from './Avisos';
 import { partesObjetivos } from '../services/coherencia';
 import { MUESTREOS, tamanoMuestra } from '../data/metodologia';
@@ -120,13 +120,24 @@ const Constructor = ({ intro, onNavigate }) => {
         setRedactando(true);
         const patch = {};
         const deRespaldo = [];
-        const respaldo = (key) => { if (ejemplos[key]) { patch[key] = conPunto(ejemplos[key]); deRespaldo.push(key); } };
+        const respaldo = (key) => { if (ejemplos[key]) { patch[key] = pulirBorrador(ejemplos[key]); deRespaldo.push(key); } };
         let sinCuota = false;
         try {
-            const { messages } = mensajesResumen(Object.fromEntries(PARTES_IA.map((key) => [key, partes.includes(key) ? fuentes[key] : ''])), data.titulo);
-            const r = await groq.chat.completions.create({ messages, temperature: 0.2, max_tokens: 900, response_format: { type: 'json_object' } });
-            const content = r.choices?.[0]?.message?.content || '';
-            const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+            const { messages, pedir } = mensajesResumen(Object.fromEntries(PARTES_IA.map((key) => [key, partes.includes(key) ? fuentes[key] : ''])), data.titulo);
+            // Si la IA falla o no devuelve ninguna parte, se intenta una vez más antes de usar el respaldo.
+            let json = null;
+            for (let intento = 0; intento < 2 && !json; intento += 1) {
+                try {
+                    // eslint-disable-next-line no-await-in-loop
+                    if (intento) await new Promise((ok) => { setTimeout(ok, 1500); });
+                    // eslint-disable-next-line no-await-in-loop
+                    const r = await groq.chat.completions.create({ messages, temperature: intento ? 0.4 : 0.2, max_tokens: 900 });
+                    const leidas = leerPartes(r.choices?.[0]?.message?.content || '', pedir);
+                    if (Object.keys(leidas).length) json = leidas;
+                } catch (err) {
+                    if (err?.code === 'cuota_ia' || intento === 1) throw err;
+                }
+            }
             partes.forEach((key) => { const rev = revisarParte(json[key], fuentes[key]); if (rev.ok) patch[key] = rev.texto; else respaldo(key); });
         } catch (err) {
             sinCuota = err?.code === 'cuota_ia';

@@ -1,7 +1,7 @@
 // Resumen redactado desde el proyecto: fuentes por sección y comprobación de lo que devuelve la IA.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PARTES_IA, fuentesResumen, limpiarParte, mensajesResumen, revisarParte } from '../src/services/resumenIA.js';
+import { PARTES_IA, fuentesResumen, leerPartes, limpiarParte, mensajesResumen, pulirBorrador, revisarParte } from '../src/services/resumenIA.js';
 
 const data = {
     titulo: 'Factores asociados a la inasistencia a citas médicas',
@@ -27,7 +27,7 @@ test('mensajes para la IA: se piden solo las partes con origen', () => {
     assert.deepEqual(m.pedir, ['objetivo', 'resultados']);
     assert.match(m.messages[1].content, /=== OBJETIVOS \(texto del estudiante\) ===/);
     assert.doesNotMatch(m.messages[1].content, /METODOLOGÍA/);
-    assert.match(m.messages[1].content, /\{"objetivo": "…", "resultados": "…"\}$/);
+    assert.match(m.messages[1].content, /\[1\] …\n\[2\] …$/);
 });
 
 test('revisar una parte: quita citas, exige texto y rechaza cifras que no están en la sección', () => {
@@ -38,4 +38,25 @@ test('revisar una parte: quita citas, exige texto y rechaza cifras que no están
     assert.deepEqual([inventada.ok, inventada.motivo, inventada.ajenas], [false, 'cifras', ['63']]);
     assert.equal(revisarParte('Muy corto.', fuente).motivo, 'vacia');
     assert.equal(revisarParte(Array(90).fill('palabra').join(' '), fuente).motivo, 'larga');
+});
+
+test('borrador de respaldo: sin arranques dobles y corto', () => {
+    assert.equal(pulirBorrador('Los resultados mostraron que se identificó que el olvido fue la causa principal'), 'Los resultados mostraron que el olvido fue la causa principal.');
+    assert.equal(pulirBorrador('Se concluye que se constató que la inasistencia se asocia al olvido (Pérez, 2022)'), 'Se concluye que la inasistencia se asocia al olvido.');
+    const largo = `Se concluye que la inasistencia se asocia al olvido de la fecha y al costo del transporte; ${Array(70).fill('palabra').join(' ')}.`;
+    const corto = pulirBorrador(largo);
+    assert.ok(corto.split(/\s+/).length <= 56 && /[.]$/.test(corto));
+    assert.match(corto, /^Se concluye que la inasistencia se asocia al olvido/);
+    assert.equal(pulirBorrador(''), '');
+});
+
+test('leer la respuesta de la IA: líneas numeradas, en el orden pedido, aunque traigan comillas', () => {
+    const pedir = ['objetivo', 'resultados', 'conclusiones'];
+    const r = leerPartes('[1] Esta investigación tuvo como objetivo analizar los factores.\n[2] Los resultados mostraron que el ítem "Prefiero otro centro" obtuvo la media más alta\ny el olvido fue frecuente.\n\n[3] Se concluye que el olvido se asocia a la inasistencia.', pedir);
+    assert.deepEqual(Object.keys(r), pedir);
+    assert.match(r.resultados, /"Prefiero otro centro" obtuvo la media más alta\ny el olvido fue frecuente\.$/);
+    assert.equal(r.conclusiones, 'Se concluye que el olvido se asocia a la inasistencia.');
+    // Números fuera de rango o texto sin marcas: no se inventa nada.
+    assert.deepEqual(leerPartes('[7] sobra. Texto libre.', pedir), {});
+    assert.deepEqual(leerPartes('', pedir), {});
 });

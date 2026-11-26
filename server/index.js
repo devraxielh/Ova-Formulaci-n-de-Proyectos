@@ -2489,13 +2489,21 @@ app.post('/api/ai/chat', requireUser, aiLimit, async (req, res) => {
     if (GROQ_MODEL.startsWith('openai/gpt-oss') && GROQ_REASONING_EFFORT) payload.reasoning_effort = GROQ_REASONING_EFFORT;
 
     try {
-        const upstream = await fetch(GROQ_URL, {
+        const pedir = () => fetch(GROQ_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_API_KEY}` },
             body: JSON.stringify(payload),
             signal: AbortSignal.timeout(90000),
         });
-        const body = await upstream.json().catch(() => ({}));
+        let upstream = await pedir();
+        let body = await upstream.json().catch(() => ({}));
+        // En modo JSON la IA a veces devuelve un JSON inválido (por ejemplo, al copiar comillas del texto del estudiante)
+        // y el proveedor responde 400. Es un fallo de esa respuesta, no de la solicitud: se intenta una vez más.
+        if (upstream.status === 400 && payload.response_format && /json/i.test(String(body?.error?.message || ''))) {
+            payload.temperature = Math.min(1.5, payload.temperature + 0.2);
+            upstream = await pedir();
+            body = await upstream.json().catch(() => ({}));
+        }
         if (!upstream.ok) {
             console.error('Groq error', upstream.status, body?.error?.message);
             aiState.fails += 1;
