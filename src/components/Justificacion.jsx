@@ -50,35 +50,35 @@ const PARTES = [
     {
         key: 'importancia', label: 'Conveniencia', color: 'que',
         what: '¿Por qué es importante y oportuno estudiar este problema ahora?',
-        hint: 'Retoma el problema en una oración (no lo repitas entero) y di por qué conviene investigarlo hoy.',
+        hint: 'Uno o dos párrafos: retoma el problema en una oración (no lo repitas entero) y desarrolla por qué conviene investigarlo hoy.',
         placeholder: 'Ej: Esta investigación es conveniente porque la deserción en primer semestre sigue en aumento y la universidad aún no conoce sus causas…',
         conectores: ['Esta investigación es conveniente porque', 'Resulta oportuno', 'En la actualidad,', 'Dado que'],
     },
     {
         key: 'social', label: 'Relevancia social', color: 'paraque',
         what: '¿Quiénes se benefician y de qué manera?',
-        hint: 'Nombra a los beneficiarios directos (tu población) e indirectos (institución, familias, región) y qué ganan.',
+        hint: 'Uno o dos párrafos: nombra a los beneficiarios directos (tu población) e indirectos (institución, familias, región) y explica qué gana cada uno.',
         placeholder: 'Ej: Los principales beneficiarios serán los estudiantes de primer semestre, pues…',
         conectores: ['Los principales beneficiarios serán', 'De igual forma,', 'Esto permitirá a', 'Asimismo,'],
     },
     {
         key: 'practico', label: 'Implicaciones prácticas', color: 'quien',
         what: '¿Qué problema real ayudará a resolver y quién usará los resultados?',
-        hint: 'Di qué decisión o acción podrá tomarse con tus resultados y quién la tomaría.',
+        hint: 'Uno o dos párrafos: di qué decisión o acción podrá tomarse con tus resultados, quién la tomaría y qué cambiaría.',
         placeholder: 'Ej: En lo práctico, los resultados servirán a la oficina de bienestar para diseñar…',
         conectores: ['En lo práctico,', 'Los resultados servirán para', 'Esto contribuirá a', 'De este modo,'],
     },
     {
         key: 'teorico', label: 'Valor teórico y metodológico', color: 'donde',
         what: '¿Qué conocimiento nuevo aporta y qué deja para otros investigadores?',
-        hint: 'Di qué vacío ayuda a llenar (pocos estudios en tu contexto) y si deja un instrumento o procedimiento reutilizable.',
+        hint: 'Uno o dos párrafos: di qué vacío ayuda a llenar (pocos estudios en tu contexto) y si deja un instrumento o procedimiento reutilizable.',
         placeholder: 'Ej: En lo teórico, el estudio aportará evidencia sobre… En lo metodológico, dejará un cuestionario validado…',
         conectores: ['En lo teórico,', 'Desde el punto de vista metodológico,', 'Además,', 'Por otra parte,'],
     },
     {
         key: 'viabilidad', label: 'Viabilidad', color: 'cuando',
         what: '¿Cuentas con acceso, tiempo, recursos y permisos para hacerlo?',
-        hint: 'Menciona el acceso a la población, el aval de la institución, el tiempo y los recursos con que cuentas.',
+        hint: 'Un párrafo: menciona el acceso a la población, el aval de la institución, el tiempo y los recursos con que cuentas.',
         placeholder: 'Ej: El estudio es viable porque se cuenta con el aval de la facultad, acceso a los registros académicos y…',
         conectores: ['El estudio es viable porque', 'Se cuenta con', 'Por último,', 'Finalmente,'],
     },
@@ -652,7 +652,7 @@ const Justificacion = ({ onNavigate }) => {
                 intro={(
                     <>
                         {heading}
-                        <p>Escribe un párrafo por argumento. Tab en una caja vacía escribe un ejemplo armado con tu proyecto: completa lo que está entre corchetes y une los párrafos con conectores.</p>
+                        <p>Desarrolla cada argumento en uno o dos párrafos, hasta sumar entre 1.200 y 2.400 palabras. Tab en una caja vacía escribe un ejemplo armado con tu proyecto: completa lo que está entre corchetes y une los párrafos con conectores.</p>
                     </>
                 )}
             />

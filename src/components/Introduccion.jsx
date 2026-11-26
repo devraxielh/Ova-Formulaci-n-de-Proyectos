@@ -59,21 +59,21 @@ const PARTES = [
     {
         key: 'contexto', label: 'Contexto', color: 'que',
         what: 'Presenta el tema amplio y por qué importa hoy.',
-        hint: 'Dos o tres oraciones, con un dato si lo tienes. Empieza por lo general.',
+        hint: 'Uno o dos párrafos, con un dato si lo tienes. Empieza por lo general.',
         placeholder: 'Ej: En la actualidad, la inasistencia a citas médicas es uno de los problemas que más afecta la eficiencia de los servicios de salud…',
         conectores: ['En la actualidad,', 'En los últimos años,', 'A nivel nacional,', 'En el contexto de'],
     },
     {
         key: 'problema', label: 'Problema', color: 'paraque',
         what: 'Resume el problema en tu población y tu lugar.',
-        hint: 'Es la síntesis del planteamiento: qué pasa, en quiénes y dónde. No lo repitas entero.',
+        hint: 'Uno o dos párrafos: es la síntesis del planteamiento (qué pasa, en quiénes y dónde). No lo repitas entero.',
         placeholder: 'Ej: En un hospital de Sincelejo, los pacientes de consulta externa presentan una alta tasa de inasistencia a sus citas…',
         conectores: ['En particular,', 'En este contexto,', 'Esta situación se presenta en', 'Sin embargo,'],
     },
     {
         key: 'importancia', label: 'Importancia y vacío', color: 'quien',
         what: 'Dice por qué vale la pena estudiarlo y qué falta por saber.',
-        hint: 'Una síntesis de la justificación: a quién beneficia y qué no se conoce todavía.',
+        hint: 'Un párrafo: la síntesis de la justificación (a quién beneficia y qué no se conoce todavía).',
         placeholder: 'Ej: Aunque el problema es conocido, no se han estudiado sus factores en esta institución, lo que impide diseñar acciones…',
         conectores: ['Por esta razón,', 'Aunque', 'No obstante,', 'De ahí la importancia de'],
     },
@@ -191,7 +191,7 @@ const checkIntro = (text, { general, pregunta, quien }) => {
         { id: 'parrafos', ok: paragraphs.length >= 4, label: 'Está organizada en párrafos', detail: `Tiene ${paragraphs.length} ${paragraphs.length === 1 ? 'párrafo' : 'párrafos'}; usa uno por movimiento.` },
         { id: 'contexto', ok: /en la actualidad|en los últimos años|a nivel (nacional|mundial|regional)|en colombia|en el contexto/i.test(paragraphs[0] || ''), label: 'Abre con el contexto', detail: 'Empieza por el tema amplio: «En la actualidad…», «En Colombia…».' },
         { id: 'poblacion', ok: !quienClave || lowerText.includes(quienClave), label: 'Presenta el problema en tu población', detail: quien ? `Tu población es «${clean(quien)}».` : '' },
-        { id: 'importancia', ok: /importan|conveniente|benefici|vacío|no se ha|no se han|pocos estudios|necesario/i.test(raw), label: 'Dice por qué importa', detail: 'Resume en una o dos oraciones por qué vale la pena y qué falta por saber.' },
+        { id: 'importancia', ok: /importan|conveniente|benefici|vacío|no se ha|no se han|pocos estudios|necesario/i.test(raw), label: 'Dice por qué importa', detail: 'Resume en un párrafo por qué vale la pena y qué falta por saber.' },
         { id: 'objetivo', ok: /objetivo|tiene como propósito|busca|pretende/i.test(raw), label: 'Presenta el objetivo', detail: '«Esta investigación tiene como objetivo…».' },
         { id: 'general', ok: !general || coincide(general), label: 'El objetivo coincide con el de tu proyecto', detail: general ? `Tu objetivo general es: ${clean(general)}` : '' },
         { id: 'pregunta', ok: /¿[^?]+\?/.test(raw) || /pregunta/i.test(raw) || (pregunta && coincide(pregunta)), label: 'Incluye la pregunta', detail: 'Presenta tu pregunta de investigación.' },
@@ -246,7 +246,7 @@ const CONECTORES = [
 
 const ERRORES = [
     { error: 'Escribirla primero', example: 'Redactar la introducción antes de tener objetivos y método.', fix: 'Escríbela al final, cuando el resto del proyecto esté listo.' },
-    { error: 'Copiar el planteamiento', example: 'Pegar los cinco párrafos del planteamiento.', fix: 'Resume el problema en un párrafo: qué pasa, en quiénes y dónde.' },
+    { error: 'Copiar el planteamiento', example: 'Pegar todos los párrafos del planteamiento.', fix: 'Resume el problema en uno o dos párrafos: qué pasa, en quiénes y dónde.' },
     { error: 'Empezar demasiado lejos', example: '«Desde el inicio de la humanidad, la salud…».', fix: 'Empieza por el tema actual y llega a tu problema en dos o tres oraciones.' },
     { error: 'Olvidar el objetivo', example: 'Contexto y problema, pero nunca dice qué busca el estudio.', fix: 'Incluye el objetivo general y la pregunta, tal como están en el proyecto.' },
     { error: 'Un objetivo distinto al del proyecto', example: 'La introducción dice «diseñar una app» y el objetivo general dice «analizar factores».', fix: 'Copia el objetivo general; si cambió, actualiza la introducción.' },
@@ -623,13 +623,13 @@ const Introduccion = ({ onNavigate }) => {
                     <ol className="pla-steps-list">
                         {PARTES.map((parte) => <li key={parte.key}><b>{parte.label}</b> {parte.what}</li>)}
                     </ol>
-                    <p className="ide-hint">Cada movimiento suele ocupar un párrafo.</p>
+                    <p className="ide-hint">Contexto y problema ocupan uno o dos párrafos cada uno; los demás, un párrafo. En total, entre {MIN_PALABRAS} y {MAX_PALABRAS} palabras.</p>
                 </div>
                 <div className="ide-panel">
                     <h3>De dónde sale cada movimiento</h3>
                     <ul className="pla-map">
                         <li data-part="donde"><span>Contexto y problema</span><p>Del planteamiento del problema, resumido.</p></li>
-                        <li data-part="paraque"><span>Importancia y vacío</span><p>De la justificación, en una o dos oraciones.</p></li>
+                        <li data-part="paraque"><span>Importancia y vacío</span><p>De la justificación, en un párrafo.</p></li>
                         <li data-part="quien"><span>Objetivo y pregunta</span><p>Copiados de tus objetivos y tu pregunta.</p></li>
                         <li><span>Método</span><p>De los alcances y la metodología.</p></li>
                         <li><span>Organización</span><p>De las secciones de tu documento.</p></li>

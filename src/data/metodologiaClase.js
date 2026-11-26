@@ -293,7 +293,7 @@ export const SLIDES = construccionPrimero([
                 { id: 'conv', label: 'Por conveniencia', what: 'Los disponibles y accesibles.', example: 'Los pacientes en sala de espera durante la semana de recolección.' },
                 { id: 'int', label: 'Intencional', what: 'Los que cumplen características definidas.', example: 'Docentes con más de 5 años en educación virtual.' },
                 { id: 'bola', label: 'Bola de nieve', what: 'Los participantes recomiendan a otros.', example: 'Estudiantes que desertaron, contactados por sus compañeros.' },
-                { id: 'censo', label: 'Censo', what: 'Toda la población, si es pequeña y accesible.', example: 'Los 35 trabajadores de una empresa.' },
+                { id: 'censo', label: 'Censo', what: 'No es un muestreo: se estudia a toda la población, sin sacar muestra. Sirve cuando es pequeña y accesible.', example: 'Los 35 trabajadores de una empresa.' },
             ],
         },
     },

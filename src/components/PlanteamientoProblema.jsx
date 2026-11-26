@@ -49,35 +49,35 @@ const PARTES = [
     {
         key: 'contexto', label: 'Contexto', color: 'que',
         what: 'Presenta el tema y la situación general: dónde ocurre y por qué importa. Va de lo general a lo particular.',
-        hint: 'Dos o tres oraciones. Empieza por el panorama y acércate a tu lugar y tu población.',
+        hint: 'Dos o tres párrafos: empieza por el panorama (mundo, país, región), con datos y fuentes, y acércate a tu lugar y tu población.',
         placeholder: 'Ej: En Colombia, la deserción en el primer año de universidad supera el 30 %… En el departamento de Córdoba…',
         conectores: ['En la actualidad,', 'En el contexto de', 'A nivel nacional,', 'En particular,'],
     },
     {
         key: 'descripcion', label: 'Descripción del problema', color: 'paraque',
         what: 'Dice qué está mal hoy, en quiénes y dónde, con datos que lo demuestren (síntomas).',
-        hint: 'Incluye al menos un dato con su fuente: una cifra, un porcentaje, un informe.',
+        hint: 'Uno o dos párrafos. Incluye al menos un dato con su fuente (una cifra, un porcentaje, un informe) y explica qué muestra.',
         placeholder: 'Ej: En una universidad pública de Montería, el 38 % de los estudiantes de primer semestre de ingeniería reprobó cálculo en 2025 (Oficina de Registro, 2025).',
         conectores: ['Según', 'De acuerdo con', 'Esta situación se evidencia en', 'Asimismo,'],
     },
     {
         key: 'causas', label: 'Causas', color: 'quien',
         what: 'Explica por qué ocurre: las raíces de tu árbol de problemas.',
-        hint: 'Nombra dos o tres causas y, si puedes, respáldalas con un estudio.',
+        hint: 'Uno o dos párrafos: nombra dos o tres causas, desarrolla cada una y, si puedes, respáldalas con un estudio.',
         placeholder: 'Ej: Entre las causas se encuentran los vacíos del bachillerato, el poco tiempo de estudio autónomo y…',
         conectores: ['Esto se debe a', 'Entre las causas se encuentran', 'Además,', 'A esto se suma'],
     },
     {
         key: 'efectos', label: 'Consecuencias', color: 'donde',
         what: 'Dice qué efectos tiene el problema y qué pasará si no se atiende: las ramas de tu árbol.',
-        hint: 'Muestra lo que el problema ya causa y lo que podría pasar si continúa, para las personas, la institución o la región.',
+        hint: 'Uno o dos párrafos: muestra lo que el problema ya causa y lo que podría pasar si continúa, para las personas, la institución o la región.',
         placeholder: 'Ej: Como consecuencia, aumentan la repitencia y la deserción temprana, y se alarga el tiempo de graduación…',
         conectores: ['Como consecuencia,', 'Por consiguiente,', 'Esto genera', 'De continuar esta situación,'],
     },
     {
         key: 'cierre', label: 'Párrafo de cierre', color: 'cuando',
         what: 'Sintetiza el problema y muestra por qué es necesario investigarlo: conduce a tu pregunta.',
-        hint: 'Dos o tres oraciones: resume lo esencial (quiénes, qué problema, por qué importa) y anuncia lo que hace falta conocer. Tu pregunta va a continuación, en su propia sección.',
+        hint: 'Un párrafo: resume lo esencial (quiénes, qué problema, por qué importa) y anuncia lo que hace falta conocer. Tu pregunta va a continuación, en su propia sección.',
         placeholder: 'Ej: Por lo anterior, resulta necesario analizar los factores asociados a la inasistencia de estos pacientes, como base para mejorar la atención…',
         conectores: ['Por lo anterior,', 'En síntesis,', 'En este sentido,', 'De ahí la necesidad de'],
     },
@@ -183,7 +183,7 @@ const CONECTORES = [
 
 const ERRORES = [
     { error: 'No tiene datos', example: '«Es bien sabido que muchos estudiantes fracasan».', fix: 'Agrega cifras y su fuente: informes oficiales, estudios, registros de la institución.' },
-    { error: 'Empieza demasiado lejos', example: 'Dos párrafos sobre la historia de la educación desde la Antigüedad.', fix: 'Un párrafo de contexto basta; llega rápido a tu población y tu lugar.' },
+    { error: 'Empieza demasiado lejos', example: 'Dos párrafos sobre la historia de la educación desde la Antigüedad.', fix: 'Dos o tres párrafos de contexto bastan, y cada uno más cerca de tu población y tu lugar.' },
     { error: 'Mezcla varios problemas', example: 'Habla de deserción, salud mental y transporte a la vez.', fix: 'Quédate con un problema central; los demás pueden ser causas o efectos.' },
     { error: 'Propone la solución', example: '«Por eso se desarrollará una aplicación…».', fix: 'La solución va en los objetivos y la metodología; aquí solo describes.' },
     { error: 'Se confunde con la justificación', example: '«Este estudio es importante porque…».', fix: 'El planteamiento dice qué pasa; la justificación, por qué vale la pena investigarlo.' },
@@ -580,7 +580,7 @@ const PlanteamientoProblema = ({ onNavigate }) => {
                 <div>
                     {heading}
                     <p>El planteamiento funciona como un embudo: empieza con el panorama amplio y se va cerrando hasta llegar a tu población, tu lugar y tu pregunta.</p>
-                    <p className="ide-hint">Un párrafo de contexto basta. Si tardas más en llegar a tu problema, el lector se pierde.</p>
+                    <p className="ide-hint">Dos o tres párrafos de contexto bastan. Si tardas más en llegar a tu problema, el lector se pierde.</p>
                 </div>
                 <Embudo />
             </>
