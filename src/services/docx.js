@@ -1,6 +1,6 @@
 /*
  * Documento de Word real (.docx) con la estructura de la plantilla de proyectos:
- * portada y portada interna (sin logo ni afiliación), dedicatoria y agradecimientos opcionales,
+ * portada (con el logo de la institución, si se elige) y portada interna, dedicatoria y agradecimientos opcionales,
  * tabla de contenido numerada, lista de tablas, preliminares con firmas y capítulos en página nueva.
  * Times New Roman 12, interlineado 1,5, texto justificado, márgenes de 2,5 cm y número de página arriba a la derecha.
  */
@@ -172,7 +172,8 @@ const firma = (author, lugarFecha) => [
 ];
 
 /**
- * @param extra { ciudad, director, dedicatoria, agradecimientos, imagenes } datos opcionales de portada y preliminares;
+ * @param extra { ciudad, director, dedicatoria, agradecimientos, imagenes, logo } datos opcionales de portada y preliminares;
+ *        logo = { data: Uint8Array, type: 'png' | 'jpg', width, height } de la institución, para la portada;
  *        imagenes = { [fileId]: { data: Uint8Array, type: 'png' | 'jpg', w, h } } para las figuras.
  */
 export const crearDocx = (name, author, sections, extra = {}) => {
@@ -184,14 +185,17 @@ export const crearDocx = (name, author, sections, extra = {}) => {
     const lugarFecha = `${ciudad ? `${ciudad} ` : ''}${fechaLarga()}`;
     const autores = String(author || '').split(/\n|;/).map((a) => a.trim()).filter(Boolean);
 
-    // Portada y portada interna, sin logo ni afiliación institucional.
+    // Portada (con el logo de la institución, si se eligió una) y portada interna.
+    const logo = extra.logo?.data && extra.logo.width > 0
+        ? new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 240, line: 240 }, children: [new ImageRun({ type: extra.logo.type === 'png' ? 'png' : 'jpg', data: extra.logo.data, transformation: { width: extra.logo.width, height: extra.logo.height } })] })
+        : null;
     const portada = [
-        ...vacios(4),
+        ...(logo ? [...vacios(1), logo, ...vacios(1)] : vacios(4)),
         centrado(titulo, { bold: true }),
-        ...vacios(5),
+        ...vacios(logo ? 4 : 5),
         centrado('Presentado por:'),
         ...autores.map((a) => centrado(a)),
-        ...vacios(6),
+        ...vacios(logo ? 4 : 6),
         centrado(lugarFecha),
         salto(),
         ...vacios(4),

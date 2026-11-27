@@ -12,6 +12,7 @@ import { TEMAS, temaDe } from '../data/temasDiapositivas';
 import './Proyecto.css';
 import { Aviso } from './Avisos';
 import Propagar from './Propagar';
+import { INSTITUCIONES, institucionDe, medidaLogo } from '../data/instituciones';
 
 // Mismo orden que el menú lateral.
 const MENU_ORDER = ['ideacion', 'titulo', 'pregunta', 'arbol', 'arbolobjetivos', 'planteamiento', 'objetivos', 'justificacion', 'alcances', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'introduccion', 'resumen', 'referencias'];
@@ -52,7 +53,7 @@ const SAVE_LABEL = {
 const MiProyecto = ({ onNavigate }) => {
     const {
         user, projects, project, data, saveState, saveError, retrySave,
-        openProject, createProject, renameProject, deleteProject, clearDraft,
+        openProject, createProject, renameProject, deleteProject, clearDraft, setField,
     } = useProject();
     const [name, setName] = useState(project.name);
     const [notice, setNotice] = useState('');
@@ -166,14 +167,37 @@ const MiProyecto = ({ onNavigate }) => {
     };
 
     // Word real (.docx) con portada, tabla de contenido y numeración. Si falla, se entrega la versión anterior (.doc).
+    // Antes de generar se elige la institución, para poner su logo en la portada; queda guardada con el proyecto.
+    const wordDialog = useRef(null);
+    const [institucion, setInstitucion] = useState(() => institucionDe(data?.institucion)?.id || '');
+    useEffect(() => { setInstitucion(institucionDe(data?.institucion)?.id || ''); }, [data?.institucion]);
+    const [destino, setDestino] = useState('word'); // qué se descarga al confirmar la institución: 'word' o 'pdf'
+    const elegirInstitucion = (d = 'word') => { setDestino(d); wordDialog.current?.showModal(); };
+    const guardarInstitucion = (ins) => { if ((data?.institucion || '') !== (ins?.id || '')) setField('institucion', ins?.id || ''); };
+    // Logo de la institución elegida: bytes para el Word y dataUrl para el PDF y la presentación.
+    // Si no se puede cargar, el archivo sale sin logo.
+    const cargarLogo = async (ins) => {
+        if (!ins) return null;
+        try {
+            const res = await fetch(ins.logo);
+            if (!res.ok) return null;
+            const bytes = new Uint8Array(await res.arrayBuffer());
+            let bin = '';
+            for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+            return { data: bytes, dataUrl: `data:image/${ins.tipo === 'png' ? 'png' : 'jpeg'};base64,${window.btoa(bin)}`, type: ins.tipo, ...medidaLogo(ins) };
+        } catch { return null; }
+    };
     const downloadWord = async () => {
+        const ins = institucionDe(institucion);
+        wordDialog.current?.close();
+        guardarInstitucion(ins);
         setError('');
         setNotice('');
         setGenerando('word');
         try {
-            const [{ docxBlob }, imagenes] = await Promise.all([import('../services/docx'), cargarImagenes()]);
-            descargar(await docxBlob(project.name, author, sections, { ...extra, imagenes }), 'docx');
-            setNotice('Word descargado. Al abrirlo, Word puede preguntar si actualiza los campos: responde «Sí» para que la tabla de contenido muestre los números de página.');
+            const [{ docxBlob }, imagenes, logo] = await Promise.all([import('../services/docx'), cargarImagenes(), cargarLogo(ins)]);
+            descargar(await docxBlob(project.name, author, sections, { ...extra, imagenes, logo }), 'docx');
+            setNotice(`Word descargado${ins ? (logo ? ` con el logo de ${ins.corto} en la portada` : ' (no se pudo cargar el logo: salió sin él)') : ''}. Al abrirlo, Word puede preguntar si actualiza los campos: responde «Sí» para que la tabla de contenido muestre los números de página.`);
         } catch {
             descargar(new Blob(['\ufeff', documentHtml(project.name, author, sections)], { type: 'application/msword' }), 'doc');
             setNotice('No se pudo generar el .docx; se descargó la versión .doc.');
@@ -184,13 +208,16 @@ const MiProyecto = ({ onNavigate }) => {
 
     // PDF con la misma estructura del Word y el índice ya paginado.
     const downloadPdf = async () => {
+        const ins = institucionDe(institucion);
+        wordDialog.current?.close();
+        guardarInstitucion(ins);
         setError('');
         setNotice('');
         setGenerando('pdf');
         try {
-            const [{ pdfBlob }, imagenes] = await Promise.all([import('../services/pdf'), cargarImagenes()]);
-            descargar(await pdfBlob(project.name, author, sections, { ...extra, imagenes }), 'pdf');
-            setNotice('PDF descargado.');
+            const [{ pdfBlob }, imagenes, logo] = await Promise.all([import('../services/pdf'), cargarImagenes(), cargarLogo(ins)]);
+            descargar(await pdfBlob(project.name, author, sections, { ...extra, imagenes, logo }), 'pdf');
+            setNotice(`PDF descargado${ins ? (logo ? ` con el logo de ${ins.corto} en la portada` : ' (no se pudo cargar el logo: salió sin él)') : ''}.`);
         } catch (err) {
             setError(`No se pudo generar el PDF${err?.message ? `: ${err.message}` : ''}. Inténtalo de nuevo o descarga el Word.`);
         } finally {
@@ -206,6 +233,8 @@ const MiProyecto = ({ onNavigate }) => {
     const elegirTema = () => temasDialog.current?.showModal();
     const downloadSlides = async () => {
         const tema = temaDe(temaId);
+        const ins = institucionDe(institucion);
+        guardarInstitucion(ins);
         try { window.localStorage.setItem('projectsia:tema-diapositivas', tema.id); } catch { /* sin almacenamiento: no se recuerda */ }
         temasDialog.current?.close();
         setError('');
@@ -233,9 +262,9 @@ const MiProyecto = ({ onNavigate }) => {
                 } catch { /* sin IA: primeras frases de cada apartado */ }
             }
             const slides = guionDiapositivas(sections, data, { autor: author, resumen });
-            const imagenes = await cargarImagenes();
-            descargar(await presentacionPptx(slides, imagenes, tema), 'pptx');
-            setNotice(`Presentación descargada con el tema «${tema.nombre}»: ${slides.length} diapositivas con los apartados de la plantilla de sustentación${conIA ? ', resumidos por la IA a partir de tu documento' : ' (sin resumen de IA: se usaron las primeras frases de cada apartado)'}. Los apartados que aún no has escrito no aparecen. Revísala en PowerPoint antes de sustentar.`);
+            const [imagenes, logo] = await Promise.all([cargarImagenes(), cargarLogo(ins)]);
+            descargar(await presentacionPptx(slides, imagenes, tema, logo), 'pptx');
+            setNotice(`Presentación descargada con el tema «${tema.nombre}»${ins ? (logo ? ` y el logo de ${ins.corto} en la portada` : ' (no se pudo cargar el logo: salió sin él)') : ''}: ${slides.length} diapositivas con los apartados de la plantilla de sustentación${conIA ? ', resumidos por la IA a partir de tu documento' : ' (sin resumen de IA: se usaron las primeras frases de cada apartado)'}. Los apartados que aún no has escrito no aparecen. Revísala en PowerPoint antes de sustentar.`);
         } catch (err) {
             setError(`No se pudo generar la presentación${err?.message ? `: ${err.message}` : ''}.`);
         } finally {
@@ -243,8 +272,45 @@ const MiProyecto = ({ onNavigate }) => {
         }
     };
 
+    const descargarElegido = () => (destino === 'pdf' ? downloadPdf() : downloadWord());
+    const formato = destino === 'pdf' ? 'PDF' : 'Word';
+
     return (
         <div className="pro-page">
+            <dialog ref={wordDialog} className="pro-temas-modal pro-ie-modal" aria-labelledby="pro-ie-titulo" onClick={(e) => { if (e.target === wordDialog.current) wordDialog.current.close(); }}>
+                <header>
+                    <div>
+                        <h2 id="pro-ie-titulo"><Download size={19} aria-hidden="true" /> ¿De qué institución es tu proyecto?</h2>
+                        <p>Su logo irá en la portada del {formato}. La elección queda guardada con el proyecto y puedes cambiarla cada vez que descargues.</p>
+                    </div>
+                    <button type="button" className="pro-coh-cerrar" aria-label="Cerrar" onClick={() => wordDialog.current?.close()}><X size={18} /></button>
+                </header>
+                <ul className="pro-ies" role="radiogroup" aria-label="Institución">
+                    {INSTITUCIONES.map((ins) => (
+                        <li key={ins.id}>
+                            <button type="button" className="pro-ie" role="radio" aria-checked={institucion === ins.id} onClick={() => setInstitucion(ins.id)} onDoubleClick={descargarElegido}>
+                                <span className="pro-ie-logo"><img src={ins.logo} alt="" loading="lazy" /></span>
+                                <span className="pro-ie-nombre">{ins.nombre}</span>
+                                {institucion === ins.id && <span className="pro-tema-ok"><CheckCircle2 size={18} aria-hidden="true" /></span>}
+                            </button>
+                        </li>
+                    ))}
+                    <li>
+                        <button type="button" className="pro-ie" role="radio" aria-checked={!institucion} onClick={() => setInstitucion('')} onDoubleClick={descargarElegido}>
+                            <span className="pro-ie-logo pro-ie-logo--sin" aria-hidden="true">Sin logo</span>
+                            <span className="pro-ie-nombre">Otra institución o sin logo</span>
+                            {!institucion && <span className="pro-tema-ok"><CheckCircle2 size={18} aria-hidden="true" /></span>}
+                        </button>
+                    </li>
+                </ul>
+                <footer>
+                    <small>{institucionDe(institucion) ? <>Portada con el logo de <b>{institucionDe(institucion).corto}</b></> : 'Portada sin logo'}</small>
+                    <span>
+                        <button type="button" className="pro-btn pro-btn--ghost" onClick={() => wordDialog.current?.close()}>Cancelar</button>
+                        <button type="button" className="pro-btn pro-btn--primary" onClick={descargarElegido}><Download size={16} /> Descargar {formato}</button>
+                    </span>
+                </footer>
+            </dialog>
             <dialog ref={temasDialog} className="pro-temas-modal" aria-labelledby="pro-temas-titulo" onClick={(e) => { if (e.target === temasDialog.current) temasDialog.current.close(); }}>
                 <header>
                     <div>
@@ -277,6 +343,14 @@ const MiProyecto = ({ onNavigate }) => {
                         </li>
                     ))}
                 </ul>
+                <label className="pro-tema-ie">
+                    <span><b>Logo en la portada</b><small>Es la misma institución que eliges para el Word y el PDF.</small></span>
+                    {institucionDe(institucion) && <img src={institucionDe(institucion).logo} alt="" />}
+                    <select value={institucion} onChange={(e) => setInstitucion(e.target.value)}>
+                        <option value="">Sin logo</option>
+                        {INSTITUCIONES.map((ins) => <option key={ins.id} value={ins.id}>{ins.corto}</option>)}
+                    </select>
+                </label>
                 <footer>
                     <small>Tema elegido: <b>{temaDe(temaId).nombre}</b></small>
                     <span>
@@ -435,10 +509,10 @@ const MiProyecto = ({ onNavigate }) => {
                     <div className="pro-doc-bar">
                         <h2 id="pro-doc-title">Documento del proyecto</h2>
                         <div className="pro-actions">
-                            <button type="button" className="pro-btn pro-btn--primary" onClick={downloadWord} disabled={inPaper.length === 0 || Boolean(generando)}>
+                            <button type="button" className="pro-btn pro-btn--primary" onClick={() => elegirInstitucion('word')} disabled={inPaper.length === 0 || Boolean(generando)}>
                                 <Download size={16} /> {generando === 'word' ? 'Generando…' : 'Descargar Word'}
                             </button>
-                            <button type="button" className="pro-btn pro-btn--ghost" onClick={downloadPdf} disabled={inPaper.length === 0 || Boolean(generando)}>
+                            <button type="button" className="pro-btn pro-btn--ghost" onClick={() => elegirInstitucion('pdf')} disabled={inPaper.length === 0 || Boolean(generando)}>
                                 <FileDown size={16} /> {generando === 'pdf' ? 'Generando…' : 'Descargar PDF'}
                             </button>
                             <button type="button" className="pro-btn pro-btn--ghost" onClick={elegirTema} disabled={inPaper.length === 0 || Boolean(generando)}>

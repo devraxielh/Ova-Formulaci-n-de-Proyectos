@@ -118,8 +118,9 @@ export const guionDiapositivas = (sections, data, { autor = '', resumen = {} } =
     return slides;
 };
 
-/** Genera el .pptx. `imagenes` = { [fileId]: { dataUrl } }; `tema` = uno de los TEMAS (colores). */
-export const presentacionPptx = async (slides, imagenes = {}, tema = temaDe()) => {
+/** Genera el .pptx. `imagenes` = { [fileId]: { dataUrl } }; `tema` = uno de los TEMAS (colores);
+ *  `logo` = { dataUrl, width, height } de la institución, para la portada (opcional). */
+export const presentacionPptx = async (slides, imagenes = {}, tema = temaDe(), logo = null) => {
     const T = tema;
     const { default: Pptx } = await import('pptxgenjs');
     const pptx = new Pptx();
@@ -140,7 +141,16 @@ export const presentacionPptx = async (slides, imagenes = {}, tema = temaDe()) =
 slide.addText(s.titulo, { x: 0.9, y: 0.9, w: 11.5, h: 2.7, fontSize: s.titulo.length > 140 ? 28 : 36, bold: true, color: T.sobrePrimario, fontFace: 'Calibri', valign: 'middle', fit: 'shrink' });
             slide.addText(s.antetitulo || 'Socialización', { x: 0.9, y: 3.75, w: 11.5, h: 0.7, fontSize: 26, color: T.suavePrimario, fontFace: 'Calibri' });
             slide.addText('Presentado por:', { x: 0.9, y: 5.0, w: 11.5, h: 0.45, fontSize: 16, color: T.suavePrimario, fontFace: 'Calibri' });
-            slide.addText(s.autores.join('  |  ') || ' ', { x: 0.9, y: 5.45, w: 11.5, h: 0.8, fontSize: 22, bold: true, color: T.sobrePrimario, fontFace: 'Calibri', valign: 'top', fit: 'shrink' });
+            // Logo de la institución: en una tarjeta blanca (los logos traen fondo blanco y la portada es de color).
+            const conLogo = Boolean(logo?.dataUrl && logo.width > 0 && logo.height > 0);
+            if (conLogo) {
+                const CX = 10.15; const CY = 4.75; const CW = 2.55; const CH = 2.0; const pad = 0.2;
+                const k = Math.min((CW - pad * 2) / logo.width, (CH - pad * 2) / logo.height);
+                const w = logo.width * k; const h = logo.height * k;
+                slide.addShape(pptx.ShapeType.roundRect, { x: CX, y: CY, w: CW, h: CH, fill: { color: 'FFFFFF' }, line: { color: 'FFFFFF', width: 0 }, rectRadius: 0.12 });
+                slide.addImage({ data: logo.dataUrl, x: CX + (CW - w) / 2, y: CY + (CH - h) / 2, w, h });
+            }
+            slide.addText(s.autores.join('  |  ') || ' ', { x: 0.9, y: 5.45, w: conLogo ? 9.0 : 11.5, h: 0.8, fontSize: 22, bold: true, color: T.sobrePrimario, fontFace: 'Calibri', valign: 'top', fit: 'shrink' });
             return;
         }
         if (s.tipo === 'cierre') {

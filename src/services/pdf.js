@@ -101,7 +101,7 @@ const prepararFuentes = () => {
     fuentesListas = true;
 };
 
-/** @param extra { ciudad, director, dedicatoria, agradecimientos, imagenes: { [fileId]: { dataUrl } } } */
+/** @param extra { ciudad, director, dedicatoria, agradecimientos, logo: { dataUrl, width, height }, imagenes: { [fileId]: { dataUrl } } } */
 export const definicionPdf = (name, author, sections, extra = {}) => {
     const numeradas = documentoNumerado(sections);
     const titulo = numeradas.find((s) => s.id === 'titulo')?.content[0]?.text || name;
@@ -112,8 +112,11 @@ export const definicionPdf = (name, author, sections, extra = {}) => {
     const autores = String(author || '').split(/\n|;/).map((a) => a.trim()).filter(Boolean);
     const firma = () => [...vacios(2), centrado('_______________________________'), centrado(autores.join(', ') || '(Nombres y apellidos completos)'), ...vacios(1), centrado(`Firmado en ${lugarFecha}`)];
 
+    // Logo de la institución (si se eligió): va arriba en la portada y ocupa el lugar de varios renglones en blanco.
+    const lg = extra.logo?.dataUrl ? extra.logo : null;
+    const logo = lg ? [{ image: lg.dataUrl, width: lg.width * 0.75, height: lg.height * 0.75, alignment: 'center', margin: [0, 0, 0, 6] }] : [];
     const portada = [
-        ...vacios(4), centrado(titulo, { bold: true }), ...vacios(5), centrado('Presentado por:'), ...autores.map((a) => centrado(a)), ...vacios(6), centrado(lugarFecha),
+        ...(lg ? [...vacios(1), ...logo, ...vacios(1)] : vacios(4)), centrado(titulo, { bold: true }), ...vacios(lg ? 4 : 5), centrado('Presentado por:'), ...autores.map((a) => centrado(a)), ...vacios(6), centrado(lugarFecha),
         { text: ' ', pageBreak: 'before' },
         ...vacios(3), centrado(titulo, { bold: true }), ...vacios(3), centrado('Presentado por:'), ...autores.map((a) => centrado(a)),
         ...(director ? [...vacios(2), centrado('Bajo la dirección de:'), ...director.split('\n').map((d) => centrado(d.trim()))] : []),
