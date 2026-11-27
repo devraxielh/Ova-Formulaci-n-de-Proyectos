@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ListChecks, Lock, Plus, Trash2, Unlock, UserPlus, Users } from 'lucide-react';
+import { ListChecks, Lock, Plus, Search, Trash2, Unlock, UserPlus, Users } from 'lucide-react';
 import { api } from '../services/api';
 import { SECCIONES_MENU } from '../data/secciones';
 import { avisar, confirmar } from './Avisos';
@@ -20,6 +20,7 @@ const SeccionesGrupo = ({ version = 0, onGrupos, students = [], onCrear, onVer }
     const [alumno, setAlumno] = useState({ name: '', email: '' });
     const [creandoAlumno, setCreandoAlumno] = useState(false);
     const [credenciales, setCredenciales] = useState(null);
+    const [filtro, setFiltro] = useState(''); // busca por nombre o correo dentro del grupo elegido
 
     const cargar = useCallback(async () => {
         try { setGrupos((await api.teacher.secciones()).grupos); } catch (err) { avisar(err.message, 'error'); setGrupos([]); }
@@ -53,6 +54,7 @@ const SeccionesGrupo = ({ version = 0, onGrupos, students = [], onCrear, onVer }
         if (actual.grupo !== grupo) setGrupo(actual.grupo);
         setMarcadas(actual.secciones || TODAS);
     }, [actual, grupo]);
+    useEffect(() => { setFiltro(''); }, [grupo]);
 
     if (!grupos) return null;
     const formulario = (
@@ -73,6 +75,9 @@ const SeccionesGrupo = ({ version = 0, onGrupos, students = [], onCrear, onVer }
     }
 
     const delGrupo = students.filter((x) => (x.grupo || '') === actual.grupo);
+    const plano = (v) => String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const buscado = plano(filtro.trim());
+    const filtrados = buscado ? delGrupo.filter((x) => plano(x.name).includes(buscado) || plano(x.email).includes(buscado)) : delGrupo;
     const crearAlumno = async (event) => {
         event.preventDefault();
         if (!onCrear) return;
@@ -127,14 +132,22 @@ const SeccionesGrupo = ({ version = 0, onGrupos, students = [], onCrear, onVer }
                 {delGrupo.length === 0
                     ? <p className="adm-muted">Este grupo aún no tiene estudiantes. Créalos aquí o asócialos desde «Mis estudiantes».</p>
                     : (
+                        <>
+                        <label className="sec-filtro">
+                            <Search size={15} aria-hidden="true" />
+                            <input className="input-field" type="search" value={filtro} onChange={(e) => setFiltro(e.target.value)} placeholder="Filtrar por nombre o correo" aria-label={`Filtrar los estudiantes de ${actual.grupo || 'sin grupo'}`} />
+                            {buscado && <small>{filtrados.length} de {delGrupo.length}</small>}
+                        </label>
+                        {filtrados.length === 0 && <p className="adm-muted">Ningún estudiante de este grupo coincide con «{filtro.trim()}».</p>}
                         <ul className="sec-alumnos-lista">
-                            {delGrupo.map((x) => (
+                            {filtrados.map((x) => (
                                 <li key={x.id}>
                                     <b>{x.name}</b>
-                                    <small>{x.email}{x.projects?.length ? ` · ${x.projects.length} ${x.projects.length === 1 ? 'proyecto' : 'proyectos'}${x.projects[0]?.avance != null ? `, ${Math.max(...x.projects.map((p) => p.avance || 0))} % de avance` : ''}` : ' · sin proyecto'}</small>
+                                    <small>{x.email}{x.projects?.length ? ` · proyecto con ${Math.max(...x.projects.map((p) => p.avance || 0))} % de avance` : ' · sin proyecto'}</small>
                                 </li>
                             ))}
                         </ul>
+                        </>
                     )}
                 {onCrear && (
                     <form className="sec-alumno-nuevo" onSubmit={crearAlumno}>

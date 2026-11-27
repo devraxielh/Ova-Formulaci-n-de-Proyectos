@@ -98,7 +98,7 @@ const Cupo = ({ user, onChange, busy }) => {
         <span className="adm-cupo" data-cero={limit === 0}>
             <button type="button" disabled={busy || limit <= 0} onClick={() => onChange(user, limit - 1)} aria-label={`Permitir un proyecto menos a ${user.name}`}>−</button>
             <b title={limit === 0 ? 'Sin permiso para crear proyectos' : `Puede crear hasta ${limit}`}>{limit}</b>
-            <button type="button" disabled={busy || limit >= 20} onClick={() => onChange(user, limit + 1)} aria-label={`Autorizar un proyecto más a ${user.name}`}>+</button>
+            <button type="button" disabled={busy || limit >= (user.role === 'student' ? 1 : 20)} title={user.role === 'student' && limit >= 1 ? 'Un estudiante solo puede tener un proyecto' : undefined} onClick={() => onChange(user, limit + 1)} aria-label={`Autorizar un proyecto más a ${user.name}`}>+</button>
         </span>
     );
 };

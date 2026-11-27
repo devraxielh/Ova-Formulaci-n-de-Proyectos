@@ -1366,3 +1366,26 @@ test('el profesor crea un grupo vacío, le deja sus secciones y luego asocia est
     assert.equal((await profe.api('/teacher/grupos/eliminar', 'POST', { name: grupo })).status, 200);
     assert.ok(!(await profe.api('/teacher/secciones')).body.grupos.some((g) => g.grupo === grupo));
 });
+
+test('un estudiante solo puede tener un proyecto, aunque se le intente dar más cupo', async () => {
+    const admin = await entrarAdmin();
+    const profe = await cuenta('profe-uno', 'teacher');
+    const sello = Date.now();
+    const alta = await profe.api('/teacher/students', 'POST', { name: 'Uno Solo', email: `uno.solo.${sello}@example.test`, permitir: true });
+    const est = await estrenar(`uno.solo.${sello}@example.test`, alta.body.clave);
+    assert.equal((await profe.api('/teacher/students')).body.cupoMaximo, 1);
+    assert.equal((await est.api('/auth/me')).body.user.projectLimit, 1);
+
+    // Ni el profesor ni el administrador pueden darle dos.
+    assert.equal((await profe.api(`/teacher/students/${alta.body.student.id}/limit`, 'POST', { limit: 2 })).status, 400);
+    assert.equal((await admin(`/admin/users/${alta.body.student.id}/limit`, 'POST', { limit: 2 })).status, 400);
+    assert.equal((await admin('/admin/users/bulk', 'POST', { ids: [alta.body.student.id], action: 'limit', value: 5 })).status, 200);
+    assert.equal((await est.api('/auth/me')).body.user.projectLimit, 1);
+
+    assert.equal((await est.api('/projects', 'POST', { name: 'Mi único proyecto', data: {} })).status, 201);
+    const otro = await est.api('/projects', 'POST', { name: 'Otro', data: {} });
+    assert.deepEqual([otro.status, otro.body.code], [403, 'quota_full']);
+    // Quitar el permiso y devolverlo sigue funcionando.
+    assert.equal((await profe.api(`/teacher/students/${alta.body.student.id}/limit`, 'POST', { limit: 0 })).status, 200);
+    assert.equal((await profe.api(`/teacher/students/${alta.body.student.id}/limit`, 'POST', { limit: 1 })).status, 200);
+});

@@ -265,7 +265,7 @@ const publicUser = (user) => ({
     name: user.name,
     role: user.role,
     mustChangePassword: Boolean(user.must_change_password),
-    projectLimit: user.role === 'admin' ? MAX_PROJECTS : Number(user.project_limit) || 0,
+    projectLimit: cupoDe(user),
     ...(user.email === INVITADO_COMUN ? { comun: true } : {}), // la cuenta compartida del botón «Entrar como invitado»
     ...(user.admin_id ? { comoAdmin: true } : {}), // un administrador está dentro de esta cuenta
     ...(user.role === 'student' ? { secciones: seccionesDe(user) } : {}), // null = sin restricción
@@ -278,7 +278,14 @@ const cupoAlCambiar = (rol, actual) => (rol === 'guest' ? 0 : rol !== 'student' 
 // Cupo de proyectos con que nace una cuenta de profesor o investigador (el administrador lo puede cambiar).
 const CUPO_AUTONOMO = 10;
 // Cuántos proyectos puede permitirle un profesor a un estudiante.
-const CUPO_MAX_ESTUDIANTE = 5;
+// Un estudiante construye un solo proyecto: su cupo es 0 (aún no puede) o 1.
+const CUPO_MAX_ESTUDIANTE = 1;
+// Cupo efectivo de una cuenta: el administrador no tiene tope propio y el estudiante nunca pasa de uno.
+function cupoDe(user) {
+    if (user.role === 'admin') return MAX_PROJECTS;
+    const cupo = Number(user.project_limit) || 0;
+    return user.role === 'student' ? Math.min(cupo, CUPO_MAX_ESTUDIANTE) : cupo;
+}
 
 /* ---------- Correo ---------- */
 
@@ -895,7 +902,7 @@ app.get('/api/projects', requireUser, (req, res) => {
 
 app.post('/api/projects', requireUser, (req, res) => {
     const count = db.prepare('SELECT COUNT(*) AS n FROM projects WHERE user_id = ?').get(req.user.id).n;
-    const limit = req.user.role === 'admin' ? MAX_PROJECTS : Number(req.user.project_limit) || 0;
+    const limit = cupoDe(req.user);
     const quien = req.user.role === 'student' ? 'tu profesor o el administrador' : 'el administrador';
     if (limit === 0) return res.status(403).json({ error: `Tu cuenta todavía no tiene permiso para crear proyectos: ${quien} debe permitirlo.`, code: 'no_quota' });
     if (count >= limit) return res.status(403).json({ error: `Tu cuenta puede tener hasta ${limit} ${limit === 1 ? 'proyecto' : 'proyectos'}. Pide a ${quien} que amplíe tu cupo o elimina uno.`, code: 'quota_full' });
@@ -1244,7 +1251,7 @@ const adminUserRow = (row) => ({
     email: row.email,
     role: row.role,
     status: row.status,
-    projectLimit: row.role === 'admin' ? MAX_PROJECTS : Number(row.project_limit) || 0,
+    projectLimit: cupoDe(row),
     createdAt: row.created_at,
     lastLoginAt: row.last_login_at,
     projectCount: row.project_count ?? 0,
@@ -1403,7 +1410,7 @@ app.post('/api/admin/users/bulk', requireAdmin, async (req, res) => {
         if (!Number.isInteger(limit) || limit < 0 || limit > MAX_PROJECTS) return res.status(400).json({ error: `El cupo debe estar entre 0 y ${MAX_PROJECTS}.` });
         aplica = cuentas.filter((u) => u.role !== 'guest'); // un invitado no crea proyectos
         const upd = db.prepare('UPDATE users SET project_limit = ? WHERE id = ?');
-        hacer = (u) => upd.run(limit, u.id);
+        hacer = (u) => upd.run(u.role === 'student' ? Math.min(limit, CUPO_MAX_ESTUDIANTE) : limit, u.id); // el estudiante nunca pasa de uno
         texto = `Puso el cupo en ${limit}`;
     } else if (action === 'status') {
         if (!['active', 'blocked'].includes(value)) return res.status(400).json({ error: 'Estado no válido.' });
@@ -1811,6 +1818,7 @@ app.post('/api/admin/users/:id/limit', requireAdmin, async (req, res) => {
     if (!target) return res.status(404).json({ error: 'No se encontró el usuario.' });
     if (target.role === 'admin') return res.status(400).json({ error: 'El administrador no tiene cupo.' });
     if (target.role === 'guest') return res.status(400).json({ error: 'Un invitado solo ve las presentaciones: no crea proyectos. Cámbiale el rol primero.' });
+    if (target.role === 'student' && limit > CUPO_MAX_ESTUDIANTE) return res.status(400).json({ error: 'Un estudiante solo puede tener un proyecto.' });
     db.prepare('UPDATE users SET project_limit = ? WHERE id = ?').run(limit, target.id);
     bitacora(req, 'Cambió un cupo', `${target.name} (${target.email}): ${limit}`);
     // Primera autorización: se le avisa al estudiante que ya puede empezar.
@@ -2009,7 +2017,7 @@ const filaEstudiante = (row) => {
     const projects = db.prepare('SELECT id, name, data, created_at, updated_at FROM projects WHERE user_id = ? ORDER BY updated_at DESC, id DESC').all(row.id);
     return {
         id: row.id, name: row.name, email: row.email, status: row.status, grupo: row.grupo || '',
-        projectLimit: Number(row.project_limit) || 0,
+        projectLimit: cupoDe(row),
         lastLoginAt: row.last_login_at, mustChangePassword: Boolean(row.must_change_password),
         projects: projects.map((p) => ({ ...projectRow(p, false), ...resumenProyecto(p.data), coherencia: coherenciaDe(p.data) })),
     };

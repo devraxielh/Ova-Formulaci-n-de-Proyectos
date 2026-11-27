@@ -26,7 +26,7 @@ const formatDate = (value) => {
 
 const Profesor = () => {
     const [students, setStudents] = useState([]);
-    const [cupoMaximo, setCupoMaximo] = useState(5);
+    const [cupoMaximo, setCupoMaximo] = useState(1);
     const [mail, setMail] = useState(true);
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
@@ -273,14 +273,18 @@ const Profesor = () => {
                                 <button type="button" className="pro-btn pro-btn--ghost adm-sm" disabled={busy} onClick={() => nuevoAcceso(s)}><KeyRound size={15} /> Contraseña nueva</button>
                             </header>
                             <div className="prf-permiso">
-                                <span className="prf-etiqueta" data-ok={s.projectLimit > 0 || undefined}>{s.projectLimit > 0 ? 'Puede crear proyectos' : 'No puede crear proyectos'}</span>
-                                <span>Proyectos permitidos:</span>
-                                <span className="adm-cupo" data-cero={s.projectLimit === 0}>
-                                    <button type="button" disabled={busy || s.projectLimit <= 0} onClick={() => cambiarCupo(s, s.projectLimit - 1)} aria-label={`Permitir un proyecto menos a ${s.name}`}>−</button>
-                                    <b>{s.projectLimit}</b>
-                                    <button type="button" disabled={busy || s.projectLimit >= cupoMaximo} onClick={() => cambiarCupo(s, s.projectLimit + 1)} aria-label={`Permitir un proyecto más a ${s.name}`}>+</button>
-                                </span>
-                                <span className="adm-muted">Tiene {s.projects.length}.</span>
+                                <span className="prf-etiqueta" data-ok={s.projectLimit > 0 || undefined}>{s.projectLimit > 0 ? 'Puede crear su proyecto' : 'No puede crear su proyecto'}</span>
+                                {/* Un estudiante construye un solo proyecto: el permiso es sí o no. */}
+                                {cupoMaximo <= 1
+                                    ? <button type="button" className="pro-btn pro-btn--ghost adm-sm" disabled={busy} onClick={() => cambiarCupo(s, s.projectLimit > 0 ? 0 : 1)}>{s.projectLimit > 0 ? 'Quitar el permiso' : 'Permitir su proyecto'}</button>
+                                    : (
+                                        <span className="adm-cupo" data-cero={s.projectLimit === 0}>
+                                            <button type="button" disabled={busy || s.projectLimit <= 0} onClick={() => cambiarCupo(s, s.projectLimit - 1)} aria-label={`Permitir un proyecto menos a ${s.name}`}>−</button>
+                                            <b>{s.projectLimit}</b>
+                                            <button type="button" disabled={busy || s.projectLimit >= cupoMaximo} onClick={() => cambiarCupo(s, s.projectLimit + 1)} aria-label={`Permitir un proyecto más a ${s.name}`}>+</button>
+                                        </span>
+                                    )}
+                                <span className="adm-muted">{s.projects.length === 0 ? 'Aún no lo ha creado.' : s.projects.length === 1 ? 'Ya lo creó.' : `Tiene ${s.projects.length} proyectos.`}</span>
                                 {grupoPara?.id === s.id ? (
                                     <form className="prf-grupo" onSubmit={(e) => { e.preventDefault(); enVarios([s.id], 'group', grupoPara.valor.trim(), grupoPara.valor.trim() ? `En el grupo «${grupoPara.valor.trim()}»` : 'Sin grupo'); }}>
                                         <input className="input-field" maxLength={60} list="prf-grupos" value={grupoPara.valor} onChange={(e) => setGrupoPara({ id: s.id, valor: e.target.value })} placeholder="Sin grupo" aria-label={`Grupo de ${s.name}`} autoFocus onKeyDown={(e) => { if (e.key === 'Escape') setGrupoPara(null); }} />

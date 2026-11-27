@@ -116,3 +116,6 @@
 .sec-alumno-nuevo label { display: grid; gap: 0.2rem; flex: 1 1 14rem; font-size: 0.85rem; color: #475569; }
 .sec-alumno-nuevo input { min-height: 2.6rem; }
 .sec-alumno-nuevo button { min-height: 2.6rem; }
+.sec-filtro { display: flex; align-items: center; gap: 0.45rem; max-width: 24rem; color: #64748b; }
+.sec-filtro input { flex: 1; min-height: 2.4rem; }
+.sec-filtro small { white-space: nowrap; }
