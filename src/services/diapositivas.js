@@ -117,11 +117,19 @@ export const guionDiapositivas = (sections, data, { autor = '', resumen = {} } =
     return slides;
 };
 
-// Alto que necesita un texto en una caja de `ancho` pulgadas con letra de `pt` puntos (estimación para Calibri).
+// Alto que necesita un texto en una caja de `ancho` pulgadas con letra de `pt` puntos. Medido contra PowerPoint con
+// Calibri: caben unos 33 caracteres por renglón en 3,3 pulgadas a 14 puntos; se deja medio renglón de holgura porque
+// el corte por palabras gasta más que el promedio.
 const altoTexto = (texto, ancho, pt) => {
-    const porLinea = Math.max(8, Math.floor((ancho * 72) / (pt * 0.47)));
+    const porLinea = Math.max(8, Math.floor((ancho * 72) / (pt * 0.54)));
     const lineas = String(texto || '').split('\n').reduce((n, l) => n + Math.max(1, Math.ceil(l.length / porLinea)), 0);
-    return (lineas * pt * 1.22) / 72;
+    return ((lineas + 0.5) * pt * 1.22) / 72;
+};
+// La letra más grande (entre `max` y `min` puntos) con la que todos los textos caben en `alto` pulgadas.
+const letraQueCabe = (textos, ancho, alto, max, min) => {
+    let pt = max;
+    while (pt > min && Math.max(...textos.map((x) => altoTexto(x, ancho, pt))) > alto) pt -= 1;
+    return pt;
 };
 
 /** Genera el .pptx. `imagenes` = { [fileId]: { dataUrl } }; `tema` = uno de los TEMAS (colores);
@@ -145,7 +153,7 @@ export const presentacionPptx = async (slides, imagenes = {}, tema = temaDe(), l
     // Zona útil de las diapositivas de contenido. Con fondo institucional queda entre las franjas de arriba y de
     // abajo, y deja libres la diagonal de arriba a la derecha y el logo de abajo a la derecha.
     const G = conFondo
-        ? { x: 0.7, w: 11.9, y: 1.65, h: 4.1, tituloY: 0.5, tituloW: 9.9, figW: 10.6, figH: 4.55, notaY: 6.35, tablaW: 10.5, listaW: 10.4, listaH: 4.9 }
+        ? { x: 0.7, w: 11.3, y: 1.65, h: 4.6, tituloY: 0.5, tituloW: 9.9, figW: 10.6, figH: 4.55, notaY: 6.35, tablaW: 10.5, listaW: 10.4, listaH: 4.9 }
         : { x: 0.9, w: 11.7, y: 1.6, h: 5.2, tituloY: 0.4, tituloW: 11.9, figW: 11.4, figH: 4.7, notaY: 6.4, tablaW: 11.5, listaW: 11.7, listaH: 5.2 };
     const rotuloColor = T.rotulo || T.acento;
     const textoColor = T.texto || T.tinta;
@@ -184,33 +192,37 @@ export const presentacionPptx = async (slides, imagenes = {}, tema = temaDe(), l
             const n = s.bloques.length;
             const cols = n <= 3 ? n : 3;
             const filas = Math.ceil(n / cols);
-            const sep = 0.3; const pad = 0.25; const cabeza = 0.8;
+            const sep = filas > 1 ? 0.25 : 0.3; const pad = 0.25; const cabeza = filas > 1 ? 0.72 : 0.8;
             const w = (G.w - sep * (cols - 1)) / cols;
             const tope = (G.h - sep * (filas - 1)) / filas;
             const largoMax = Math.max(...s.bloques.map((b) => b.texto.length));
-            const pt = filas > 1 ? (largoMax > 220 ? 12 : 14) : largoMax > 420 ? 14 : largoMax > 260 ? 16 : 18;
-            const h = Math.min(tope, Math.max(1.7, cabeza + Math.max(...s.bloques.map((b) => altoTexto(b.texto, w - pad * 2, pt))) + 0.35));
+            // La letra baja hasta que el texto más largo quepa en la caja más alta posible; así nada se sale.
+            const pt = letraQueCabe(s.bloques.map((b) => b.texto), w - pad * 2, tope - cabeza - 0.12, filas > 1 ? 14 : largoMax > 260 ? 16 : 18, 10);
+            const h = Math.min(tope, Math.max(1.7, cabeza + Math.max(...s.bloques.map((b) => altoTexto(b.texto, w - pad * 2, pt))) + 0.12));
             const total = h * filas + sep * (filas - 1);
             const y0 = G.y + (G.h - total) * 0.4;
             s.bloques.forEach((b, i) => {
                 const x = G.x + (i % cols) * (w + sep);
                 const y = y0 + Math.floor(i / cols) * (h + sep);
                 slide.addShape(pptx.ShapeType.roundRect, { x, y, w, h, fill: { color: T.tarjeta }, line: { color: T.borde, width: 1 }, rectRadius: 0.1 });
-                slide.addText(`${s.numerados ? `${i + 1}   ` : ''}${b.rotulo}`, { x: x + pad, y: y + 0.12, w: w - pad * 2, h: 0.65, fontSize: filas > 1 ? 16 : 20, bold: true, color: rotuloColor, fontFace: 'Calibri', valign: 'middle', fit: 'shrink' });
-                slide.addText(b.texto, { x: x + pad, y: y + cabeza, w: w - pad * 2, h: h - cabeza - 0.15, fontSize: pt, color: textoColor, fontFace: 'Calibri', valign: 'top', fit: 'shrink' });
+                slide.addText(`${s.numerados ? `${i + 1}   ` : ''}${b.rotulo}`, { x: x + pad, y: y + 0.12, w: w - pad * 2, h: filas > 1 ? 0.58 : 0.65, fontSize: filas > 1 ? 15 : 20, bold: true, color: rotuloColor, fontFace: 'Calibri', valign: 'middle', fit: 'shrink' });
+                slide.addText(b.texto, { x: x + pad, y: y + cabeza, w: w - pad * 2, h: h - cabeza - 0.08, fontSize: pt, color: textoColor, fontFace: 'Calibri', valign: 'top', fit: 'shrink' });
             });
         } else if (s.tipo === 'referencias') {
             slide.addText(s.items.map((item) => ({ text: item, options: { bullet: { indent: 18 }, breakLine: true, paraSpaceAfter: 10 } })), { x: G.x, y: G.y, w: G.listaW, h: G.listaH, fontSize: 14, color: textoColor, fontFace: 'Calibri', valign: 'top', fit: 'shrink' });
         } else if (s.tipo === 'objetivos') {
             // General a la izquierda, en su caja; específicos a la derecha. Las dos columnas miden lo que pide el texto.
             const wG = G.w * 0.38; const xE = G.x + wG + 0.4; const wE = G.w - wG - 0.4;
-            const ptE = s.especificos.join(' ').length > 500 ? 14 : 17;
-            const altoE = s.especificos.reduce((a, o) => a + altoTexto(o, wE - 0.3, ptE) + 0.14, 0);
-            const h = Math.min(G.h, Math.max(2.2, 0.85 + Math.max(altoTexto(s.general, wG - 0.5, 18), altoE) + 0.35));
+            const altoDe = (pt) => s.especificos.reduce((a, o) => a + altoTexto(o, wE - 0.35, pt) - (pt * 0.61) / 72 + 0.14, 0);
+            let ptE = 17;
+            while (ptE > 10 && altoDe(ptE) > G.h - 0.9) ptE -= 1;
+            const ptG = letraQueCabe([s.general], wG - 0.5, G.h - 1.0, 18, 11);
+            const altoE = altoDe(ptE);
+            const h = Math.min(G.h, Math.max(2.2, 0.85 + Math.max(altoTexto(s.general, wG - 0.5, ptG), altoE) + 0.2));
             const y = G.y + (G.h - h) * 0.4;
             slide.addShape(pptx.ShapeType.roundRect, { x: G.x, y, w: wG, h, fill: { color: T.realce }, line: { color: T.realceBorde, width: 1 }, rectRadius: 0.1 });
             slide.addText('Objetivo General', { x: G.x + 0.25, y: y + 0.12, w: wG - 0.5, h: 0.6, fontSize: 20, bold: true, color: rotuloColor, fontFace: 'Calibri' });
-            slide.addText(s.general || '', { x: G.x + 0.25, y: y + 0.8, w: wG - 0.5, h: h - 0.95, fontSize: 18, color: textoColor, fontFace: 'Calibri', valign: 'top', fit: 'shrink' });
+            slide.addText(s.general || '', { x: G.x + 0.25, y: y + 0.8, w: wG - 0.5, h: h - 0.95, fontSize: ptG, color: textoColor, fontFace: 'Calibri', valign: 'top', fit: 'shrink' });
             slide.addText('Objetivos Específicos', { x: xE, y: y + 0.12, w: wE, h: 0.6, fontSize: 20, bold: true, color: rotuloColor, fontFace: 'Calibri' });
             slide.addText(s.especificos.map((o) => ({ text: o, options: { bullet: { indent: 18 }, breakLine: true, paraSpaceAfter: 10 } })), { x: xE, y: y + 0.8, w: wE, h: h - 0.8, fontSize: ptE, color: textoColor, fontFace: 'Calibri', valign: 'top', fit: 'shrink' });
         } else if (s.tipo === 'figura') {
