@@ -1,6 +1,12 @@
 // Fondo institucional de la CUN para la presentación: una imagen oscura para la primera diapositiva y una clara para
 // las demás (public/fondos/), con los colores de texto y de las cajas que combinan con ellas.
-const TEMA_CUN = { id: 'cun', nombre: 'Institucional CUN', primario: '0F2240', sobrePrimario: 'FFFFFF', suavePrimario: 'D9F99D', fondo: 'FFFFFF', tinta: '0F2240', gris: '475569', tarjeta: 'EEF2F7', borde: 'D5DCE6', realce: 'ECFCCB', realceBorde: 'A3E635', acento: '3F6212' };
+const TEMA_CUN = {
+    id: 'cun', nombre: 'Institucional CUN',
+    // Colores de la «Plantilla Presentación Final – Proyecto-Seminario II»: azul oscuro en los títulos, grises en los
+    // apartados y en el texto, y cajas gris claro con borde gris.
+    primario: '0C2340', sobrePrimario: 'FFFFFF', suavePrimario: 'FFFFFF', fondo: 'FFFFFF', tinta: '0C2340', gris: '3C3939',
+    rotulo: '1B1B27', texto: '3C3939', tarjeta: 'EDEDEF', borde: 'C7C7D0', realce: 'EDEDEF', realceBorde: 'C7C7D0', acento: '0C2340',
+};
 
 // Instituciones cuyo logo puede ir en la portada del documento. El archivo está en public/logos/ y se descarga solo
 // al generar el Word. `w` y `h` son el tamaño del archivo en píxeles (se usan para conservar la proporción).
