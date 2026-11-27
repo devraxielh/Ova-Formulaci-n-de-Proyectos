@@ -5,6 +5,7 @@ import { useProject } from './context/ProjectContext';
 import { CAMPOS_SECCION, SECTIONS, buildDocument } from './services/projectDoc';
 import { api } from './services/api';
 import { SECCIONES_MENU, seccionesBloqueadas } from './data/secciones';
+import { SoloPresentacion } from './context/SoloPresentacion';
 import Avisos from './components/Avisos';
 import './components/Proyecto.css';
 
@@ -131,6 +132,9 @@ function App() {
     const isGuest = user?.role === 'guest';
     // Con la contraseña inicial solo se puede estar en la cuenta, la cambie o no la pestaña elegida.
     const activeTab = user?.mustChangePassword ? 'cuenta' : isGuest && ['proyecto', 'referencias', 'admin', 'profesor'].includes(selectedTab) ? 'ideacion' : selectedTab;
+    // En una sección que el profesor aún no habilita, la clase muestra solo su presentación.
+    const libres = SECCIONES_MENU.filter((x) => !bloqueadas.has(x.id)).map((x) => x.label).join(', ');
+    const soloPresentacion = useMemo(() => (bloqueadas.has(activeTab) ? { libres } : null), [bloqueadas, activeTab, libres]);
 
     // Enlace para restablecer la contraseña: /?restablecer=TOKEN
     useEffect(() => {
@@ -207,8 +211,9 @@ function App() {
     }, []);
 
     const renderContent = () => {
-        // Sección que el profesor aún no habilita: se explica en lugar de abrirla.
-        if (bloqueadas.has(activeTab)) {
+        // Sección que el profesor aún no habilita y que no tiene presentación (Referencias): se explica en lugar de abrirla.
+        // Las demás se abren, pero solo con su presentación (ver SoloPresentacion).
+        if (bloqueadas.has(activeTab) && activeTab === 'referencias') {
             return (
                 <section className="app-bloqueada" role="status">
                     <Lock size={30} aria-hidden="true" />
@@ -670,7 +675,7 @@ function App() {
 
                 <div className="fade-in">
                     <Suspense fallback={<Cargando />}>
-                        {renderContent()}
+                        <SoloPresentacion.Provider value={soloPresentacion}>{renderContent()}</SoloPresentacion.Provider>
                     </Suspense>
                 </div>
             </main>

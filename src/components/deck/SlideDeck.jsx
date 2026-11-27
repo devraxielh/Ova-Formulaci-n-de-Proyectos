@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { SoloPresentacion } from '../../context/SoloPresentacion';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, CheckCircle2, Clock, Maximize2, Minimize2, Pause, Play, Presentation, RotateCcw, X, XCircle } from 'lucide-react';
 import Citar from './Citar';
@@ -395,7 +396,10 @@ const DE_TRABAJO = new Set(['construccion', 'sintesis', 'revision']);
 // `teoria`: teoría ampliada por diapositiva ({ idDeLaDiapositiva: { claves, ejemplo, ojo } }), de src/data/teoria/.
 const SlideDeck = ({ sections, slides, label, renderSlide, teoria: ampliada, finish }) => {
     const { user } = useProject();
-    const invitado = user?.role === 'guest'; // solo ve la presentación: sin construcción, revisión ni herramientas de escritura
+    // Solo la presentación (sin construcción, revisión ni herramientas de escritura): para el invitado, y para el
+    // estudiante en una sección que su profesor aún no habilita.
+    const bloqueada = useContext(SoloPresentacion);
+    const invitado = user?.role === 'guest' || Boolean(bloqueada);
     const [presentacion, setPresentacion] = useState(null); // null = cerrada; { seccion } = abierta (en esa sección)
     const [irA, setIrA] = useState(null); // { seccion }: sección de trabajo pedida desde la presentación
     const dialog = useRef(null);
@@ -431,10 +435,13 @@ const SlideDeck = ({ sections, slides, label, renderSlide, teoria: ampliada, fin
     };
 
     if (invitado) {
-        if (teoria.length === 0) return <p className="ide-invitado-nota">Este módulo no tiene presentación: es solo de trabajo sobre el proyecto.</p>;
+        const nota = bloqueada
+            ? <p className="ide-invitado-nota"><b>Tu profesor aún no habilita la construcción de esta sección.</b> Puedes ver la presentación. {bloqueada.libres ? <>Por ahora puedes construir: {bloqueada.libres}.</> : null}</p>
+            : <p className="ide-invitado-nota">Estás viendo la presentación de este módulo como invitado. La construcción del proyecto y el asistente de IA son para las cuentas de estudiantes, profesores e investigadores.</p>;
+        if (teoria.length === 0) return bloqueada ? nota : <p className="ide-invitado-nota">Este módulo no tiene presentación: es solo de trabajo sobre el proyecto.</p>;
         return (
             <>
-                <p className="ide-invitado-nota">Estás viendo la presentación de este módulo como invitado. La construcción del proyecto y el asistente de IA son para las cuentas de estudiantes, profesores e investigadores.</p>
+                {nota}
                 <Mazo {...comunes} soloVer totalClase={teoria.reduce((sum, item) => sum + item.min, 0)} sections={sections.filter((item) => !DE_TRABAJO.has(item.id))} slides={teoria} />
             </>
         );

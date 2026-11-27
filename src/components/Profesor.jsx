@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { ArrowLeft, FileText, KeyRound, RefreshCw, Search, Upload, UserPlus, Users } from 'lucide-react';
 import { api } from '../services/api';
 import { buildDocument } from '../services/projectDoc';
@@ -64,6 +64,14 @@ const Profesor = () => {
             setForm({ name: '', email: '', grupo: form.grupo, permitir: form.permitir });
         } catch (err) { setError(err.message); } finally { setBusy(false); }
     };
+    // Crear un estudiante desde la tarjeta de un grupo: queda asociado a ese grupo. Devuelve su contraseña temporal.
+    const crearEnGrupo = async ({ name, email, grupo }) => {
+        const r = await api.teacher.createStudent({ name, email, grupo, permitir: form.permitir });
+        setStudents((prev) => [...prev, r.student].sort((a, b) => a.name.localeCompare(b.name, 'es')));
+        return { cuentas: [{ name: r.student.name, email: r.student.email, clave: r.clave, emailSent: r.emailSent }], mail: r.emailSent };
+    };
+    const listaRef = useRef(null);
+    const verGrupoEnLista = (grupo) => { setFGrupo(grupo || SIN_GRUPO); setQuery(''); listaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
     const cambiarCupo = async (s, limit) => {
         setBusy(true);
         try {
@@ -215,9 +223,9 @@ const Profesor = () => {
                 {!mail && <p className="adm-muted">El servidor no tiene correo configurado: entrega tú la contraseña temporal a cada estudiante.</p>}
             </section>
 
-            <SeccionesGrupo version={students.map((x) => `${x.id}:${x.grupo || ''}`).join('|')} onGrupos={setGruposCreados} />
+            <SeccionesGrupo version={students.map((x) => `${x.id}:${x.grupo || ''}`).join('|')} onGrupos={setGruposCreados} students={students} onCrear={crearEnGrupo} onVer={verGrupoEnLista} />
 
-            <section className="pro-card cue">
+            <section className="pro-card cue" ref={listaRef}>
                 <div className="cue-cabeza">
                     <h2><Users size={19} aria-hidden="true" /> Mis estudiantes ({students.length})</h2>
                     <button type="button" className="pro-btn pro-btn--ghost" onClick={load} disabled={loading}><RefreshCw size={15} /> Actualizar</button>

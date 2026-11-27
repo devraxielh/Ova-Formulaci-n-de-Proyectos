@@ -560,7 +560,7 @@ select:not([multiple]) {
 @media (max-width: 640px) { .app-prestada { border-radius: 1rem; padding: 0.6rem 0.8rem; } }
 
 /* Secciones que el profesor aún no habilita al estudiante */
-.nav-button--locked { opacity: 0.5; }
+.nav-button--locked { opacity: 0.7; }
 .nav-button--locked > span::after { content: ' 🔒'; font-size: 0.8em; }
 .app-bloqueada { display: grid; justify-items: center; gap: 0.75rem; max-width: 38rem; margin: 3rem auto; padding: 2rem 1.5rem; text-align: center; border: 1px solid #e2e8f0; border-radius: 1rem; background: #fff; color: #334155; }
 .app-bloqueada svg { color: #64748b; }
