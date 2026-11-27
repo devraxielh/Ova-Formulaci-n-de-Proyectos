@@ -450,3 +450,5 @@ li[data-estado='falla'] .adm-servicio-estado { background: #fee2e2; color: #991b
 .adm ::selection { background: #c7d2fe; color: #1e1b4b; }
 .adm-table-wrap { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
 @media (prefers-reduced-motion: reduce) { .adm-panel .adm-table tbody tr, .adm-gira { transition: none; animation: none; } }
+.adm-ejemplo { display: inline-flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.adm-ejemplo select { min-height: 2.5rem; max-width: 15rem; }

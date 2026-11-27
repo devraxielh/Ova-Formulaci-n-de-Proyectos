@@ -160,7 +160,9 @@ export const ordenarReferencias = (refs) => [...(refs || [])].sort((a, b) => pla
 
 /* ---------- Clave para cruzar citas y referencias ---------- */
 
-const claveAutor = (apellido) => plain(apellido).replace(/[^a-z0-9ñ ]/g, '').split(/\s+/).filter((w) => !['y', 'et', 'al', 'de', 'la', 'del', 'los', 'las'].includes(w))[0] || '';
+// Partículas de apellido que no cuentan para cruzar la cita con su referencia: «da Costa» y «Costa» son el mismo autor.
+const PARTICULAS = ['y', 'et', 'al', 'de', 'la', 'del', 'los', 'las', 'da', 'das', 'do', 'dos', 'di', 'du', 'van', 'von', 'der', 'den', 'le'];
+const claveAutor = (apellido) => plain(apellido).replace(/[^a-z0-9ñ ]/g, '').split(/\s+/).filter((w) => !PARTICULAS.includes(w))[0] || '';
 export const claveRef = (ref) => {
     if (ref.tipo === 'ley') return `${plain(ref.titulo).replace(/[^a-z0-9]/g, '').replace(/de(19|20)\d{2}$/, '')}|${t(ref.anio)}`;
     const as = leerAutores(ref.autores);
@@ -201,7 +203,7 @@ export const citasEnTexto = (texto) => {
             if (!mm) return;
             const autor = t(mm[1]).replace(/^(véase|ver|cf\.|e\.g\.|por ejemplo,?)\s+/i, '').replace(/,$/, '');
             if (/^(ley|decreto|resoluci[oó]n|acuerdo)\s\d+\sde$/i.test(autor)) return; // ya contada como norma
-            if (!autor || /^\d/.test(autor) || autor.length > 80 || !/[A-ZÁÉÍÓÚÑ]/.test(autor[0]) || /[=<>≥≤%]/.test(autor)) return;
+            if (!autor || /^\d/.test(autor) || autor.length > 80 || !/[A-ZÁÉÍÓÚÑ]/.test(autor.replace(/^(?:(?:da|das|do|dos|di|du|van|von|der|den|de|del|la|le)\s)+/, '')[0] || '') || /[=<>≥≤%]/.test(autor)) return;
             const anio = mm[2].replace(/\s/g, ' ');
             out.push({ texto: `(${autor}, ${anio})`, autor, anio, clave: claveCita(autor, anio.replace(/[a-z]$/, (c) => (/s\. ?f\./.test(anio) ? c : ''))) });
         });

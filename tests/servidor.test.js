@@ -1259,7 +1259,7 @@ test('proyecto de ejemplo: el administrador lo crea completo, con su encuesta y 
     const ana = await cuenta('sin-ejemplo');
     assert.equal((await ana.api('/admin/ejemplos/sistemas', 'POST')).status, 403); // solo el administrador
     assert.equal((await admin('/admin/ejemplos/no-existe', 'POST')).status, 404);
-    assert.deepEqual((await admin('/admin/ejemplos')).body.ejemplos.map((e) => e.clave), ['sistemas']);
+    assert.deepEqual((await admin('/admin/ejemplos')).body.ejemplos.map((e) => e.clave), ['sistemas', 'industrial']);
 
     const creado = await admin('/admin/ejemplos/sistemas', 'POST');
     assert.equal(creado.status, 201);
@@ -1400,4 +1400,29 @@ test('un estudiante solo puede tener un proyecto, aunque se le intente dar más 
     // Quitar el permiso y devolverlo sigue funcionando.
     assert.equal((await profe.api(`/teacher/students/${alta.body.student.id}/limit`, 'POST', { limit: 0 })).status, 200);
     assert.equal((await profe.api(`/teacher/students/${alta.body.student.id}/limit`, 'POST', { limit: 1 })).status, 200);
+});
+
+test('proyecto de ejemplo de Ingeniería Industrial: completo, coherente y con tablas que salen de sus respuestas', async () => {
+    const admin = await entrarAdmin();
+    const creado = await admin('/admin/ejemplos/industrial', 'POST');
+    assert.equal(creado.status, 201);
+    assert.equal(creado.body.respuestas, 175);
+    const id = creado.body.project.id;
+    const proyecto = (await admin(`/projects/${id}`)).body.project;
+    assert.match(proyecto.name, /Ingeniería Industrial/);
+    const d = proyecto.data;
+    const { buildDocument, documentoNumerado } = await import('../src/services/projectDoc.js');
+    const secciones = documentoNumerado(buildDocument(d)).map((s) => s.id);
+    ['resumen', 'introduccion', 'planteamiento', 'objetivos', 'justificacion', 'alcances', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'referencias', 'anexos'].forEach((s) => assert.ok(secciones.includes(s), `falta ${s}`));
+    assert.match(d.ejemplo.aviso, /simuladas/);
+    const { revisarCitas } = await import('../src/services/apa.js');
+    const citas = revisarCitas(d, d.referencias); // incluye «da Costa y Vieira», apellido con partícula
+    assert.deepEqual([citas.sinReferencia.length, citas.noCitadas.length], [0, 0]);
+    const { evaluarCoherencia } = await import('../src/services/coherencia.js');
+    assert.ok(evaluarCoherencia(d).score >= 90);
+    const r = (await admin(`/projects/${id}/surveys/cuest01/responses`)).body;
+    assert.equal(r.responses.length, 175);
+    const { analizarPorObjetivo, metaDePreguntas } = await import('../src/services/resultadosPunta.js');
+    const an = analizarPorObjetivo({ encuestas: [{ titulo: r.definition.titulo, definition: r.definition, responses: r.responses, meta: metaDePreguntas(r.definition, 'cuest01', d.instrumentosGen, d.operacionalizacion) }], especificos: d.objetivosForm.especificos, plan: d.metodologiaForm.analisis });
+    assert.deepEqual(d.elementos.filter((e) => e.tipo === 'tabla').map((e) => [e.titulo, e.rows]), an.tablas.map((x) => [x.titulo, x.rows]));
 });

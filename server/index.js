@@ -1651,7 +1651,7 @@ app.post('/api/admin/projects/:id/duplicate', requireAdmin, (req, res) => {
 // Proyectos de ejemplo: un proyecto completo (todas las secciones, el instrumento, la encuesta publicada con sus
 // respuestas y las tablas de resultados) que el administrador crea en su propia cuenta para mostrarlo o duplicarlo.
 // El contenido se genera con scripts/ejemplo-<clave>.mjs y se guarda en server/ejemplos/. Las respuestas son simuladas.
-const EJEMPLOS = { sistemas: 'Ingeniería de Sistemas' };
+const EJEMPLOS = { sistemas: 'Ingeniería de Sistemas', industrial: 'Ingeniería Industrial' };
 const leerEjemplo = (clave) => {
     if (!Object.hasOwn(EJEMPLOS, clave)) return null;
     try { return JSON.parse(fs.readFileSync(path.join(here, 'ejemplos', `${clave}.json`), 'utf8')); } catch { return null; }

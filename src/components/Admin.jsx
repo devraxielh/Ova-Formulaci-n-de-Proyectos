@@ -168,6 +168,12 @@ const Esqueleto = ({ columnas }) => Array.from({ length: 6 }, (_, i) => (
     </tr>
 ));
 
+// Proyectos de ejemplo que el servidor sabe crear (server/ejemplos/).
+const EJEMPLOS = [
+    { clave: 'sistemas', nombre: 'Ingeniería de Sistemas', tema: 'uso de contraseñas inseguras en estudiantes universitarios' },
+    { clave: 'industrial', nombre: 'Ingeniería Industrial', tema: 'molestias musculoesqueléticas en operarios de confecciones' },
+];
+
 const Admin = () => {
     const { refreshProjects } = useProject();
     const [vista, setVista] = useRecordado('vista', 'usuarios');
@@ -377,11 +383,13 @@ const Admin = () => {
     // Proyecto de ejemplo completo (Ingeniería de Sistemas): el servidor lo crea en la cuenta del administrador con
     // su encuesta y sus respuestas simuladas; aquí se dibujan las figuras de resultados y se le agregan.
     const [creandoEjemplo, setCreandoEjemplo] = useState(false);
+    const [ejemplo, setEjemplo] = useState(EJEMPLOS[0].clave);
     const crearEjemplo = async () => {
-        if (!(await confirmar({ texto: '¿Crear el proyecto de ejemplo de Ingeniería de Sistemas?', detalle: 'Se crea en tu cuenta un proyecto completo: todas las secciones, el cuestionario, la encuesta con 292 respuestas simuladas, tablas y figuras. Después puedes duplicarlo para otra cuenta.', aceptar: 'Crear ejemplo' }))) return;
+        const elegido = EJEMPLOS.find((e) => e.clave === ejemplo) || EJEMPLOS[0];
+        if (!(await confirmar({ texto: `¿Crear el proyecto de ejemplo de ${elegido.nombre}?`, detalle: `Tema: ${elegido.tema}. Se crea en tu cuenta un proyecto completo: todas las secciones, el cuestionario, la encuesta con respuestas simuladas, tablas y figuras. Después puedes duplicarlo para otra cuenta.`, aceptar: 'Crear ejemplo' }))) return;
         setCreandoEjemplo(true);
         try {
-            const { project: nuevo, figuras, respuestas } = await api.admin.crearEjemplo('sistemas');
+            const { project: nuevo, figuras, respuestas } = await api.admin.crearEjemplo(elegido.clave);
             let conFiguras = 0;
             try {
                 const [{ dibujarBarras }, { project: completo }] = await Promise.all([import('./AnalisisDatos'), api.getProject(nuevo.id)]);
@@ -930,7 +938,12 @@ const Admin = () => {
                         <Selector buscar etiqueta="Filtrar proyectos por profesor" value={pProfesor} onChange={setPProfesor} opciones={[{ value: '', label: 'Todos los profesores' }, ...profesores.map((p) => ({ value: p.id, label: p.name, nota: p.email }))]} />
                         {hayFiltrosP && <button type="button" className="pro-link" onClick={() => { setPQuery(''); setPGrupo(''); setPProfesor(''); setPTramo(''); }}>Quitar filtros</button>}
                         <span className="adm-toolbar-fin">
-                            <button type="button" className="pro-btn pro-btn--ghost" onClick={crearEjemplo} disabled={creandoEjemplo} title="Crea en tu cuenta un proyecto completo de Ingeniería de Sistemas, con encuesta y respuestas simuladas"><FilePlus2 size={15} /> {creandoEjemplo ? 'Creando ejemplo…' : 'Crear proyecto de ejemplo'}</button>
+                            <span className="adm-ejemplo">
+                                <select className="input-field" value={ejemplo} onChange={(event) => setEjemplo(event.target.value)} disabled={creandoEjemplo} aria-label="Proyecto de ejemplo que se crea">
+                                    {EJEMPLOS.map((e) => <option key={e.clave} value={e.clave}>Ejemplo: {e.nombre}</option>)}
+                                </select>
+                                <button type="button" className="pro-btn pro-btn--ghost" onClick={crearEjemplo} disabled={creandoEjemplo} title="Crea en tu cuenta un proyecto completo, con encuesta y respuestas simuladas"><FilePlus2 size={15} /> {creandoEjemplo ? 'Creando ejemplo…' : 'Crear proyecto de ejemplo'}</button>
+                            </span>
                             <button type="button" className="pro-btn pro-btn--ghost" onClick={exportarProyectos} disabled={proyectosVisibles.length === 0}><Download size={15} /> Exportar</button>
                         </span>
                     </div>
