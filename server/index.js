@@ -2441,6 +2441,7 @@ app.get('/api/buscar/normas', requireUser, searchLimit, async (req, res) => {
 
 /* ---------- Proxy de IA ---------- */
 
+const AI_ESPERA_MAX = Math.max(1, parseInt(process.env.AI_RETRY_MAX_SECONDS, 10) || 25); // segundos que se espera, como mucho, por cada reintento
 const aiLimit = rateLimit({
     name: 'ai',
     limit: 60,
@@ -2502,6 +2503,19 @@ app.post('/api/ai/chat', requireUser, aiLimit, async (req, res) => {
         if (upstream.status === 400 && payload.response_format && /json/i.test(String(body?.error?.message || ''))) {
             payload.temperature = Math.min(1.5, payload.temperature + 0.2);
             upstream = await pedir();
+            body = await upstream.json().catch(() => ({}));
+        }
+        // El proveedor limita los tokens por minuto de toda la plataforma. Cuando responde 429 dice en cuántos segundos
+        // se puede volver a pedir: si es poco, el servidor espera y reintenta (hasta dos veces) en lugar de devolverle
+        // el fallo al estudiante. Con varias cuentas a la vez, esto convierte un rechazo en unos segundos de espera.
+        for (let intento = 0; intento < 2 && upstream.status === 429; intento += 1) {
+            const dicho = Number((String(body?.error?.message || '').match(/try again in ([\d.]+)\s*s/i) || [])[1]) || Number(upstream.headers.get('retry-after')) || 0;
+            if (!dicho || dicho > AI_ESPERA_MAX) break;
+            // eslint-disable-next-line no-await-in-loop
+            await new Promise((ok) => { setTimeout(ok, dicho * 1000 + 300 + (process.env.NODE_ENV === 'test' ? 0 : Math.random() * 1500)); });
+            // eslint-disable-next-line no-await-in-loop
+            upstream = await pedir();
+            // eslint-disable-next-line no-await-in-loop
             body = await upstream.json().catch(() => ({}));
         }
         if (!upstream.ok) {

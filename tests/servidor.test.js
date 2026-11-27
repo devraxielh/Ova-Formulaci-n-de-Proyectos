@@ -1088,10 +1088,12 @@ test('auditoría: IA solo con sesión, cuota por respuestas, contraseña tempora
     const http = await import('node:http');
     let falla = false;
     let jsonRoto = 0;
+    let saturada = 0;
     const ia = http.createServer((req, res) => {
         req.resume();
         req.on('end', () => {
             res.setHeader('Content-Type', 'application/json');
+            if (saturada > 0) { saturada -= 1; res.statusCode = 429; return res.end(JSON.stringify({ error: { message: 'Rate limit reached on tokens per minute (TPM). Please try again in 0.2s.' } })); }
             if (jsonRoto > 0) { jsonRoto -= 1; res.statusCode = 400; return res.end(JSON.stringify({ error: { message: 'Failed to generate JSON. Please adjust your prompt.' } })); }
             if (falla) { res.statusCode = 500; return res.end(JSON.stringify({ error: { message: 'se cayó' } })); }
             return res.end(JSON.stringify({ choices: [{ message: { content: 'hola' } }] }));
@@ -1125,6 +1127,15 @@ test('auditoría: IA solo con sesión, cuota por respuestas, contraseña tempora
         jsonRoto = 1;
         const conJson = await admin('/ai/chat', 'POST', { messages: [{ role: 'user', content: 'hola' }], response_format: { type: 'json_object' } });
         assert.deepEqual([conJson.status, jsonRoto], [200, 0]);
+
+        /* IA saturada (límite por minuto del proveedor): el servidor espera lo que el proveedor indica y reintenta solo. */
+        saturada = 2;
+        const trasEspera = await admin('/ai/chat', 'POST', { messages: [{ role: 'user', content: 'hola' }] });
+        assert.deepEqual([trasEspera.status, saturada], [200, 0]);
+        // Si sigue saturada después de dos reintentos, sí se le dice al usuario.
+        saturada = 3;
+        assert.equal((await admin('/ai/chat', 'POST', { messages: [{ role: 'user', content: 'hola' }] })).status, 429);
+        saturada = 0;
 
         /* IA: sin sesión no hay IA; una cookie rota no tumba nada. */
         assert.equal((await pedir(nav())).status, 401);
