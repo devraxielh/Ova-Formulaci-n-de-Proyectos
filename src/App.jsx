@@ -1,9 +1,10 @@
 import Cargando from './components/Cargando';
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import { Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, Scale, Link, Compass, Library, PanelLeftClose, PanelLeftOpen, FolderOpen, UserRound, ShieldCheck, LogOut, CheckCircle2, ListOrdered, BarChart3, Flag, BookMarked, AlignLeft, FileSpreadsheet, Network, GitFork, GraduationCap } from 'lucide-react';
+import { Lock, Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, Scale, Link, Compass, Library, PanelLeftClose, PanelLeftOpen, FolderOpen, UserRound, ShieldCheck, LogOut, CheckCircle2, ListOrdered, BarChart3, Flag, BookMarked, AlignLeft, FileSpreadsheet, Network, GitFork, GraduationCap } from 'lucide-react';
 import { useProject } from './context/ProjectContext';
 import { CAMPOS_SECCION, SECTIONS, buildDocument } from './services/projectDoc';
 import { api } from './services/api';
+import { SECCIONES_MENU, seccionesBloqueadas } from './data/secciones';
 import Avisos from './components/Avisos';
 import './components/Proyecto.css';
 
@@ -122,6 +123,8 @@ function App() {
             <button type="button" onClick={volverAMiCuenta} disabled={volviendo}>{volviendo ? 'Volviendo…' : 'Volver a mi cuenta'}</button>
         </div>
     ) : null;
+    // Secciones que el profesor aún no habilita a este estudiante (vacío para los demás roles).
+    const bloqueadas = useMemo(() => seccionesBloqueadas(user), [user]);
     const isAdmin = user?.role === 'admin';
     const isTeacher = user?.role === 'teacher';
     // Invitado: solo las presentaciones de los módulos. No tiene «Mi proyecto» ni «Referencias».
@@ -204,6 +207,17 @@ function App() {
     }, []);
 
     const renderContent = () => {
+        // Sección que el profesor aún no habilita: se explica en lugar de abrirla.
+        if (bloqueadas.has(activeTab)) {
+            return (
+                <section className="app-bloqueada" role="status">
+                    <Lock size={30} aria-hidden="true" />
+                    <h2>{TAB_LABEL[activeTab] || 'Esta sección'} todavía no está habilitada</h2>
+                    <p>Tu profesor habilita las secciones a medida que el curso avanza. Por ahora puedes trabajar en: <b>{SECCIONES_MENU.filter((x) => !bloqueadas.has(x.id)).map((x) => x.label).join(', ') || 'ninguna sección'}</b>.</p>
+                    <button type="button" className="pro-btn pro-btn--primary" onClick={() => handleTabChange('proyecto')}>Volver a Mi proyecto</button>
+                </section>
+            );
+        }
         switch (activeTab) {
             case 'ideacion':
                 return <Ideacion onNavigate={handleTabChange} />;
@@ -402,7 +416,7 @@ function App() {
                     )}
 
                     <button
-                        className={`nav-button ${activeTab === 'ideacion' ? 'active' : ''} ${doneTabs.has('ideacion') ? 'nav-button--done' : ''}`}
+                        className={`nav-button ${activeTab === 'ideacion' ? 'active' : ''} ${doneTabs.has('ideacion') ? 'nav-button--done' : ''} ${bloqueadas.has('ideacion') ? 'nav-button--locked' : ''}`}
                         onClick={() => handleTabChange('ideacion')}
                         title="Ideación"
                     >
@@ -412,7 +426,7 @@ function App() {
                     </button>
 
                     <button
-                        className={`nav-button ${activeTab === 'titulo' ? 'active' : ''} ${doneTabs.has('titulo') ? 'nav-button--done' : ''}`}
+                        className={`nav-button ${activeTab === 'titulo' ? 'active' : ''} ${doneTabs.has('titulo') ? 'nav-button--done' : ''} ${bloqueadas.has('titulo') ? 'nav-button--locked' : ''}`}
                         onClick={() => handleTabChange('titulo')}
                         title="Título"
                     >
@@ -422,7 +436,7 @@ function App() {
                     </button>
 
                     <button
-                        className={`nav-button ${activeTab === 'pregunta' ? 'active' : ''} ${doneTabs.has('pregunta') ? 'nav-button--done' : ''}`}
+                        className={`nav-button ${activeTab === 'pregunta' ? 'active' : ''} ${doneTabs.has('pregunta') ? 'nav-button--done' : ''} ${bloqueadas.has('pregunta') ? 'nav-button--locked' : ''}`}
                         onClick={() => handleTabChange('pregunta')}
                         title="Pregunta de investigación"
                     >
@@ -432,7 +446,7 @@ function App() {
                     </button>
 
                     <button
-                        className={`nav-button ${activeTab === 'arbol' ? 'active' : ''} ${doneTabs.has('arbol') ? 'nav-button--done' : ''}`}
+                        className={`nav-button ${activeTab === 'arbol' ? 'active' : ''} ${doneTabs.has('arbol') ? 'nav-button--done' : ''} ${bloqueadas.has('arbol') ? 'nav-button--locked' : ''}`}
                         onClick={() => handleTabChange('arbol')}
                         title="Árbol del problema"
                     >
@@ -442,7 +456,7 @@ function App() {
                     </button>
 
                     <button
-                        className={`nav-button ${activeTab === 'arbolobjetivos' ? 'active' : ''} ${doneTabs.has('arbolobjetivos') ? 'nav-button--done' : ''}`}
+                        className={`nav-button ${activeTab === 'arbolobjetivos' ? 'active' : ''} ${doneTabs.has('arbolobjetivos') ? 'nav-button--done' : ''} ${bloqueadas.has('arbolobjetivos') ? 'nav-button--locked' : ''}`}
                         onClick={() => handleTabChange('arbolobjetivos')}
                         title="Árbol de objetivos"
                     >
@@ -452,7 +466,7 @@ function App() {
                     </button>
 
                     <button
-                        className={`nav-button ${activeTab === 'planteamiento' ? 'active' : ''} ${doneTabs.has('planteamiento') ? 'nav-button--done' : ''}`}
+                        className={`nav-button ${activeTab === 'planteamiento' ? 'active' : ''} ${doneTabs.has('planteamiento') ? 'nav-button--done' : ''} ${bloqueadas.has('planteamiento') ? 'nav-button--locked' : ''}`}
                         onClick={() => handleTabChange('planteamiento')}
                         title="Planteamiento del problema"
                     >
@@ -462,7 +476,7 @@ function App() {
                     </button>
 
                     <button
-                        className={`nav-button ${activeTab === 'objetivos' ? 'active' : ''} ${doneTabs.has('objetivos') ? 'nav-button--done' : ''}`}
+                        className={`nav-button ${activeTab === 'objetivos' ? 'active' : ''} ${doneTabs.has('objetivos') ? 'nav-button--done' : ''} ${bloqueadas.has('objetivos') ? 'nav-button--locked' : ''}`}
                         onClick={() => handleTabChange('objetivos')}
                         title="Objetivos"
                     >
@@ -472,7 +486,7 @@ function App() {
                     </button>
 
                     <button
-                        className={`nav-button ${activeTab === 'justificacion' ? 'active' : ''} ${doneTabs.has('justificacion') ? 'nav-button--done' : ''}`}
+                        className={`nav-button ${activeTab === 'justificacion' ? 'active' : ''} ${doneTabs.has('justificacion') ? 'nav-button--done' : ''} ${bloqueadas.has('justificacion') ? 'nav-button--locked' : ''}`}
                         onClick={() => handleTabChange('justificacion')}
                         title="Justificación"
                     >
@@ -482,7 +496,7 @@ function App() {
                     </button>
 
                     <button
-                        className={`nav-button ${activeTab === 'alcances' ? 'active' : ''} ${doneTabs.has('alcances') ? 'nav-button--done' : ''}`}
+                        className={`nav-button ${activeTab === 'alcances' ? 'active' : ''} ${doneTabs.has('alcances') ? 'nav-button--done' : ''} ${bloqueadas.has('alcances') ? 'nav-button--locked' : ''}`}
                         onClick={() => handleTabChange('alcances')}
                         title="Alcances y limitaciones"
                     >
@@ -492,7 +506,7 @@ function App() {
                     </button>
 
                     <button
-                        className={`nav-button ${activeTab === 'marco' ? 'active' : ''} ${doneTabs.has('marco') ? 'nav-button--done' : ''}`}
+                        className={`nav-button ${activeTab === 'marco' ? 'active' : ''} ${doneTabs.has('marco') ? 'nav-button--done' : ''} ${bloqueadas.has('marco') ? 'nav-button--locked' : ''}`}
                         onClick={() => handleTabChange('marco')}
                         title="Marco referencial"
                     >
@@ -502,7 +516,7 @@ function App() {
                     </button>
 
                     <button
-                        className={`nav-button ${activeTab === 'metodologia' ? 'active' : ''} ${doneTabs.has('metodologia') ? 'nav-button--done' : ''}`}
+                        className={`nav-button ${activeTab === 'metodologia' ? 'active' : ''} ${doneTabs.has('metodologia') ? 'nav-button--done' : ''} ${bloqueadas.has('metodologia') ? 'nav-button--locked' : ''}`}
                         onClick={() => handleTabChange('metodologia')}
                         title="Metodología"
                     >
@@ -512,7 +526,7 @@ function App() {
                     </button>
 
                     <button
-                        className={`nav-button ${activeTab === 'fases' ? 'active' : ''} ${doneTabs.has('fases') ? 'nav-button--done' : ''}`}
+                        className={`nav-button ${activeTab === 'fases' ? 'active' : ''} ${doneTabs.has('fases') ? 'nav-button--done' : ''} ${bloqueadas.has('fases') ? 'nav-button--locked' : ''}`}
                         onClick={() => handleTabChange('fases')}
                         title="Desarrollo de las fases"
                     >
@@ -522,7 +536,7 @@ function App() {
                     </button>
 
                     <button
-                        className={`nav-button ${activeTab === 'resultados' ? 'active' : ''} ${doneTabs.has('resultados') ? 'nav-button--done' : ''}`}
+                        className={`nav-button ${activeTab === 'resultados' ? 'active' : ''} ${doneTabs.has('resultados') ? 'nav-button--done' : ''} ${bloqueadas.has('resultados') ? 'nav-button--locked' : ''}`}
                         onClick={() => handleTabChange('resultados')}
                         title="Resultados y discusión"
                     >
@@ -532,7 +546,7 @@ function App() {
                     </button>
 
                     <button
-                        className={`nav-button ${activeTab === 'conclusiones' ? 'active' : ''} ${doneTabs.has('conclusiones') ? 'nav-button--done' : ''}`}
+                        className={`nav-button ${activeTab === 'conclusiones' ? 'active' : ''} ${doneTabs.has('conclusiones') ? 'nav-button--done' : ''} ${bloqueadas.has('conclusiones') ? 'nav-button--locked' : ''}`}
                         onClick={() => handleTabChange('conclusiones')}
                         title="Conclusiones"
                     >
@@ -542,7 +556,7 @@ function App() {
                     </button>
 
                     <button
-                        className={`nav-button ${activeTab === 'introduccion' ? 'active' : ''} ${doneTabs.has('introduccion') ? 'nav-button--done' : ''}`}
+                        className={`nav-button ${activeTab === 'introduccion' ? 'active' : ''} ${doneTabs.has('introduccion') ? 'nav-button--done' : ''} ${bloqueadas.has('introduccion') ? 'nav-button--locked' : ''}`}
                         onClick={() => handleTabChange('introduccion')}
                         title="Introducción"
                     >
@@ -552,7 +566,7 @@ function App() {
                     </button>
 
                     <button
-                        className={`nav-button ${activeTab === 'resumen' ? 'active' : ''} ${doneTabs.has('resumen') ? 'nav-button--done' : ''}`}
+                        className={`nav-button ${activeTab === 'resumen' ? 'active' : ''} ${doneTabs.has('resumen') ? 'nav-button--done' : ''} ${bloqueadas.has('resumen') ? 'nav-button--locked' : ''}`}
                         onClick={() => handleTabChange('resumen')}
                         title="Resumen"
                     >
@@ -563,7 +577,7 @@ function App() {
 
                     {!isGuest && (
                     <button
-                        className={`nav-button ${activeTab === 'referencias' ? 'active' : ''} ${doneTabs.has('referencias') ? 'nav-button--done' : ''}`}
+                        className={`nav-button ${activeTab === 'referencias' ? 'active' : ''} ${doneTabs.has('referencias') ? 'nav-button--done' : ''} ${bloqueadas.has('referencias') ? 'nav-button--locked' : ''}`}
                         onClick={() => handleTabChange('referencias')}
                         title="Referencias bibliográficas"
                     >

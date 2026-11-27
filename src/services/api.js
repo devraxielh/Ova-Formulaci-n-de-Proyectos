@@ -102,6 +102,8 @@ export const api = {
         restoreBackup: (name, password) => request(`/admin/backups/${encodeURIComponent(name)}/restore`, { method: 'POST', body: { confirm: 'RESTAURAR', password } }),
         // Proyectos: cambiar de dueño o duplicar como plantilla.
         transferProject: (id, userId, keepAccess) => request(`/admin/projects/${id}/transfer`, { method: 'POST', body: { userId, keepAccess } }),
+        // Crea en la cuenta del administrador un proyecto de ejemplo completo (con encuesta y respuestas simuladas).
+        crearEjemplo: (clave) => request(`/admin/ejemplos/${clave}`, { method: 'POST' }),
         duplicateProject: (id, userId, name) => request(`/admin/projects/${id}/duplicate`, { method: 'POST', body: { userId, name } }),
         usage: (days = 30) => request(`/admin/usage?days=${days}`),
         restore: (id) => request(`/admin/trash/${id}/restore`, { method: 'POST' }),
@@ -126,6 +128,9 @@ export const api = {
         setLimit: (id, limit) => request(`/teacher/students/${id}/limit`, { method: 'POST', body: { limit } }),
         newAccess: (id) => request(`/teacher/students/${id}/access`, { method: 'POST' }),
         project: (id) => request(`/teacher/projects/${id}`),
+        // Secciones que cada grupo puede construir (null = todas).
+        secciones: () => request('/teacher/secciones'),
+        guardarSecciones: (grupo, secciones) => request('/teacher/secciones', { method: 'PUT', body: { grupo, secciones } }),
     },
 };
 

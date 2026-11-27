@@ -172,7 +172,7 @@ export const claveRef = (ref) => {
 
 const ANIO = '(?:(?:19|20)\\d{2}[a-z]?|s\\. ?f\\.)';
 const PARENTESIS = new RegExp(`\\(([^()]*?${ANIO}[^()]*?)\\)`, 'g');
-const NARRATIVA = new RegExp(`((?:[A-ZÁÉÍÓÚÑ][\\wáéíóúñü-]+)(?:\\s(?:y|e|&)\\s[A-ZÁÉÍÓÚÑ][\\wáéíóúñü-]+|\\set al\\.)?)\\s\\((${ANIO})(?:,\\s*p{1,2}\\.\\s*[\\d–-]+)?\\)`, 'g');
+const NARRATIVA = new RegExp(`((?:[A-ZÁÉÍÓÚÑ][\\wà-ÿ-]+)(?:\\s(?:y|e|&)\\s[A-ZÁÉÍÓÚÑ][\\wà-ÿ-]+|\\set al\\.)?)\\s\\((${ANIO})(?:,\\s*p{1,2}\\.\\s*[\\d–-]+)?\\)`, 'g');
 const NO_AUTOR = /^(tabla|figura|anexo|nota|n|p|pp|ver|véase|como|en|el|la|los|las|desde|durante|entre|hasta|ley|decreto|resolución|resolucion|artículo|articulo)$/i;
 
 const claveCita = (autorTexto, anio) => {
@@ -212,9 +212,9 @@ export const citasEnTexto = (texto) => {
         // Instituciones: «Ministerio de Salud (2024)» → se extiende hacia atrás por «Mayúscula + de/del/la + …».
         let antes = s.slice(0, m.index);
         for (;;) {
-            const ext = antes.match(/([A-ZÁÉÍÓÚÑ][\wáéíóúñü-]+)\s((?:de|del|de la|de las|de los|para|para la|y)\s)$/);
+            const ext = antes.match(/([A-ZÁÉÍÓÚÑ][\wà-ÿ-]+)\s((?:de|del|de la|de las|de los|para|para la|y)\s)$/);
             // Con nombre de institución ya reconocido, también se toman las mayúsculas contiguas («Organización Mundial de la…»).
-            const junto = / (de|del|para) /.test(` ${autor} `) && antes.match(/([A-ZÁÉÍÓÚÑ][\wáéíóúñü-]+)\s$/);
+            const junto = / (de|del|para) /.test(` ${autor} `) && antes.match(/([A-ZÁÉÍÓÚÑ][\wà-ÿ-]+)\s$/);
             if (ext) {
                 autor = `${ext[1]} ${ext[2]}${autor}`;
                 antes = antes.slice(0, ext.index);

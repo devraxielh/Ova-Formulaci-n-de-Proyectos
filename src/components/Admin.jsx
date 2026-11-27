@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowLeft, ArrowUp, Ban, CheckCircle2, ChevronLeft, ChevronRight, Download, FileText, KeyRound, LogIn, Mail, Pencil, RefreshCw, Search, UserCheck, ArrowRightLeft, Copy, RotateCcw, Trash2, UserPlus, Users, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Ban, CheckCircle2, ChevronLeft, ChevronRight, Download, FileText, KeyRound, LogIn, Mail, FilePlus2, Pencil, RefreshCw, Search, UserCheck, ArrowRightLeft, Copy, RotateCcw, Trash2, UserPlus, Users, X } from 'lucide-react';
 import { api } from '../services/api';
+import { useProject } from '../context/ProjectContext';
 import { buildDocument } from '../services/projectDoc';
 import { DocumentPaper } from './ProjectDocument';
 import Coherencia from './Coherencia';
@@ -168,6 +169,7 @@ const Esqueleto = ({ columnas }) => Array.from({ length: 6 }, (_, i) => (
 ));
 
 const Admin = () => {
+    const { refreshProjects } = useProject();
     const [vista, setVista] = useRecordado('vista', 'usuarios');
     const [fallo, setFallo] = useState(''); // no se pudo cargar la lista de usuarios
     const [papelera, setPapelera] = useState([]); // cuentas eliminadas que aún se pueden restaurar
@@ -371,6 +373,39 @@ const Admin = () => {
             await api.admin.entrarComo(user.id);
             window.location.reload();
         });
+    };
+    // Proyecto de ejemplo completo (Ingeniería de Sistemas): el servidor lo crea en la cuenta del administrador con
+    // su encuesta y sus respuestas simuladas; aquí se dibujan las figuras de resultados y se le agregan.
+    const [creandoEjemplo, setCreandoEjemplo] = useState(false);
+    const crearEjemplo = async () => {
+        if (!(await confirmar({ texto: '¿Crear el proyecto de ejemplo de Ingeniería de Sistemas?', detalle: 'Se crea en tu cuenta un proyecto completo: todas las secciones, el cuestionario, la encuesta con 292 respuestas simuladas, tablas y figuras. Después puedes duplicarlo para otra cuenta.', aceptar: 'Crear ejemplo' }))) return;
+        setCreandoEjemplo(true);
+        try {
+            const { project: nuevo, figuras, respuestas } = await api.admin.crearEjemplo('sistemas');
+            let conFiguras = 0;
+            try {
+                const [{ dibujarBarras }, { project: completo }] = await Promise.all([import('./AnalisisDatos'), api.getProject(nuevo.id)]);
+                const elementos = Array.isArray(completo.data?.elementos) ? completo.data.elementos.map((e) => ({ ...e })) : [];
+                for (const fig of figuras || []) {
+                    const destino = elementos.find((e) => e.id === fig.id);
+                    if (!destino) continue;
+                    const canvas = dibujarBarras(fig.variable);
+                    // eslint-disable-next-line no-await-in-loop
+                    const { file } = await api.uploadFile(nuevo.id, { mime: 'image/png', data: canvas.toDataURL('image/png').split(',')[1] });
+                    Object.assign(destino, { fileId: file.id, w: canvas.width, h: canvas.height });
+                    conFiguras += 1;
+                }
+                if (conFiguras) await api.updateProject(nuevo.id, { patch: { elementos }, force: true });
+            } catch { /* sin figuras: el proyecto queda con sus tablas y se pueden generar desde Resultados */ }
+            setProjects(null);
+            load();
+            refreshProjects().catch(() => { /* la lista de «Mi proyecto» se actualiza al recargar */ });
+            setNotice(`Proyecto de ejemplo creado en tu cuenta: «${nuevo.name}», con ${respuestas} respuestas simuladas${conFiguras ? ` y ${conFiguras} figuras` : ' (las figuras no se pudieron dibujar: genéralas desde Resultados)'}. Ábrelo desde «Mi proyecto» o duplícalo para otra cuenta.`);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setCreandoEjemplo(false);
+        }
     };
     const guardarDatos = (event, user) => {
         event.preventDefault();
@@ -895,6 +930,7 @@ const Admin = () => {
                         <Selector buscar etiqueta="Filtrar proyectos por profesor" value={pProfesor} onChange={setPProfesor} opciones={[{ value: '', label: 'Todos los profesores' }, ...profesores.map((p) => ({ value: p.id, label: p.name, nota: p.email }))]} />
                         {hayFiltrosP && <button type="button" className="pro-link" onClick={() => { setPQuery(''); setPGrupo(''); setPProfesor(''); setPTramo(''); }}>Quitar filtros</button>}
                         <span className="adm-toolbar-fin">
+                            <button type="button" className="pro-btn pro-btn--ghost" onClick={crearEjemplo} disabled={creandoEjemplo} title="Crea en tu cuenta un proyecto completo de Ingeniería de Sistemas, con encuesta y respuestas simuladas"><FilePlus2 size={15} /> {creandoEjemplo ? 'Creando ejemplo…' : 'Crear proyecto de ejemplo'}</button>
                             <button type="button" className="pro-btn pro-btn--ghost" onClick={exportarProyectos} disabled={proyectosVisibles.length === 0}><Download size={15} /> Exportar</button>
                         </span>
                     </div>

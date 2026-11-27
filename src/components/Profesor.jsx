@@ -7,6 +7,7 @@ import Coherencia from './Coherencia';
 import { Credenciales, csv, descargar, leerEstudiantes } from './Cuentas';
 import Selector from './Selector';
 import { avisar, confirmar } from './Avisos';
+import SeccionesGrupo from './SeccionesGrupo';
 import './Proyecto.css';
 import './Cuentas.css';
 
@@ -207,6 +208,8 @@ const Profesor = () => {
                 )}
                 {!mail && <p className="adm-muted">El servidor no tiene correo configurado: entrega tú la contraseña temporal a cada estudiante.</p>}
             </section>
+
+            <SeccionesGrupo version={students.length + students.reduce((n, x) => n + String(x.grupo || '').length, 0)} />
 
             <section className="pro-card cue">
                 <div className="cue-cabeza">

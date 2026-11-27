@@ -247,6 +247,18 @@ const createSession = (res, userId, { adminId = null } = {}) => {
 const INVITADO_COMUN = 'invitado';
 const esInvitadoComun = (u) => u?.email === INVITADO_COMUN;
 
+// Secciones del menú que un profesor puede habilitar a sus estudiantes, grupo por grupo, para que no se adelanten.
+// Sin registro para el grupo, todas están habilitadas. «Mi proyecto» y la cuenta nunca se bloquean.
+const SECCIONES_MENU = ['ideacion', 'titulo', 'pregunta', 'arbol', 'arbolobjetivos', 'planteamiento', 'objetivos', 'justificacion', 'alcances', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'introduccion', 'resumen', 'referencias'];
+db.exec("CREATE TABLE IF NOT EXISTS secciones_grupo (teacher_id INTEGER NOT NULL, grupo TEXT NOT NULL DEFAULT '', secciones TEXT NOT NULL, PRIMARY KEY (teacher_id, grupo))");
+const leerSecciones = (texto) => { try { const l = JSON.parse(texto); return Array.isArray(l) ? SECCIONES_MENU.filter((x) => l.includes(x)) : null; } catch { return null; } };
+// Lo que puede construir un estudiante: null = todo; una lista = solo esas secciones.
+const seccionesDe = (user) => {
+    if (user?.role !== 'student' || !user.teacher_id) return null;
+    const fila = db.prepare('SELECT secciones FROM secciones_grupo WHERE teacher_id = ? AND grupo = ?').get(user.teacher_id, String(user.grupo || ''));
+    return fila ? leerSecciones(fila.secciones) : null;
+};
+
 const publicUser = (user) => ({
     id: user.id,
     email: user.email,
@@ -256,6 +268,7 @@ const publicUser = (user) => ({
     projectLimit: user.role === 'admin' ? MAX_PROJECTS : Number(user.project_limit) || 0,
     ...(user.email === INVITADO_COMUN ? { comun: true } : {}), // la cuenta compartida del botón «Entrar como invitado»
     ...(user.admin_id ? { comoAdmin: true } : {}), // un administrador está dentro de esta cuenta
+    ...(user.role === 'student' ? { secciones: seccionesDe(user) } : {}), // null = sin restricción
 });
 
 const ROLES = ['admin', 'teacher', 'student', 'researcher', 'guest'];
@@ -635,7 +648,7 @@ app.use((req, _res, next) => {
     const token = readCookie(req, SESSION_COOKIE);
     if (token) {
         const row = db.prepare(`
-            SELECT users.id, users.email, users.name, users.role, users.status, users.must_change_password, users.project_limit, users.grupo, users.ai_limit, sessions.expires_at, sessions.admin_id
+            SELECT users.id, users.email, users.name, users.role, users.status, users.must_change_password, users.project_limit, users.grupo, users.ai_limit, users.teacher_id, sessions.expires_at, sessions.admin_id
             FROM sessions JOIN users ON users.id = sessions.user_id
             WHERE sessions.token_hash = ?`).get(sha256(token));
         if (row && row.expires_at > Date.now() && row.status === 'active') {
@@ -1626,6 +1639,43 @@ app.post('/api/admin/projects/:id/duplicate', requireAdmin, (req, res) => {
     return res.status(201).json({ project: projectRow(db.prepare('SELECT * FROM projects WHERE id = ?').get(nuevoId), false), owner: destino });
 });
 
+// Proyectos de ejemplo: un proyecto completo (todas las secciones, el instrumento, la encuesta publicada con sus
+// respuestas y las tablas de resultados) que el administrador crea en su propia cuenta para mostrarlo o duplicarlo.
+// El contenido se genera con scripts/ejemplo-<clave>.mjs y se guarda en server/ejemplos/. Las respuestas son simuladas.
+const EJEMPLOS = { sistemas: 'Ingeniería de Sistemas' };
+const leerEjemplo = (clave) => {
+    if (!Object.hasOwn(EJEMPLOS, clave)) return null;
+    try { return JSON.parse(fs.readFileSync(path.join(here, 'ejemplos', `${clave}.json`), 'utf8')); } catch { return null; }
+};
+app.get('/api/admin/ejemplos', requireAdmin, (_req, res) => res.json({ ejemplos: Object.entries(EJEMPLOS).map(([clave, nombre]) => ({ clave, nombre })) }));
+app.post('/api/admin/ejemplos/:clave', requireAdmin, rateLimit({ name: 'ejemplo', limit: 10, windowMs: 10 * 60 * 1000, key: (req) => String(req.user?.id || req.ip) }), (req, res) => {
+    const ejemplo = leerEjemplo(String(req.params.clave));
+    if (!ejemplo) return res.status(404).json({ error: 'Ese proyecto de ejemplo no existe.' });
+    const cuantos = db.prepare('SELECT COUNT(*) AS n FROM projects WHERE user_id = ?').get(req.user.id).n;
+    if (cuantos >= MAX_PROJECTS) return res.status(403).json({ error: `Tu cuenta ya tiene ${MAX_PROJECTS} proyectos: elimina o transfiere uno antes de crear el ejemplo.` });
+    const data = serializeData(ejemplo.data);
+    if (data === null) return res.status(500).json({ error: 'El proyecto de ejemplo no se pudo leer.' });
+    let id;
+    let respuestas = 0;
+    db.transaction(() => {
+        id = Number(db.prepare('INSERT INTO projects (user_id, name, data, key_meta) VALUES (?, ?, ?, ?)').run(req.user.id, cleanName(ejemplo.nombre), data, '{}').lastInsertRowid);
+        const guardar = db.prepare('INSERT INTO survey_responses (survey_id, answers, created_at) VALUES (?, ?, ?)');
+        (Array.isArray(ejemplo.encuestas) ? ejemplo.encuestas : []).forEach((enc) => {
+            const definition = cleanSurvey(enc.definition);
+            if (!definition) return;
+            const token = crypto.randomBytes(12).toString('hex');
+            const surveyId = Number(db.prepare('INSERT INTO surveys (project_id, instrument_id, token_hash, token, definition, open) VALUES (?, ?, ?, ?, ?, 0)')
+                .run(id, corto(enc.instrumentId, 20), sha256(token), token, JSON.stringify(definition)).lastInsertRowid);
+            // Las respuestas quedan repartidas en las tres semanas anteriores, como si la encuesta hubiera estado abierta.
+            const lista = (Array.isArray(enc.respuestas) ? enc.respuestas : []).slice(0, MAX_RESPONSES);
+            const ahora = Date.now();
+            lista.forEach((answers, i) => { guardar.run(surveyId, JSON.stringify(answers), ahora - Math.round(((lista.length - i) / lista.length) * 21 * 86400000)); respuestas += 1; });
+        });
+    })();
+    bitacora(req, 'Creó un proyecto de ejemplo', `«${ejemplo.nombre}» (#${id}), con ${respuestas} respuestas simuladas`);
+    return res.status(201).json({ project: projectRow(db.prepare('SELECT * FROM projects WHERE id = ?').get(id), false), respuestas, figuras: Array.isArray(ejemplo.figuras) ? ejemplo.figuras : [] });
+});
+
 // Uso de la plataforma en los últimos días: actividad por día, por tipo, por grupo y las cuentas que más la usan.
 const TIPOS_USO = ['ingreso', 'guardado', 'ia', 'articulos', 'teorias', 'normas'];
 app.get('/api/admin/usage', requireAdmin, (req, res) => {
@@ -1962,6 +2012,30 @@ const filaEstudiante = (row) => {
         projects: projects.map((p) => ({ ...projectRow(p, false), ...resumenProyecto(p.data), coherencia: coherenciaDe(p.data) })),
     };
 };
+
+// Secciones habilitadas por grupo: el profesor decide hasta dónde pueden construir sus estudiantes.
+const gruposDelProfesor = (teacherId) => db.prepare("SELECT COALESCE(grupo, '') AS grupo, COUNT(*) AS n FROM users WHERE role = 'student' AND teacher_id = ? GROUP BY COALESCE(grupo, '') ORDER BY grupo COLLATE NOCASE").all(teacherId);
+const estadoSecciones = (teacherId) => {
+    const filas = new Map(db.prepare('SELECT grupo, secciones FROM secciones_grupo WHERE teacher_id = ?').all(teacherId).map((f) => [f.grupo, leerSecciones(f.secciones)]));
+    return gruposDelProfesor(teacherId).map((g) => ({ grupo: g.grupo, estudiantes: g.n, secciones: filas.has(g.grupo) ? filas.get(g.grupo) : null }));
+};
+app.get('/api/teacher/secciones', requireTeacher, (req, res) => res.json({ grupos: estadoSecciones(req.user.id), todas: SECCIONES_MENU }));
+app.put('/api/teacher/secciones', requireTeacher, (req, res) => {
+    const grupo = String(req.body?.grupo ?? '').trim().slice(0, 80);
+    if (!gruposDelProfesor(req.user.id).some((g) => g.grupo === grupo)) return res.status(404).json({ error: 'Ese grupo no tiene estudiantes a tu cargo.' });
+    const pedido = req.body?.secciones;
+    if (pedido === null || pedido === undefined) {
+        db.prepare('DELETE FROM secciones_grupo WHERE teacher_id = ? AND grupo = ?').run(req.user.id, grupo);
+        bitacora(req, 'Habilitó todas las secciones', grupo ? `Grupo ${grupo}` : 'Estudiantes sin grupo');
+    } else {
+        if (!Array.isArray(pedido) || pedido.some((x) => !SECCIONES_MENU.includes(x))) return res.status(400).json({ error: 'La lista de secciones no es válida.' });
+        const lista = SECCIONES_MENU.filter((x) => pedido.includes(x));
+        if (lista.length === SECCIONES_MENU.length) db.prepare('DELETE FROM secciones_grupo WHERE teacher_id = ? AND grupo = ?').run(req.user.id, grupo);
+        else db.prepare('INSERT INTO secciones_grupo (teacher_id, grupo, secciones) VALUES (?, ?, ?) ON CONFLICT(teacher_id, grupo) DO UPDATE SET secciones = excluded.secciones').run(req.user.id, grupo, JSON.stringify(lista));
+        bitacora(req, 'Cambió las secciones habilitadas', `${grupo ? `Grupo ${grupo}` : 'Estudiantes sin grupo'}: ${lista.length} de ${SECCIONES_MENU.length}`);
+    }
+    return res.json({ grupos: estadoSecciones(req.user.id), todas: SECCIONES_MENU });
+});
 
 app.get('/api/teacher/students', requireTeacher, (req, res) => {
     const rows = db.prepare("SELECT * FROM users WHERE role = 'student' AND teacher_id = ? ORDER BY name COLLATE NOCASE").all(req.user.id);

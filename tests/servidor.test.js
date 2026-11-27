@@ -1253,3 +1253,83 @@ test('el administrador entra a la cuenta de otra persona y vuelve a la suya', as
     assert.equal((await admin(`/admin/users/${pendiente.id}/status`, 'POST', { status: 'blocked' })).status, 200);
     assert.equal((await admin(`/admin/users/${pendiente.id}/entrar`, 'POST')).status, 400);
 });
+
+test('proyecto de ejemplo: el administrador lo crea completo, con su encuesta y sus respuestas', async () => {
+    const admin = await entrarAdmin();
+    const ana = await cuenta('sin-ejemplo');
+    assert.equal((await ana.api('/admin/ejemplos/sistemas', 'POST')).status, 403); // solo el administrador
+    assert.equal((await admin('/admin/ejemplos/no-existe', 'POST')).status, 404);
+    assert.deepEqual((await admin('/admin/ejemplos')).body.ejemplos.map((e) => e.clave), ['sistemas']);
+
+    const creado = await admin('/admin/ejemplos/sistemas', 'POST');
+    assert.equal(creado.status, 201);
+    assert.equal(creado.body.respuestas, 292);
+    assert.ok(creado.body.figuras.length >= 1 && creado.body.figuras.every((f) => f.id && f.variable?.frec?.items?.length));
+    const id = creado.body.project.id;
+
+    // Queda en la cuenta del administrador, con todas las secciones del documento escritas.
+    const proyecto = (await admin(`/projects/${id}`)).body.project;
+    assert.match(proyecto.name, /Ingeniería de Sistemas/);
+    const { buildDocument, documentoNumerado } = await import('../src/services/projectDoc.js');
+    const secciones = documentoNumerado(buildDocument(proyecto.data)).map((s) => s.id);
+    ['resumen', 'introduccion', 'planteamiento', 'objetivos', 'justificacion', 'alcances', 'marco', 'metodologia', 'fases', 'resultados', 'conclusiones', 'referencias', 'anexos'].forEach((s) => assert.ok(secciones.includes(s), `falta ${s}`));
+    assert.match(proyecto.data.ejemplo.aviso, /simuladas/); // el propio proyecto dice que los datos no son reales
+    // Citas y referencias cuadran, y el proyecto es coherente.
+    const { revisarCitas } = await import('../src/services/apa.js');
+    const citas = revisarCitas(proyecto.data, proyecto.data.referencias);
+    assert.deepEqual([citas.sinReferencia.length, citas.noCitadas.length], [0, 0]);
+    const { evaluarCoherencia } = await import('../src/services/coherencia.js');
+    assert.ok(evaluarCoherencia(proyecto.data).score >= 90);
+
+    // La encuesta queda publicada (cerrada) con sus respuestas, listas para analizar.
+    const encuestas = (await admin(`/projects/${id}/surveys`)).body.surveys;
+    assert.deepEqual(encuestas.map((s) => [s.instrumentId, s.count, s.open]), [['cuest01', 292, false]]);
+    const r = (await admin(`/projects/${id}/surveys/cuest01/responses`)).body;
+    assert.equal(r.responses.length, 292);
+    assert.equal(r.definition.preguntas.length, 19);
+    // Las tablas guardadas son las que la aplicación calcula con esas mismas respuestas.
+    const { analizarPorObjetivo, metaDePreguntas } = await import('../src/services/resultadosPunta.js');
+    const d = proyecto.data;
+    const an = analizarPorObjetivo({ encuestas: [{ titulo: r.definition.titulo, definition: r.definition, responses: r.responses, meta: metaDePreguntas(r.definition, 'cuest01', d.instrumentosGen, d.operacionalizacion) }], especificos: d.objetivosForm.especificos, plan: d.metodologiaForm.analisis });
+    const guardadas = d.elementos.filter((e) => e.tipo === 'tabla');
+    assert.deepEqual(guardadas.map((e) => [e.titulo, e.rows]), an.tablas.map((x) => [x.titulo, x.rows]));
+
+    const registro = (await admin('/admin/log')).body.log.map((l) => l.action);
+    assert.ok(registro.includes('Creó un proyecto de ejemplo'));
+});
+
+test('el profesor habilita secciones por grupo y el estudiante recibe solo esas', async () => {
+    const admin = await entrarAdmin();
+    const profe = await cuenta('profe-secciones', 'teacher');
+    const sello = Date.now();
+    const crear = async (nombre, grupo) => {
+        const r = await profe.api('/teacher/students', 'POST', { name: nombre, email: `${nombre}.${sello}@example.test`, grupo, permitir: true });
+        assert.equal(r.status, 201);
+        return estrenar(`${nombre}.${sello}@example.test`, r.body.clave);
+    };
+    const ana = await crear('ana-sec', `G1-${sello}`);
+    const luis = await crear('luis-sec', `G2-${sello}`);
+
+    // Sin configurar: todo habilitado (null) para los dos grupos.
+    const inicio = (await profe.api('/teacher/secciones')).body;
+    assert.equal(inicio.todas.length, 17);
+    assert.deepEqual(inicio.grupos.map((g) => [g.grupo, g.estudiantes, g.secciones]), [[`G1-${sello}`, 1, null], [`G2-${sello}`, 1, null]]);
+    assert.equal((await ana.api('/auth/me')).body.user.secciones, null);
+
+    // Solo el grupo 1 queda limitado, y en el orden del menú aunque se pida en otro.
+    const cambio = await profe.api('/teacher/secciones', 'PUT', { grupo: `G1-${sello}`, secciones: ['titulo', 'ideacion'] });
+    assert.equal(cambio.status, 200);
+    assert.deepEqual(cambio.body.grupos[0].secciones, ['ideacion', 'titulo']);
+    assert.deepEqual((await ana.api('/auth/me')).body.user.secciones, ['ideacion', 'titulo']);
+    assert.equal((await luis.api('/auth/me')).body.user.secciones, null);
+
+    // No se aceptan secciones inventadas, grupos ajenos ni cuentas que no sean de profesor.
+    assert.equal((await profe.api('/teacher/secciones', 'PUT', { grupo: `G1-${sello}`, secciones: ['otra'] })).status, 400);
+    assert.equal((await profe.api('/teacher/secciones', 'PUT', { grupo: 'grupo-ajeno', secciones: [] })).status, 404);
+    assert.equal((await ana.api('/teacher/secciones')).status, 403);
+    assert.equal((await admin('/auth/me')).body.user.secciones, undefined); // solo aplica a estudiantes
+
+    // Habilitar todas otra vez quita la restricción.
+    assert.equal((await profe.api('/teacher/secciones', 'PUT', { grupo: `G1-${sello}`, secciones: null })).status, 200);
+    assert.equal((await ana.api('/auth/me')).body.user.secciones, null);
+});
