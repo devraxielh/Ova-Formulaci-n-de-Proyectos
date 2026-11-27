@@ -430,6 +430,8 @@ const grupoLimpio = (texto) => String(texto || '').trim().replace(/\s+/g, ' ').s
 
 // Un grupo es el texto `users.grupo`; aquí va lo que es del grupo y no de cada cuenta: su profesor y su cuota de IA.
 db.exec('CREATE TABLE IF NOT EXISTS grupos (name TEXT PRIMARY KEY, teacher_id INTEGER, ai_limit INTEGER)');
+// `creado`: el profesor creó el grupo a mano; se conserva aunque todavía no tenga estudiantes.
+addColumn('grupos', 'creado', 'INTEGER');
 // Quién ha tenido a cargo cada grupo y desde cuándo: al cambiar de profesor no se pierde quién estuvo antes.
 db.exec(`CREATE TABLE IF NOT EXISTS grupo_profesores (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -475,7 +477,7 @@ const heredarProfesor = (ids) => {
 const limpiarGruposVacios = () => {
     try {
         db.prepare("UPDATE grupo_profesores SET hasta = ? WHERE hasta IS NULL AND grupo NOT IN (SELECT grupo FROM users WHERE grupo != '')").run(Date.now());
-        db.prepare("DELETE FROM grupos WHERE name NOT IN (SELECT grupo FROM users WHERE grupo != '')").run();
+        db.prepare("DELETE FROM grupos WHERE COALESCE(creado, 0) = 0 AND name NOT IN (SELECT grupo FROM users WHERE grupo != '')").run();
     } catch { /* la limpieza nunca debe tumbar la solicitud */ }
 };
 // 5. Un profesor no mete a sus estudiantes en el grupo que está a cargo de otro profesor.
@@ -2014,11 +2016,38 @@ const filaEstudiante = (row) => {
 };
 
 // Secciones habilitadas por grupo: el profesor decide hasta dónde pueden construir sus estudiantes.
-const gruposDelProfesor = (teacherId) => db.prepare("SELECT COALESCE(grupo, '') AS grupo, COUNT(*) AS n FROM users WHERE role = 'student' AND teacher_id = ? GROUP BY COALESCE(grupo, '') ORDER BY grupo COLLATE NOCASE").all(teacherId);
+// Grupos del profesor: los de sus estudiantes y los que creó a mano (aunque aún estén vacíos).
+const gruposDelProfesor = (teacherId) => {
+    const conEstudiantes = db.prepare("SELECT COALESCE(grupo, '') AS grupo, COUNT(*) AS n FROM users WHERE role = 'student' AND teacher_id = ? GROUP BY COALESCE(grupo, '')").all(teacherId);
+    const creados = db.prepare('SELECT name FROM grupos WHERE teacher_id = ? AND creado = 1').all(teacherId).map((g) => g.name);
+    const todos = [...conEstudiantes.map((g) => ({ ...g, creado: creados.includes(g.grupo) })), ...creados.filter((n) => !conEstudiantes.some((g) => g.grupo === n)).map((n) => ({ grupo: n, n: 0, creado: true }))];
+    return todos.sort((a, b) => a.grupo.localeCompare(b.grupo, 'es', { numeric: true, sensitivity: 'base' }));
+};
 const estadoSecciones = (teacherId) => {
     const filas = new Map(db.prepare('SELECT grupo, secciones FROM secciones_grupo WHERE teacher_id = ?').all(teacherId).map((f) => [f.grupo, leerSecciones(f.secciones)]));
-    return gruposDelProfesor(teacherId).map((g) => ({ grupo: g.grupo, estudiantes: g.n, secciones: filas.has(g.grupo) ? filas.get(g.grupo) : null }));
+    return gruposDelProfesor(teacherId).map((g) => ({ grupo: g.grupo, estudiantes: g.n, creado: Boolean(g.creado), secciones: filas.has(g.grupo) ? filas.get(g.grupo) : null }));
 };
+// El profesor crea un grupo antes de tener estudiantes en él: así puede dejarle listas sus secciones y luego asociarlos.
+app.post('/api/teacher/grupos', requireTeacher, (req, res) => {
+    const nombre = grupoLimpio(req.body?.name);
+    if (!nombre) return res.status(400).json({ error: 'Escribe el nombre del grupo.' });
+    const ajenos = db.prepare("SELECT COUNT(*) AS n FROM users WHERE grupo = ? AND (role != 'student' OR teacher_id IS NULL OR teacher_id != ?)").get(nombre, req.user.id).n;
+    if (grupoDeOtroProfesor(nombre, req.user.id) || ajenos > 0) return res.status(400).json({ error: GRUPO_AJENO });
+    db.prepare('INSERT INTO grupos (name, teacher_id, creado) VALUES (?, ?, 1) ON CONFLICT(name) DO UPDATE SET teacher_id = excluded.teacher_id, creado = 1').run(nombre, req.user.id);
+    bitacora(req, 'Creó un grupo', nombre);
+    return res.status(201).json({ grupos: estadoSecciones(req.user.id), todas: SECCIONES_MENU });
+});
+// Solo se elimina un grupo vacío: con estudiantes, primero se pasan a otro grupo.
+app.post('/api/teacher/grupos/eliminar', requireTeacher, (req, res) => {
+    const nombre = grupoLimpio(req.body?.name);
+    const mio = gruposDelProfesor(req.user.id).find((g) => g.grupo === nombre && nombre);
+    if (!mio) return res.status(404).json({ error: 'Ese grupo no es tuyo.' });
+    if (mio.n > 0) return res.status(400).json({ error: `El grupo tiene ${mio.n} ${mio.n === 1 ? 'estudiante' : 'estudiantes'}: pásalos a otro grupo antes de eliminarlo.` });
+    db.prepare('DELETE FROM grupos WHERE name = ? AND teacher_id = ?').run(nombre, req.user.id);
+    db.prepare('DELETE FROM secciones_grupo WHERE teacher_id = ? AND grupo = ?').run(req.user.id, nombre);
+    bitacora(req, 'Eliminó un grupo', nombre);
+    return res.json({ grupos: estadoSecciones(req.user.id), todas: SECCIONES_MENU });
+});
 app.get('/api/teacher/secciones', requireTeacher, (req, res) => res.json({ grupos: estadoSecciones(req.user.id), todas: SECCIONES_MENU }));
 app.put('/api/teacher/secciones', requireTeacher, (req, res) => {
     const grupo = String(req.body?.grupo ?? '').trim().slice(0, 80);

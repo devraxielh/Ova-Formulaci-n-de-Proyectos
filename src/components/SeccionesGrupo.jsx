@@ -1,23 +1,45 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ListChecks, Lock, Unlock } from 'lucide-react';
+import { ListChecks, Lock, Plus, Trash2, Unlock } from 'lucide-react';
 import { api } from '../services/api';
 import { SECCIONES_MENU } from '../data/secciones';
-import { avisar } from './Avisos';
+import { avisar, confirmar } from './Avisos';
 
-// El profesor decide qué secciones pueden construir sus estudiantes, grupo por grupo, para que no se adelanten.
-// Sin lista guardada, el grupo tiene todas habilitadas.
+// El profesor crea sus grupos y decide qué secciones puede construir cada uno, para que nadie se adelante.
+// Sin lista guardada, el grupo tiene todas habilitadas. Un grupo puede crearse antes de tener estudiantes.
 const TODAS = SECCIONES_MENU.map((s) => s.id);
 
-const SeccionesGrupo = ({ version = 0 }) => {
+const SeccionesGrupo = ({ version = 0, onGrupos }) => {
     const [grupos, setGrupos] = useState(null);
     const [grupo, setGrupo] = useState('');
     const [marcadas, setMarcadas] = useState(TODAS);
     const [guardando, setGuardando] = useState(false);
+    const [nuevo, setNuevo] = useState('');
+    const [creando, setCreando] = useState(false);
 
     const cargar = useCallback(async () => {
         try { setGrupos((await api.teacher.secciones()).grupos); } catch (err) { avisar(err.message, 'error'); setGrupos([]); }
     }, []);
     useEffect(() => { cargar(); }, [cargar, version]);
+    // El panel usa estos nombres para ofrecerlos al crear estudiantes y al asociarlos.
+    useEffect(() => { if (grupos) onGrupos?.(grupos.map((g) => g.grupo).filter(Boolean)); }, [grupos, onGrupos]);
+
+    const crear = async (event) => {
+        event.preventDefault();
+        const nombre = nuevo.trim();
+        if (!nombre) return;
+        setCreando(true);
+        try {
+            const r = await api.teacher.crearGrupo(nombre);
+            setGrupos(r.grupos);
+            setGrupo(r.grupos.find((g) => g.grupo.toLowerCase() === nombre.toLowerCase())?.grupo || nombre);
+            setNuevo('');
+            avisar(`Grupo «${nombre}» creado. Elige abajo sus secciones y asocia estudiantes desde «Mis estudiantes».`);
+        } catch (err) { avisar(err.message, 'error'); } finally { setCreando(false); }
+    };
+    const eliminar = async (g) => {
+        if (!(await confirmar({ texto: `¿Eliminar el grupo «${g.grupo}»?`, detalle: 'Está vacío. Se borra también su lista de secciones habilitadas.', aceptar: 'Eliminar grupo', peligro: true }))) return;
+        try { setGrupos((await api.teacher.eliminarGrupo(g.grupo)).grupos); setGrupo(''); avisar(`Grupo «${g.grupo}» eliminado.`); } catch (err) { avisar(err.message, 'error'); }
+    };
 
     // Al cambiar de grupo (o al recargar) se muestra lo que ese grupo tiene guardado.
     const actual = (grupos || []).find((g) => g.grupo === grupo) || (grupos || [])[0];
@@ -27,7 +49,23 @@ const SeccionesGrupo = ({ version = 0 }) => {
         setMarcadas(actual.secciones || TODAS);
     }, [actual, grupo]);
 
-    if (!grupos || grupos.length === 0) return null;
+    if (!grupos) return null;
+    const formulario = (
+        <form className="sec-crear" onSubmit={crear}>
+            <label htmlFor="sec-nuevo">Crear grupo</label>
+            <input id="sec-nuevo" className="input-field" maxLength={60} value={nuevo} onChange={(e) => setNuevo(e.target.value)} placeholder="Ej.: Seminario II – Grupo A" />
+            <button type="submit" className="pro-btn pro-btn--ghost" disabled={creando || !nuevo.trim()}><Plus size={15} /> {creando ? 'Creando…' : 'Crear'}</button>
+        </form>
+    );
+    if (grupos.length === 0) {
+        return (
+            <section className="pro-card cue">
+                <div className="cue-cabeza"><h2><ListChecks size={19} aria-hidden="true" /> Grupos y secciones habilitadas</h2></div>
+                <p className="adm-muted">Crea un grupo para decidir qué secciones pueden construir sus estudiantes. Después los asocias desde «Mis estudiantes» o al crearlos.</p>
+                {formulario}
+            </section>
+        );
+    }
 
     const guardadas = actual?.secciones || TODAS;
     const cambio = marcadas.length !== guardadas.length || marcadas.some((id) => !guardadas.includes(id));
@@ -48,19 +86,20 @@ const SeccionesGrupo = ({ version = 0 }) => {
     return (
         <section className="pro-card cue">
             <div className="cue-cabeza">
-                <h2><ListChecks size={19} aria-hidden="true" /> Secciones habilitadas</h2>
-                {grupos.length > 1 && (
-                    <label className="sec-grupo">
-                        <span>Grupo</span>
-                        <select className="input-field" value={actual.grupo} onChange={(e) => setGrupo(e.target.value)}>
-                            {grupos.map((g) => <option key={g.grupo || '—'} value={g.grupo}>{g.grupo || 'Sin grupo'} ({g.estudiantes})</option>)}
-                        </select>
-                    </label>
-                )}
+                <h2><ListChecks size={19} aria-hidden="true" /> Grupos y secciones habilitadas</h2>
+            </div>
+            {formulario}
+            <div className="sec-grupos" role="group" aria-label="Grupo que se configura">
+                {grupos.map((g) => (
+                    <button key={g.grupo || '—'} type="button" className="sec-chip" aria-pressed={g.grupo === actual.grupo} onClick={() => setGrupo(g.grupo)}>
+                        <b>{g.grupo || 'Sin grupo'}</b>
+                        <small>{g.estudiantes} {g.estudiantes === 1 ? 'estudiante' : 'estudiantes'} · {g.secciones ? `${g.secciones.length} de ${TODAS.length}` : 'todas'}</small>
+                    </button>
+                ))}
             </div>
             <p className="adm-muted">
-                Marca lo que {grupos.length > 1 ? 'este grupo puede' : 'tus estudiantes pueden'} construir ahora. Las demás secciones les aparecen con candado, para que nadie se adelante. «Mi proyecto» siempre está disponible.
-                {grupos.length === 1 && actual.grupo ? <> Grupo: <b>{actual.grupo}</b> ({actual.estudiantes}).</> : null}
+                Marca lo que <b>{actual.grupo ? `el grupo ${actual.grupo}` : 'los estudiantes sin grupo'}</b> puede construir ahora. Las demás secciones les aparecen con candado, para que nadie se adelante. «Mi proyecto» siempre está disponible.
+                {actual.estudiantes === 0 && actual.grupo ? <> Este grupo aún no tiene estudiantes: asócialos desde «Mis estudiantes». <button type="button" className="pro-link" onClick={() => eliminar(actual)}><Trash2 size={13} aria-hidden="true" /> Eliminar grupo</button></> : null}
             </p>
             <ol className="sec-lista">
                 {SECCIONES_MENU.map((s, i) => {

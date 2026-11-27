@@ -101,7 +101,13 @@ const Profesor = () => {
     };
 
     // Grupos y filtro de la lista.
-    const grupos = useMemo(() => [...new Set(students.map((s) => s.grupo).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es', { numeric: true })), [students]);
+    // Grupos: los de los estudiantes más los que el profesor creó a mano (aunque aún estén vacíos).
+    const [gruposCreados, setGruposCreados] = useState([]);
+    const grupos = useMemo(() => [...new Set([...students.map((s) => s.grupo), ...gruposCreados].filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es', { numeric: true })), [students, gruposCreados]);
+    // Estudiantes marcados para asociarlos a un grupo de una sola vez.
+    const [marcados, setMarcados] = useState([]);
+    const [grupoDestino, setGrupoDestino] = useState('');
+    const alternarMarcado = (id) => setMarcados((m) => (m.includes(id) ? m.filter((x) => x !== id) : [...m, id]));
     const visibles = useMemo(() => {
         const q = query.trim().toLowerCase();
         return students.filter((s) => (!fGrupo || (fGrupo === SIN_GRUPO ? !s.grupo : s.grupo === fGrupo)) && (!q || s.name.toLowerCase().includes(q) || s.email.includes(q)));
@@ -209,7 +215,7 @@ const Profesor = () => {
                 {!mail && <p className="adm-muted">El servidor no tiene correo configurado: entrega tú la contraseña temporal a cada estudiante.</p>}
             </section>
 
-            <SeccionesGrupo version={students.length + students.reduce((n, x) => n + String(x.grupo || '').length, 0)} />
+            <SeccionesGrupo version={students.map((x) => `${x.id}:${x.grupo || ''}`).join('|')} onGrupos={setGruposCreados} />
 
             <section className="pro-card cue">
                 <div className="cue-cabeza">
@@ -227,6 +233,23 @@ const Profesor = () => {
                         <span className="adm-muted">{visibles.length} de {students.length}</span>
                     </div>
                 )}
+                {students.length > 0 && (
+                    <div className="prf-asociar" data-activa={marcados.length > 0 || undefined}>
+                        <label className="prf-todos">
+                            <input type="checkbox" checked={visibles.length > 0 && visibles.every((x) => marcados.includes(x.id))} onChange={(e) => setMarcados(e.target.checked ? [...new Set([...marcados, ...visibles.map((x) => x.id)])] : marcados.filter((id) => !visibles.some((x) => x.id === id)))} />
+                            <span>{marcados.length > 0 ? `${marcados.length} ${marcados.length === 1 ? 'marcado' : 'marcados'}` : 'Marcar los que ves'}</span>
+                        </label>
+                        <label className="prf-destino">
+                            <span>Asociar al grupo</span>
+                            <select className="input-field" value={grupoDestino} onChange={(e) => setGrupoDestino(e.target.value)} aria-label="Grupo al que se asocian los estudiantes marcados">
+                                <option value="">Sin grupo</option>
+                                {grupos.map((g) => <option key={g} value={g}>{g}</option>)}
+                            </select>
+                        </label>
+                        <button type="button" className="pro-btn pro-btn--primary adm-sm" disabled={busy || marcados.length === 0} onClick={async () => { await enVarios(marcados, 'group', grupoDestino, grupoDestino ? `En el grupo «${grupoDestino}»` : 'Sin grupo'); setMarcados([]); }}>Asociar</button>
+                        {grupos.length === 0 && <small className="adm-muted">Crea primero un grupo arriba.</small>}
+                    </div>
+                )}
                 {loading && students.length === 0 && <p className="adm-muted">Cargando…</p>}
                 {!loading && students.length > 0 && visibles.length === 0 && <p className="adm-muted">Ningún estudiante coincide. Prueba con otro nombre o quita el filtro de grupo.</p>}
                 {!loading && students.length === 0 && <p className="adm-muted">Todavía no tienes estudiantes a tu cargo. Crea el primero arriba.</p>}
@@ -234,6 +257,7 @@ const Profesor = () => {
                     {visibles.map((s) => (
                         <article className="prf-estudiante" key={s.id}>
                             <header>
+                                <input type="checkbox" className="prf-marca" checked={marcados.includes(s.id)} onChange={() => alternarMarcado(s.id)} aria-label={`Marcar a ${s.name}`} />
                                 <div>
                                     <b>{s.name}</b>
                                     <small>{s.email} · Último ingreso: {formatDate(s.lastLoginAt)}{s.mustChangePassword ? ' · aún no cambia su contraseña temporal' : ''}{s.status === 'blocked' ? ' · cuenta bloqueada' : ''}</small>

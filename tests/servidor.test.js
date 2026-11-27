@@ -1333,3 +1333,36 @@ test('el profesor habilita secciones por grupo y el estudiante recibe solo esas'
     assert.equal((await profe.api('/teacher/secciones', 'PUT', { grupo: `G1-${sello}`, secciones: null })).status, 200);
     assert.equal((await ana.api('/auth/me')).body.user.secciones, null);
 });
+
+test('el profesor crea un grupo vacío, le deja sus secciones y luego asocia estudiantes', async () => {
+    const profe = await cuenta('profe-grupos', 'teacher');
+    const otro = await cuenta('profe-vecino', 'teacher');
+    const sello = Date.now();
+    const grupo = `Seminario ${sello}`;
+
+    assert.equal((await profe.api('/teacher/grupos', 'POST', { name: '  ' })).status, 400);
+    const creado = await profe.api('/teacher/grupos', 'POST', { name: grupo });
+    assert.equal(creado.status, 201);
+    assert.deepEqual(creado.body.grupos.map((g) => [g.grupo, g.estudiantes, g.creado]), [[grupo, 0, true]]);
+    // Otro profesor no puede tomar ese nombre ni tocar el grupo.
+    assert.equal((await otro.api('/teacher/grupos', 'POST', { name: grupo })).status, 400);
+    assert.equal((await otro.api('/teacher/grupos/eliminar', 'POST', { name: grupo })).status, 404);
+
+    // Las secciones se dejan listas antes de que haya estudiantes.
+    assert.equal((await profe.api('/teacher/secciones', 'PUT', { grupo, secciones: ['ideacion'] })).status, 200);
+
+    // Un estudiante sin grupo se asocia después y recibe la restricción del grupo.
+    const alta = await profe.api('/teacher/students', 'POST', { name: 'Eva Grupo', email: `eva.grupo.${sello}@example.test`, permitir: true });
+    const eva = await estrenar(`eva.grupo.${sello}@example.test`, alta.body.clave);
+    assert.equal((await eva.api('/auth/me')).body.user.secciones, null);
+    const asociar = await profe.api('/teacher/students/bulk', 'POST', { ids: [alta.body.student.id], action: 'group', value: grupo });
+    assert.equal(asociar.body.hechas, 1);
+    assert.deepEqual((await eva.api('/auth/me')).body.user.secciones, ['ideacion']);
+
+    // Con estudiantes no se elimina; al sacarlos, el grupo creado a mano sigue ahí y entonces sí.
+    assert.equal((await profe.api('/teacher/grupos/eliminar', 'POST', { name: grupo })).status, 400);
+    await profe.api('/teacher/students/bulk', 'POST', { ids: [alta.body.student.id], action: 'group', value: '' });
+    assert.ok((await profe.api('/teacher/secciones')).body.grupos.some((g) => g.grupo === grupo && g.estudiantes === 0));
+    assert.equal((await profe.api('/teacher/grupos/eliminar', 'POST', { name: grupo })).status, 200);
+    assert.ok(!(await profe.api('/teacher/secciones')).body.grupos.some((g) => g.grupo === grupo));
+});
