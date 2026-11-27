@@ -91,7 +91,10 @@
 .sec-grupos { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
 .sec-chip { display: grid; gap: 0.1rem; min-height: 2.75rem; padding: 0.4rem 0.8rem; border: 2px solid #e2e8f0; border-radius: 0.7rem; background: #fff; font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .sec-chip small { color: #64748b; font-size: 0.78rem; }
-.sec-chip[aria-pressed="true"] { border-color: #4f46e5; background: #eef2ff; }
+.sec-chip[aria-selected="true"] { border-color: #4f46e5; background: #eef2ff; }
+.sec-chip { max-width: 20rem; }
+.sec-chip-nombres { font-size: 0.82rem; color: #334155; line-height: 1.35; }
+.sec-chip-nombres[data-vacio] { color: #94a3b8; font-style: italic; }
 .sec-chip:hover { border-color: #a5b4fc; }
 .prf-asociar { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin: 0.25rem 0 0.75rem; padding: 0.5rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 0.7rem; background: #f8fafc; font-size: 0.9rem; }
 .prf-asociar[data-activa] { border-color: #a5b4fc; background: #eef2ff; }

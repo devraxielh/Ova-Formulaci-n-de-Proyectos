@@ -104,13 +104,20 @@ const SeccionesGrupo = ({ version = 0, onGrupos, students = [], onCrear, onVer }
                 <h2><ListChecks size={19} aria-hidden="true" /> Grupos y secciones habilitadas</h2>
             </div>
             {formulario}
-            <div className="sec-grupos" role="group" aria-label="Grupo que se configura">
-                {grupos.map((g) => (
-                    <button key={g.grupo || '—'} type="button" className="sec-chip" aria-pressed={g.grupo === actual.grupo} onClick={() => setGrupo(g.grupo)}>
-                        <b>{g.grupo || 'Sin grupo'}</b>
-                        <small>{g.estudiantes} {g.estudiantes === 1 ? 'estudiante' : 'estudiantes'} · {g.secciones ? `${g.secciones.length} de ${TODAS.length}` : 'todas'}</small>
-                    </button>
-                ))}
+            <div className="sec-grupos" role="tablist" aria-label="Grupos">
+                {grupos.map((g) => {
+                    // Cada pestaña muestra a sus estudiantes: hasta cuatro nombres y cuántos más hay.
+                    const suyos = students.filter((x) => (x.grupo || '') === g.grupo);
+                    return (
+                        <button key={g.grupo || '—'} type="button" role="tab" className="sec-chip" aria-selected={g.grupo === actual.grupo} onClick={() => setGrupo(g.grupo)}>
+                            <b>{g.grupo || 'Sin grupo'}</b>
+                            <small>{g.estudiantes} {g.estudiantes === 1 ? 'estudiante' : 'estudiantes'} · {g.secciones ? `${g.secciones.length} de ${TODAS.length} secciones` : 'todas las secciones'}</small>
+                            {suyos.length > 0
+                                ? <span className="sec-chip-nombres">{suyos.slice(0, 4).map((x) => x.name).join(', ')}{suyos.length > 4 ? ` y ${suyos.length - 4} más` : ''}</span>
+                                : <span className="sec-chip-nombres" data-vacio>Sin estudiantes todavía</span>}
+                        </button>
+                    );
+                })}
             </div>
             <div className="sec-alumnos">
                 <div className="sec-alumnos-cabeza">
