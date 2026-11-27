@@ -43,7 +43,7 @@ export const PLANTILLA = [
         { clave: 'antecedentes', rotulo: 'Antecedentes', fuente: campo('marcoAntecedentes') },
         { clave: 'conceptos', rotulo: 'Conceptos', fuente: campo('marcoConceptual') },
     ] },
-    { titulo: 'Metodología', items: [
+    { titulo: 'Metodología', figuras: 'fases', items: [
         { clave: 'enfoque', rotulo: 'Enfoque de investigación', fuente: campo('metEnfoque') },
         { clave: 'tipo', rotulo: 'Tipo de investigación', fuente: campo('metTipo') },
         { clave: 'diseno', rotulo: 'Diseño de investigación', fuente: campo('metDiseno') },
@@ -51,7 +51,7 @@ export const PLANTILLA = [
         { clave: 'instrumentos', rotulo: 'Instrumentos de recolección de información', fuente: campo('instrumentos') },
         { clave: 'analisis', rotulo: 'Análisis de información', fuente: campo('metPlanAnalisis') },
     ] },
-    { titulo: 'Resultados', items: [
+    { titulo: 'Resultados', figuras: 'resultados', items: [
         { clave: 'hallazgos', rotulo: 'Hallazgos', fuente: campo('resultados') },
         { clave: 'interpretacion', rotulo: 'Interpretación', fuente: campo('discusion') },
     ] },
@@ -76,6 +76,7 @@ export const apartadosParaResumir = (data, max = 2200) => PLANTILLA.flatMap((dia
  * lo que falte se arma con las primeras frases del apartado.
  * Devuelve [{ tipo: 'portada' | 'bloques' | 'objetivos' | 'figura' | 'tabla' | 'referencias' | 'cierre', titulo, … }].
  */
+const MAX_GRAFICOS = 8;
 export const guionDiapositivas = (sections, data, { autor = '', resumen = {} } = {}) => {
     const d = data || {};
     const numeradas = documentoNumerado(sections);
@@ -102,13 +103,11 @@ export const guionDiapositivas = (sections, data, { autor = '', resumen = {} } =
         }
         const bloques = dia.items.map((it) => ({ rotulo: it.rotulo, texto: textoDe(it) })).filter((b) => b.texto);
         if (bloques.length) slides.push({ tipo: 'bloques', titulo: dia.titulo, bloques, numerados: Boolean(dia.numerados) });
-        if (dia.visuales) {
-            // Tablas y figuras de Resultados: una por diapositiva (máximo 6), con su número y su título.
-            const visuales = (numeradas.find((s) => s.id === 'resultados')?.content || []).filter((b) => (b.type === 'figure' || (b.type === 'table' && b.caption)) && b.rotulo);
-            visuales.slice(0, 6).forEach((b) => {
-                if (b.type === 'figure') slides.push({ tipo: 'figura', titulo: `${b.rotulo}. ${b.caption}`, fileId: b.fileId, w: b.w, h: b.h, nota: t(b.nota) });
-                else if (b.head.length <= 6) slides.push({ tipo: 'tabla', titulo: `${b.rotulo}. ${b.caption}`, head: b.head, rows: b.rows.slice(0, 9), nota: `${t(b.nota)}${b.rows.length > 9 ? ' (Se muestran las primeras filas.)' : ''}`.trim() });
-            });
+        // Después de Metodología va el gráfico de la ruta de fases; después de Resultados, sus gráficos
+        // (uno por diapositiva, con su número y su título; como mucho MAX_GRAFICOS).
+        if (dia.figuras) {
+            const figuras = (numeradas.find((sec) => sec.id === dia.figuras)?.content || []).filter((b) => b.type === 'figure' && b.rotulo && (dia.figuras !== 'fases' || b.fases));
+            figuras.slice(0, MAX_GRAFICOS).forEach((b) => slides.push({ tipo: 'figura', titulo: dia.figuras === 'fases' ? 'Fases del proyecto' : `${b.rotulo}. ${sinMarcas(b.caption)}`, fileId: b.fileId, w: b.w, h: b.h, nota: t(b.nota) }));
         }
     });
 
@@ -118,31 +117,57 @@ export const guionDiapositivas = (sections, data, { autor = '', resumen = {} } =
     return slides;
 };
 
+// Con fondo institucional, el contenido se encoge hacia la zona libre de la imagen (sin tocar la franja diagonal de
+// arriba a la derecha ni el logo de abajo a la derecha). Zona original → zona libre, en pulgadas.
+const ZONA = { x0: 0.75, y0: 0.4, w0: 11.9, h0: 6.45, x1: 0.6, y1: 0.55, w1: 10.75, h1: 6.25 };
+const enZona = (o = {}) => {
+    const fx = ZONA.w1 / ZONA.w0; const fy = ZONA.h1 / ZONA.h0;
+    return {
+        ...o,
+        ...(typeof o.x === 'number' ? { x: ZONA.x1 + (o.x - ZONA.x0) * fx } : {}),
+        ...(typeof o.y === 'number' ? { y: ZONA.y1 + (o.y - ZONA.y0) * fy } : {}),
+        ...(typeof o.w === 'number' ? { w: o.w * fx } : {}),
+        ...(typeof o.h === 'number' ? { h: o.h * fy } : {}),
+        ...(typeof o.fontSize === 'number' ? { fontSize: Math.round(o.fontSize * 0.93) } : {}),
+    };
+};
+// La diapositiva con sus medidas ya ajustadas a la zona libre.
+const ajustada = (slide) => ({
+    addText: (t2, o) => slide.addText(t2, enZona(o)),
+    addShape: (f, o) => slide.addShape(f, enZona(o)),
+    addImage: (o) => slide.addImage(enZona(o)),
+    addTable: (filas, o) => slide.addTable(filas, enZona(o)),
+});
+
 /** Genera el .pptx. `imagenes` = { [fileId]: { dataUrl } }; `tema` = uno de los TEMAS (colores);
- *  `logo` = { dataUrl, width, height } de la institución, para la portada (opcional). */
-export const presentacionPptx = async (slides, imagenes = {}, tema = temaDe(), logo = null) => {
-    const T = tema;
+ *  `logo` = { dataUrl, width, height } de la institución, para la portada (opcional);
+ *  `fondos` = { portada, contenido } (dataUrl) y `tema`: fondo institucional. La imagen oscura va en la primera
+ *  diapositiva y la clara en las demás; ya trae el logo, así que la portada no lo repite. */
+export const presentacionPptx = async (slides, imagenes = {}, tema = temaDe(), logo = null, fondos = null) => {
+    const conFondo = Boolean(fondos?.portada && fondos?.contenido);
+    const T = conFondo && fondos.tema ? fondos.tema : tema;
     const { default: Pptx } = await import('pptxgenjs');
     const pptx = new Pptx();
     pptx.layout = 'LAYOUT_WIDE'; // 13,33 × 7,5 pulgadas (16:9)
     pptx.title = slides[0]?.titulo || 'Sustentación';
     pptx.defineSlideMaster({
         title: 'CONTENIDO',
-        background: { color: T.fondo },
-        objects: [{ rect: { x: 0, y: 0, w: 0.28, h: 7.5, fill: { color: T.primario } } }],
-        slideNumber: { x: 12.45, y: 6.95, fontSize: 11, color: T.gris, fontFace: 'Calibri' },
+        background: conFondo ? { data: fondos.contenido } : { color: T.fondo },
+        objects: conFondo ? [] : [{ rect: { x: 0, y: 0, w: 0.28, h: 7.5, fill: { color: T.primario } } }],
+        // Con fondo institucional el número va sobre la franja oscura de abajo, a la izquierda (a la derecha está el logo).
+        slideNumber: conFondo ? { x: 0.45, y: 7.05, fontSize: 11, color: 'FFFFFF', fontFace: 'Calibri' } : { x: 12.45, y: 6.95, fontSize: 11, color: T.gris, fontFace: 'Calibri' },
     });
-    const titular = (slide, texto) => slide.addText(texto, { x: 0.75, y: 0.4, w: 11.9, h: 1.0, fontSize: texto.length > 70 ? 24 : 30, bold: true, color: T.tinta, fontFace: 'Calibri', valign: 'middle', fit: 'shrink' });
+    const titular = (slide, texto) => slide.addText(texto, { x: 0.75, y: 0.4, w: conFondo ? 10.6 : 11.9, h: 1.0, fontSize: texto.length > 70 ? 24 : 30, bold: true, color: T.tinta, fontFace: 'Calibri', valign: 'middle', fit: 'shrink' });
 
     slides.forEach((s) => {
         if (s.tipo === 'portada') {
             const slide = pptx.addSlide();
-            slide.background = { color: T.primario };
-slide.addText(s.titulo, { x: 0.9, y: 0.9, w: 11.5, h: 2.7, fontSize: s.titulo.length > 140 ? 28 : 36, bold: true, color: T.sobrePrimario, fontFace: 'Calibri', valign: 'middle', fit: 'shrink' });
+            slide.background = conFondo ? { data: fondos.portada } : { color: T.primario };
+            slide.addText(s.titulo, { x: 0.9, y: 0.9, w: conFondo ? 9.6 : 11.5, h: 2.7, fontSize: s.titulo.length > 140 ? 28 : 36, bold: true, color: T.sobrePrimario, fontFace: 'Calibri', valign: 'middle', fit: 'shrink' });
             slide.addText(s.antetitulo || 'Socialización', { x: 0.9, y: 3.75, w: 11.5, h: 0.7, fontSize: 26, color: T.suavePrimario, fontFace: 'Calibri' });
             slide.addText('Presentado por:', { x: 0.9, y: 5.0, w: 11.5, h: 0.45, fontSize: 16, color: T.suavePrimario, fontFace: 'Calibri' });
             // Logo de la institución: en una tarjeta blanca (los logos traen fondo blanco y la portada es de color).
-            const conLogo = Boolean(logo?.dataUrl && logo.width > 0 && logo.height > 0);
+            const conLogo = !conFondo && Boolean(logo?.dataUrl && logo.width > 0 && logo.height > 0);
             if (conLogo) {
                 const CX = 10.15; const CY = 4.75; const CW = 2.55; const CH = 2.0; const pad = 0.2;
                 const k = Math.min((CW - pad * 2) / logo.width, (CH - pad * 2) / logo.height);
@@ -150,16 +175,17 @@ slide.addText(s.titulo, { x: 0.9, y: 0.9, w: 11.5, h: 2.7, fontSize: s.titulo.le
                 slide.addShape(pptx.ShapeType.roundRect, { x: CX, y: CY, w: CW, h: CH, fill: { color: 'FFFFFF' }, line: { color: 'FFFFFF', width: 0 }, rectRadius: 0.12 });
                 slide.addImage({ data: logo.dataUrl, x: CX + (CW - w) / 2, y: CY + (CH - h) / 2, w, h });
             }
-            slide.addText(s.autores.join('  |  ') || ' ', { x: 0.9, y: 5.45, w: conLogo ? 9.0 : 11.5, h: 0.8, fontSize: 22, bold: true, color: T.sobrePrimario, fontFace: 'Calibri', valign: 'top', fit: 'shrink' });
+            slide.addText(s.autores.join('  |  ') || ' ', { x: 0.9, y: 5.45, w: conLogo || conFondo ? 9.0 : 11.5, h: 0.8, fontSize: 22, bold: true, color: T.sobrePrimario, fontFace: 'Calibri', valign: 'top', fit: 'shrink' });
             return;
         }
         if (s.tipo === 'cierre') {
             const slide = pptx.addSlide();
-            slide.background = { color: T.primario };
-            slide.addText(s.titulo, { x: 0.9, y: 2.6, w: 11.5, h: 1.6, fontSize: 60, bold: true, color: T.sobrePrimario, fontFace: 'Calibri', align: 'center' });
+            slide.background = conFondo ? { data: fondos.contenido } : { color: T.primario };
+            slide.addText(s.titulo, { x: 0.9, y: 2.6, w: 11.5, h: 1.6, fontSize: 60, bold: true, color: conFondo ? T.tinta : T.sobrePrimario, fontFace: 'Calibri', align: 'center' });
             return;
         }
-        const slide = pptx.addSlide({ masterName: 'CONTENIDO' });
+        const hoja = pptx.addSlide({ masterName: 'CONTENIDO' });
+        const slide = conFondo ? ajustada(hoja) : hoja;
         titular(slide, s.titulo);
         if (s.tipo === 'bloques') {
             // Tarjetas por apartado: hasta 3 en una fila; 4 a 6, en dos filas de tres (como la plantilla).

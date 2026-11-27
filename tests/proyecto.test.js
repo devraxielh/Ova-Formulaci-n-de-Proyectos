@@ -184,8 +184,15 @@ test('diapositivas de sustentación: siguen los ítems de la plantilla, con resu
     const slides = guionDiapositivas(buildDocument(datos), datos, { autor: 'Ana Pérez\nLuis Ruiz', resumen: { enfoque: 'Cuantitativo: se miden **variables** [[tab0001]]', implicaciones: 'Permite decidir dónde invertir en recordatorios' } });
     assert.deepEqual(slides.map((s) => s.titulo === datos.titulo ? s.tipo : s.titulo), [
         'portada', 'Introducción', 'Planteamiento del Problema', 'Objetivos', 'Justificación', 'Marco Referencial', 'Metodología',
-        'Resultados', 'Conclusiones y Recomendaciones', 'Referencias bibliográficas', '¿Preguntas?', // exactamente las de la plantilla, sin diapositivas extra
+        'Resultados', 'Figura 1. Distribución', // las de la plantilla, más los gráficos de resultados (las tablas no)
+        'Conclusiones y Recomendaciones', 'Referencias bibliográficas', '¿Preguntas?',
     ]);
+    assert.deepEqual((({ tipo, fileId, w, h }) => [tipo, fileId, w, h])(slides.find((x) => x.titulo === 'Figura 1. Distribución')), ['figura', 9, 1200, 420]);
+    // Con las fases diseñadas, su gráfico va justo después de Metodología.
+    const fase = (n) => ({ id: `f${n}`, nombre: `Fase ${n}`, objetivo: n - 1, duracion: 2, actividades: [{ id: `a${n}`, texto: 'Aplicar el instrumento' }] });
+    const conFases = { ...datos, fases: 'El proyecto se ejecuta en dos fases.', fasesForm: { unidad: 'semanas', fases: [fase(1), fase(2)] } };
+    const orden = guionDiapositivas(buildDocument(conFases), conFases, {}).map((x) => x.titulo);
+    assert.equal(orden[orden.indexOf('Metodología') + 1], 'Fases del proyecto');
     const bloques = (titulo) => slides.find((s) => s.titulo === titulo).bloques.map((b) => b.rotulo);
     assert.deepEqual(bloques('Introducción'), ['Contexto', 'Importancia']);
     assert.deepEqual(bloques('Planteamiento del Problema'), ['Problema Identificado', 'Pregunta Central']);

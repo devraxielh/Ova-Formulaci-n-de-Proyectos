@@ -1488,3 +1488,4 @@
 .pro-tema-ie small { color: #64748b; font-size: 0.8rem; }
 .pro-tema-ie img { height: 40px; width: auto; max-width: 70px; object-fit: contain; }
 .pro-tema-ie select { flex: 0 1 220px; min-height: 40px; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; font: inherit; }
+.pro-temas[data-sin-efecto="true"] { opacity: 0.45; }

@@ -176,15 +176,24 @@ const MiProyecto = ({ onNavigate }) => {
     const guardarInstitucion = (ins) => { if ((data?.institucion || '') !== (ins?.id || '')) setField('institucion', ins?.id || ''); };
     // Logo de la institución elegida: bytes para el Word y dataUrl para el PDF y la presentación.
     // Si no se puede cargar, el archivo sale sin logo.
+    const leerImagen = async (url, tipo) => {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('sin imagen');
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        let bin = '';
+        for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+        return { data: bytes, dataUrl: `data:image/${tipo === 'png' ? 'png' : 'jpeg'};base64,${window.btoa(bin)}` };
+    };
     const cargarLogo = async (ins) => {
         if (!ins) return null;
+        try { return { ...(await leerImagen(ins.logo, ins.tipo)), type: ins.tipo, ...medidaLogo(ins) }; } catch { return null; }
+    };
+    // Fondo institucional de la presentación (hoy, solo la CUN). Si no carga, la presentación sale con el tema elegido.
+    const cargarFondos = async (ins) => {
+        if (!ins?.fondos) return null;
         try {
-            const res = await fetch(ins.logo);
-            if (!res.ok) return null;
-            const bytes = new Uint8Array(await res.arrayBuffer());
-            let bin = '';
-            for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-            return { data: bytes, dataUrl: `data:image/${ins.tipo === 'png' ? 'png' : 'jpeg'};base64,${window.btoa(bin)}`, type: ins.tipo, ...medidaLogo(ins) };
+            const [portada, contenido] = await Promise.all([leerImagen(ins.fondos.portada, 'jpg'), leerImagen(ins.fondos.contenido, 'jpg')]);
+            return { portada: portada.dataUrl, contenido: contenido.dataUrl, tema: ins.fondos.tema };
         } catch { return null; }
     };
     const downloadWord = async () => {
@@ -262,9 +271,9 @@ const MiProyecto = ({ onNavigate }) => {
                 } catch { /* sin IA: primeras frases de cada apartado */ }
             }
             const slides = guionDiapositivas(sections, data, { autor: author, resumen });
-            const [imagenes, logo] = await Promise.all([cargarImagenes(), cargarLogo(ins)]);
-            descargar(await presentacionPptx(slides, imagenes, tema, logo), 'pptx');
-            setNotice(`Presentación descargada con el tema «${tema.nombre}»${ins ? (logo ? ` y el logo de ${ins.corto} en la portada` : ' (no se pudo cargar el logo: salió sin él)') : ''}: ${slides.length} diapositivas con los apartados de la plantilla de sustentación${conIA ? ', resumidos por la IA a partir de tu documento' : ' (sin resumen de IA: se usaron las primeras frases de cada apartado)'}. Los apartados que aún no has escrito no aparecen. Revísala en PowerPoint antes de sustentar.`);
+            const [imagenes, logo, fondos] = await Promise.all([cargarImagenes(), cargarLogo(ins), cargarFondos(ins)]);
+            descargar(await presentacionPptx(slides, imagenes, tema, logo, fondos), 'pptx');
+            setNotice(`Presentación descargada ${fondos ? `con el fondo institucional de ${ins.corto}` : `con el tema «${tema.nombre}»${ins ? (logo ? ` y el logo de ${ins.corto} en la portada` : ' (no se pudo cargar el logo: salió sin él)') : ''}`}: ${slides.length} diapositivas con los apartados de la plantilla de sustentación${conIA ? ', resumidos por la IA a partir de tu documento' : ' (sin resumen de IA: se usaron las primeras frases de cada apartado)'}. Los apartados que aún no has escrito no aparecen. Revísala en PowerPoint antes de sustentar.`);
         } catch (err) {
             setError(`No se pudo generar la presentación${err?.message ? `: ${err.message}` : ''}.`);
         } finally {
@@ -319,7 +328,7 @@ const MiProyecto = ({ onNavigate }) => {
                     </div>
                     <button type="button" className="pro-coh-cerrar" aria-label="Cerrar" onClick={() => temasDialog.current?.close()}><X size={18} /></button>
                 </header>
-                <ul className="pro-temas" role="radiogroup" aria-label="Tema de color">
+                <ul className="pro-temas" role="radiogroup" aria-label="Tema de color" data-sin-efecto={Boolean(institucionDe(institucion)?.fondos)}>
                     {TEMAS.map((t) => (
                         <li key={t.id}>
                             <button type="button" className="pro-tema" role="radio" aria-checked={temaId === t.id} onClick={() => setTemaId(t.id)} onDoubleClick={downloadSlides}>
@@ -344,7 +353,7 @@ const MiProyecto = ({ onNavigate }) => {
                     ))}
                 </ul>
                 <label className="pro-tema-ie">
-                    <span><b>Logo en la portada</b><small>Es la misma institución que eliges para el Word y el PDF.</small></span>
+                    <span><b>Institución</b><small>{institucionDe(institucion)?.fondos ? `Se usa el fondo institucional de ${institucionDe(institucion).corto}: oscuro en la primera diapositiva y claro en las demás. El tema de color no se aplica.` : 'Su logo va en la portada. Es la misma institución que eliges para el Word y el PDF.'}</small></span>
                     {institucionDe(institucion) && <img src={institucionDe(institucion).logo} alt="" />}
                     <select value={institucion} onChange={(e) => setInstitucion(e.target.value)}>
                         <option value="">Sin logo</option>
@@ -352,7 +361,7 @@ const MiProyecto = ({ onNavigate }) => {
                     </select>
                 </label>
                 <footer>
-                    <small>Tema elegido: <b>{temaDe(temaId).nombre}</b></small>
+                    <small>{institucionDe(institucion)?.fondos ? <>Fondo: <b>institucional de {institucionDe(institucion).corto}</b></> : <>Tema elegido: <b>{temaDe(temaId).nombre}</b></>}</small>
                     <span>
                         <button type="button" className="pro-btn pro-btn--ghost" onClick={() => temasDialog.current?.close()}>Cancelar</button>
                         <button type="button" className="pro-btn pro-btn--primary" onClick={downloadSlides}><Download size={16} /> Aplicar y descargar</button>

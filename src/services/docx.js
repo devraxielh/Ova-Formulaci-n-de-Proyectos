@@ -6,7 +6,7 @@
  */
 import { estimatePageNumbersWith } from 'docx/layout';
 import {
-    AlignmentType, Bookmark, BorderStyle, Document, InternalHyperlink, LeaderType, PageReference, Tab, TabStopType, Header, HeadingLevel, ImageRun, LineRuleType, Math as Ecuacion, MathFraction, MathRun, Packer, PageBreak, PageNumber,
+    AlignmentType, Bookmark, BorderStyle, Document, InternalHyperlink, LeaderType, PageReference, Tab, TabStopType, Header, HeadingLevel, ImageRun, LineRuleType, Math as Ecuacion, MathFraction, MathRun, Packer, PageBreak, PageNumber, NumberFormat,
     Paragraph, SequentialIdentifier, ShadingType, Table, TableCell, TableOfContents, TableRow, TextRun, WidthType,
 } from 'docx';
 import { documentoNumerado } from './projectDoc.js';
@@ -242,7 +242,11 @@ export const crearDocx = (name, author, sections, extra = {}) => {
         ] : []),
     ];
 
-    const contenido = cuerpo.flatMap((section, index) => {
+    // Las páginas se numeran 1, 2, 3… desde la primera sección numerada (1 Introducción). Lo anterior (portadas,
+    // índice, resumen, preliminares) va en otra sección del archivo, con números romanos. El cambio de sección ya
+    // pasa de página, así que esa primera sección numerada no lleva salto propio.
+    const corte = cuerpo.findIndex((sec) => sec.numero);
+    const porSeccion = cuerpo.map((section, index) => {
         if (section.id === 'preliminares') {
             // Preliminares (nivel 2) y cada declaración (nivel 3, centrada) con su firma, cada una en página propia.
             let primera = true;
@@ -255,13 +259,19 @@ export const crearDocx = (name, author, sections, extra = {}) => {
                 } else partes.push(...bloques(b));
             });
             partes.push(...firma(autores.join(', '), lugarFecha));
-            return [new Paragraph({ heading: HeadingLevel.HEADING_2, pageBreakBefore: index > 0, children: [new TextRun({ text: section.titulo })] }), ...partes];
+            return [new Paragraph({ heading: HeadingLevel.HEADING_2, pageBreakBefore: index > 0 && index !== corte, children: [new TextRun({ text: section.titulo })] }), ...partes];
         }
         return [
-            new Paragraph({ heading: HeadingLevel.HEADING_1, pageBreakBefore: index > 0, children: [new TextRun({ text: section.titulo })] }),
+            new Paragraph({ heading: HeadingLevel.HEADING_1, pageBreakBefore: index > 0 && index !== corte, children: [new TextRun({ text: section.titulo })] }),
             ...section.content.flatMap(bloques),
         ];
     });
+
+    const hoja = { size: { width: 12240, height: 15840 }, margin: { top: 1418, right: 1418, bottom: 1418, left: 1418, header: 709, footer: 709 } };
+    const conNumero = () => new Header({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ children: [PageNumber.CURRENT], size: 20 })] })] });
+    const frente = [...portada, ...dedicatoria, ...indice];
+    // Si entre el índice y la Introducción no hay nada (sin resumen ni preliminares), sobra el salto final del índice.
+    const antes = corte > 0 ? [...frente, ...porSeccion.slice(0, corte).flat()] : frente.slice(0, -1);
 
     return new Document({
         creator: autores.join(', ') || 'PROJECTSIA',
@@ -284,11 +294,12 @@ export const crearDocx = (name, author, sections, extra = {}) => {
                 { id: 'TOC3', name: 'toc 3', basedOn: 'Normal', next: 'Normal', run: { font: FUENTE, size: 22 }, paragraph: { spacing: { before: 60, after: 60, line: 240 }, indent: { left: 442 }, alignment: AlignmentType.LEFT } },
             ],
         },
-        sections: [{
-            properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 1418, right: 1418, bottom: 1418, left: 1418, header: 709, footer: 709 } } },
-            headers: { default: new Header({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ children: [PageNumber.CURRENT], size: 20 })] })] }) },
-            children: [...portada, ...dedicatoria, ...indice, ...contenido],
-        }],
+        sections: corte < 0
+            ? [{ properties: { page: hoja }, headers: { default: conNumero() }, children: [...frente, ...porSeccion.flat()] }]
+            : [
+                { properties: { page: { ...hoja, pageNumbers: { start: 1, formatType: NumberFormat.LOWER_ROMAN } }, titlePage: true }, headers: { default: conNumero(), first: new Header({ children: [new Paragraph({ children: [] })] }) }, children: antes },
+                { properties: { page: { ...hoja, pageNumbers: { start: 1, formatType: NumberFormat.DECIMAL } } }, headers: { default: conNumero() }, children: porSeccion.slice(corte).flat() },
+            ],
     });
 };
 
