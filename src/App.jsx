@@ -1,6 +1,6 @@
 import Cargando from './components/Cargando';
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import { Lock, Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, Scale, Link, Compass, Library, PanelLeftClose, PanelLeftOpen, FolderOpen, UserRound, ShieldCheck, LogOut, CheckCircle2, ListOrdered, BarChart3, Flag, BookMarked, AlignLeft, FileSpreadsheet, Network, GitFork, GraduationCap } from 'lucide-react';
+import { ClipboardCheck, Lock, Lightbulb, Type, HelpCircle, Layers, Menu, FileText, Target, BookOpen, Scale, Link, Compass, Library, PanelLeftClose, PanelLeftOpen, FolderOpen, UserRound, ShieldCheck, LogOut, CheckCircle2, ListOrdered, BarChart3, Flag, BookMarked, AlignLeft, FileSpreadsheet, Network, GitFork, GraduationCap } from 'lucide-react';
 import { useProject } from './context/ProjectContext';
 import { CAMPOS_SECCION, SECTIONS, buildDocument } from './services/projectDoc';
 import { api } from './services/api';
@@ -32,6 +32,7 @@ const MiProyecto = lazy(() => import('./components/MiProyecto'));
 const Cuenta = lazy(() => import('./components/Cuenta'));
 const Admin = lazy(() => import('./components/Admin'));
 const Profesor = lazy(() => import('./components/Profesor'));
+const EvaluarProyecto = lazy(() => import('./components/EvaluarProyecto'));
 
 const TAB_ALIAS = { instrumentos: 'metodologia', analisis: 'resultados', doi: 'referencias', poblacion: 'metodologia', 'plan-analisis': 'metodologia', cronograma: 'metodologia', presupuesto: 'metodologia' };
 
@@ -46,7 +47,7 @@ const seccionDe = (key) => {
     return SECTIONS.find((s) => s.id === id)?.label || 'Otros datos del proyecto';
 };
 // Nombre visible de la pestaña donde está un compañero.
-const TAB_LABEL = { proyecto: 'Mi proyecto', ideacion: 'Ideación', titulo: 'Título', pregunta: 'Pregunta de investigación', arbol: 'Árbol del problema', planteamiento: 'Planteamiento', arbolobjetivos: 'Árbol de objetivos', objetivos: 'Objetivos', introduccion: 'Introducción', justificacion: 'Justificación', alcances: 'Alcances y limitaciones', marco: 'Marco Referencial', metodologia: 'Metodología', fases: 'Desarrollo de las fases', resultados: 'Resultados y discusión', conclusiones: 'Conclusiones', resumen: 'Resumen', referencias: 'Referencias', cuenta: 'Mi cuenta' };
+const TAB_LABEL = { proyecto: 'Mi proyecto', evaluar: 'Evaluar proyecto', ideacion: 'Ideación', titulo: 'Título', pregunta: 'Pregunta de investigación', arbol: 'Árbol del problema', planteamiento: 'Planteamiento', arbolobjetivos: 'Árbol de objetivos', objetivos: 'Objetivos', introduccion: 'Introducción', justificacion: 'Justificación', alcances: 'Alcances y limitaciones', marco: 'Marco Referencial', metodologia: 'Metodología', fases: 'Desarrollo de las fases', resultados: 'Resultados y discusión', conclusiones: 'Conclusiones', resumen: 'Resumen', referencias: 'Referencias', cuenta: 'Mi cuenta' };
 
 // Errores del navegador → registro del servidor (se ven en Administración). Como mucho 5 por visita.
 let erroresEnviados = 0;
@@ -131,7 +132,7 @@ function App() {
     // Invitado: solo las presentaciones de los módulos. No tiene «Mi proyecto» ni «Referencias».
     const isGuest = user?.role === 'guest';
     // Con la contraseña inicial solo se puede estar en la cuenta, la cambie o no la pestaña elegida.
-    const activeTab = user?.mustChangePassword ? 'cuenta' : isGuest && ['proyecto', 'referencias', 'admin', 'profesor'].includes(selectedTab) ? 'ideacion' : selectedTab;
+    const activeTab = user?.mustChangePassword ? 'cuenta' : isGuest && ['proyecto', 'referencias', 'admin', 'profesor', 'evaluar'].includes(selectedTab) ? 'ideacion' : selectedTab;
     // En una sección que el profesor aún no habilita, la clase muestra solo su presentación.
     const libres = SECCIONES_MENU.filter((x) => !bloqueadas.has(x.id)).map((x) => x.label).join(', ');
     const soloPresentacion = useMemo(() => (bloqueadas.has(activeTab) ? { libres } : null), [bloqueadas, activeTab, libres]);
@@ -266,6 +267,8 @@ function App() {
                 return <MiProyecto onNavigate={handleTabChange} />;
             case 'cuenta':
                 return <Cuenta onNavigate={handleTabChange} activation={activation} />;
+            case 'evaluar':
+                return <EvaluarProyecto />;
             case 'profesor':
                 return isTeacher && !user.mustChangePassword ? <Profesor /> : <Cuenta onNavigate={handleTabChange} activation={activation} />;
             case 'admin':
@@ -302,6 +305,7 @@ function App() {
             case 'cuenta': return 'Mi cuenta';
             case 'admin': return 'Administración';
             case 'profesor': return 'Mis estudiantes';
+            case 'evaluar': return 'Evaluación de proyectos';
             default: return '';
         }
     };
@@ -417,6 +421,16 @@ function App() {
                     >
                         <FolderOpen size={20} />
                         <span>Mi proyecto</span>
+                    </button>
+                    )}
+                    {!isGuest && (
+                    <button
+                        className={`nav-button ${activeTab === 'evaluar' ? 'active' : ''}`}
+                        onClick={() => handleTabChange('evaluar')}
+                        title="Evaluar un proyecto en Word o PDF"
+                    >
+                        <ClipboardCheck size={20} />
+                        <span>Evaluar proyecto</span>
                     </button>
                     )}
 
@@ -645,6 +659,8 @@ function App() {
                                     ? 'Guarda tu proyecto y continúalo desde cualquier equipo.'
                                     : activeTab === 'admin'
                                         ? 'Crea las cuentas, asigna los roles y consulta los proyectos y su estado.'
+                                    : activeTab === 'evaluar'
+                                        ? 'Revisa un proyecto hecho fuera de la plataforma: sube su Word o PDF y mira su estructura, su coherencia y qué le falta a cada sección.'
                                     : activeTab === 'profesor'
                                         ? 'Crea a los estudiantes a tu cargo, permíteles crear su proyecto y revisa cómo van.'
                                     : activeTab === 'arbol'

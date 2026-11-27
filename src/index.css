@@ -531,6 +531,24 @@ label {
   .sidebar--collapsed nav .nav-button { flex: 1 1 0; min-height: 1.7rem; max-height: 2.85rem; padding-block: 0; margin-bottom: 0.12rem; }
 }
 
+/* Menú sin desplazamiento: el alto de cada opción, la letra y los íconos se ajustan al alto de la ventana para que
+   todas las opciones quepan; el pie (proyecto y cierre de sesión) se compacta en pantallas bajas. Solo en ventanas
+   muy bajas (menos de ~520 px) vuelve a aparecer la barra de desplazamiento. */
+@media (min-width: 769px) {
+  .sidebar { overflow: hidden; }
+  .sidebar nav .nav-button,
+  .sidebar--collapsed nav .nav-button { min-height: 1.05rem; margin-bottom: clamp(0px, 0.18vh, 0.12rem); font-size: clamp(0.74rem, 1.55vh, 0.9rem); }
+  .sidebar nav .nav-button svg { width: clamp(14px, 2.3vh, 18px); height: clamp(14px, 2.3vh, 18px); }
+}
+@media (min-width: 769px) and (max-height: 760px) {
+  .sidebar { padding-top: 0.6rem; padding-bottom: 0.4rem; }
+  .sidebar-header { margin-bottom: 0.2rem; padding-bottom: 0.4rem; }
+  .sidebar-footer { padding-top: 0.35rem !important; }
+  .sidebar-account { padding-block: 0.3rem; margin-bottom: 0.2rem; }
+  .sidebar-logout { padding-block: 0.25rem; margin-bottom: 0.15rem; }
+  .sidebar-footer p { display: none; }
+}
+
 /* Listas desplegables del navegador: mismo aspecto que el selector con búsqueda (borde, radio y flecha propia).
    Van con especificidad cero para que cada módulo pueda ajustar tamaño y ancho; la flecha se fija para que ninguno la tape. */
 :where(select:not([multiple])) {
