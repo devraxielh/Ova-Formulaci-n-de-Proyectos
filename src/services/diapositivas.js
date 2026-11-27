@@ -153,7 +153,7 @@ export const presentacionPptx = async (slides, imagenes = {}, tema = temaDe(), l
     // Zona útil de las diapositivas de contenido. Con fondo institucional queda entre las franjas de arriba y de
     // abajo, y deja libres la diagonal de arriba a la derecha y el logo de abajo a la derecha.
     const G = conFondo
-        ? { x: 0.7, w: 11.3, y: 1.65, h: 4.6, tituloY: 0.5, tituloW: 9.9, figW: 10.6, figH: 4.55, notaY: 6.35, tablaW: 10.5, listaW: 10.4, listaH: 4.9 }
+        ? { x: 0.7, w: 11.2, y: 1.55, h: 4.8, tituloY: 0.5, tituloW: 9.9, figW: 10.6, figH: 4.55, notaY: 6.35, tablaW: 10.5, listaW: 10.4, listaH: 4.9 }
         : { x: 0.9, w: 11.7, y: 1.6, h: 5.2, tituloY: 0.4, tituloW: 11.9, figW: 11.4, figH: 4.7, notaY: 6.4, tablaW: 11.5, listaW: 11.7, listaH: 5.2 };
     const rotuloColor = T.rotulo || T.acento;
     const textoColor = T.texto || T.tinta;
@@ -196,17 +196,21 @@ export const presentacionPptx = async (slides, imagenes = {}, tema = temaDe(), l
             const w = (G.w - sep * (cols - 1)) / cols;
             const tope = (G.h - sep * (filas - 1)) / filas;
             const largoMax = Math.max(...s.bloques.map((b) => b.texto.length));
-            // La letra baja hasta que el texto más largo quepa en la caja más alta posible; así nada se sale.
+            // Primero crece la caja: mide lo que pide el texto más largo, hasta el alto disponible. Solo si ni así
+            // cabe, baja la letra. Rótulo y texto van dentro de la misma caja, con «ajustar la forma al texto», para
+            // que PowerPoint la agrande sola si alguien alarga el texto.
             const pt = letraQueCabe(s.bloques.map((b) => b.texto), w - pad * 2, tope - cabeza - 0.12, filas > 1 ? 14 : largoMax > 260 ? 16 : 18, 10);
-            const h = Math.min(tope, Math.max(1.7, cabeza + Math.max(...s.bloques.map((b) => altoTexto(b.texto, w - pad * 2, pt))) + 0.12));
+            const h = Math.min(tope, Math.max(1.5, cabeza + Math.max(...s.bloques.map((b) => altoTexto(b.texto, w - pad * 2, pt))) + 0.12));
             const total = h * filas + sep * (filas - 1);
             const y0 = G.y + (G.h - total) * 0.4;
+            const ptRotulo = filas > 1 ? 15 : 20;
             s.bloques.forEach((b, i) => {
                 const x = G.x + (i % cols) * (w + sep);
                 const y = y0 + Math.floor(i / cols) * (h + sep);
-                slide.addShape(pptx.ShapeType.roundRect, { x, y, w, h, fill: { color: T.tarjeta }, line: { color: T.borde, width: 1 }, rectRadius: 0.1 });
-                slide.addText(`${s.numerados ? `${i + 1}   ` : ''}${b.rotulo}`, { x: x + pad, y: y + 0.12, w: w - pad * 2, h: filas > 1 ? 0.58 : 0.65, fontSize: filas > 1 ? 15 : 20, bold: true, color: rotuloColor, fontFace: 'Calibri', valign: 'middle', fit: 'shrink' });
-                slide.addText(b.texto, { x: x + pad, y: y + cabeza, w: w - pad * 2, h: h - cabeza - 0.08, fontSize: pt, color: textoColor, fontFace: 'Calibri', valign: 'top', fit: 'shrink' });
+                slide.addText([
+                    { text: `${s.numerados ? `${i + 1}   ` : ''}${b.rotulo}`, options: { fontSize: ptRotulo, bold: true, color: rotuloColor, breakLine: true, paraSpaceAfter: 8 } },
+                    { text: b.texto, options: { fontSize: pt, color: textoColor } },
+                ], { shape: pptx.ShapeType.roundRect, x, y, w, h, fill: { color: T.tarjeta }, line: { color: T.borde, width: 1 }, rectRadius: 0.1, margin: pad * 72, fontFace: 'Calibri', align: 'left', valign: 'top', fit: 'resize' });
             });
         } else if (s.tipo === 'referencias') {
             slide.addText(s.items.map((item) => ({ text: item, options: { bullet: { indent: 18 }, breakLine: true, paraSpaceAfter: 10 } })), { x: G.x, y: G.y, w: G.listaW, h: G.listaH, fontSize: 14, color: textoColor, fontFace: 'Calibri', valign: 'top', fit: 'shrink' });
