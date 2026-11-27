@@ -9,7 +9,7 @@ import { Credenciales } from './Cuentas';
 // Sin lista guardada, el grupo tiene todas habilitadas. Un grupo puede crearse antes de tener estudiantes.
 const TODAS = SECCIONES_MENU.map((s) => s.id);
 
-const SeccionesGrupo = ({ version = 0, onGrupos, students = [], onCrear, onVer }) => {
+const SeccionesGrupo = ({ version = 0, onGrupos, students = [], onCrear, onVer, onEstudiantes }) => {
     const [grupos, setGrupos] = useState(null);
     const [grupo, setGrupo] = useState('');
     const [marcadas, setMarcadas] = useState(TODAS);
@@ -43,8 +43,18 @@ const SeccionesGrupo = ({ version = 0, onGrupos, students = [], onCrear, onVer }
         } catch (err) { avisar(err.message, 'error'); } finally { setCreando(false); }
     };
     const eliminar = async (g) => {
-        if (!(await confirmar({ texto: `¿Eliminar el grupo «${g.grupo}»?`, detalle: 'Está vacío. Se borra también su lista de secciones habilitadas.', aceptar: 'Eliminar grupo', peligro: true }))) return;
-        try { setGrupos((await api.teacher.eliminarGrupo(g.grupo)).grupos); setGrupo(''); avisar(`Grupo «${g.grupo}» eliminado.`); } catch (err) { avisar(err.message, 'error'); }
+        const n = g.estudiantes;
+        const detalle = n > 0
+            ? `No se borra a nadie: ${n === 1 ? 'su estudiante queda' : `sus ${n} estudiantes quedan`} sin grupo, con sus cuentas y proyectos intactos. Se borra la lista de secciones habilitadas del grupo, así que ${n === 1 ? 'pasa' : 'pasan'} a tener las de «Sin grupo».`
+            : 'Está vacío. Se borra también su lista de secciones habilitadas.';
+        if (!(await confirmar({ texto: `¿Eliminar el grupo «${g.grupo}»?`, detalle, aceptar: 'Eliminar grupo', peligro: true }))) return;
+        try {
+            const r = await api.teacher.eliminarGrupo(g.grupo, n > 0);
+            setGrupos(r.grupos);
+            setGrupo('');
+            if (r.students) onEstudiantes?.(r.students);
+            avisar(`Grupo «${g.grupo}» eliminado${r.sacados ? `: ${r.sacados} ${r.sacados === 1 ? 'estudiante quedó' : 'estudiantes quedaron'} sin grupo` : ''}.`);
+        } catch (err) { avisar(err.message, 'error'); }
     };
 
     // Al cambiar de grupo (o al recargar) se muestra lo que ese grupo tiene guardado.
@@ -127,7 +137,10 @@ const SeccionesGrupo = ({ version = 0, onGrupos, students = [], onCrear, onVer }
             <div className="sec-alumnos">
                 <div className="sec-alumnos-cabeza">
                     <h3><Users size={16} aria-hidden="true" /> Estudiantes de {actual.grupo ? `«${actual.grupo}»` : 'sin grupo'} ({delGrupo.length})</h3>
-                    {delGrupo.length > 0 && onVer && <button type="button" className="pro-link" onClick={() => onVer(actual.grupo)}>Ver en la lista de abajo</button>}
+                    <span className="sec-alumnos-acciones">
+                        {delGrupo.length > 0 && onVer && <button type="button" className="pro-link" onClick={() => onVer(actual.grupo)}>Ver en la lista de abajo</button>}
+                        {actual.grupo && <button type="button" className="pro-btn pro-btn--ghost adm-sm adm-danger" onClick={() => eliminar(actual)}><Trash2 size={15} aria-hidden="true" /> Eliminar grupo</button>}
+                    </span>
                 </div>
                 {delGrupo.length === 0
                     ? <p className="adm-muted">Este grupo aún no tiene estudiantes. Créalos aquí o asócialos desde «Mis estudiantes».</p>
@@ -161,7 +174,7 @@ const SeccionesGrupo = ({ version = 0, onGrupos, students = [], onCrear, onVer }
             <h3 className="sec-subtitulo"><ListChecks size={16} aria-hidden="true" /> Secciones que puede construir</h3>
             <p className="adm-muted">
                 Marca lo que <b>{actual.grupo ? `el grupo ${actual.grupo}` : 'los estudiantes sin grupo'}</b> puede construir ahora. En las demás solo verán la presentación de la clase, sin el constructor ni el asistente, para que nadie se adelante. «Mi proyecto» siempre está disponible.
-                {actual.estudiantes === 0 && actual.grupo ? <> Este grupo aún no tiene estudiantes: asócialos desde «Mis estudiantes». <button type="button" className="pro-link" onClick={() => eliminar(actual)}><Trash2 size={13} aria-hidden="true" /> Eliminar grupo</button></> : null}
+
             </p>
             <ol className="sec-lista">
                 {SECCIONES_MENU.map((s, i) => {

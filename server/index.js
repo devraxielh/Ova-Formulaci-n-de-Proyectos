@@ -2045,16 +2045,22 @@ app.post('/api/teacher/grupos', requireTeacher, (req, res) => {
     bitacora(req, 'Creó un grupo', nombre);
     return res.status(201).json({ grupos: estadoSecciones(req.user.id), todas: SECCIONES_MENU });
 });
-// Solo se elimina un grupo vacío: con estudiantes, primero se pasan a otro grupo.
+// Eliminar un grupo no borra a nadie: con `sacar`, sus estudiantes quedan sin grupo (y sin la restricción de ese grupo).
+// Sin `sacar`, un grupo con estudiantes no se toca.
 app.post('/api/teacher/grupos/eliminar', requireTeacher, (req, res) => {
     const nombre = grupoLimpio(req.body?.name);
     const mio = gruposDelProfesor(req.user.id).find((g) => g.grupo === nombre && nombre);
     if (!mio) return res.status(404).json({ error: 'Ese grupo no es tuyo.' });
-    if (mio.n > 0) return res.status(400).json({ error: `El grupo tiene ${mio.n} ${mio.n === 1 ? 'estudiante' : 'estudiantes'}: pásalos a otro grupo antes de eliminarlo.` });
-    db.prepare('DELETE FROM grupos WHERE name = ? AND teacher_id = ?').run(nombre, req.user.id);
-    db.prepare('DELETE FROM secciones_grupo WHERE teacher_id = ? AND grupo = ?').run(req.user.id, nombre);
-    bitacora(req, 'Eliminó un grupo', nombre);
-    return res.json({ grupos: estadoSecciones(req.user.id), todas: SECCIONES_MENU });
+    if (mio.n > 0 && req.body?.sacar !== true) return res.status(400).json({ error: `El grupo tiene ${mio.n} ${mio.n === 1 ? 'estudiante' : 'estudiantes'}: pásalos a otro grupo antes de eliminarlo.` });
+    db.transaction(() => {
+        db.prepare("UPDATE users SET grupo = '' WHERE role = 'student' AND teacher_id = ? AND grupo = ?").run(req.user.id, nombre);
+        db.prepare('DELETE FROM grupos WHERE name = ? AND teacher_id = ?').run(nombre, req.user.id);
+        db.prepare('DELETE FROM secciones_grupo WHERE teacher_id = ? AND grupo = ?').run(req.user.id, nombre);
+    })();
+    limpiarGruposVacios();
+    bitacora(req, 'Eliminó un grupo', mio.n > 0 ? `${nombre} (${mio.n} ${mio.n === 1 ? 'estudiante quedó' : 'estudiantes quedaron'} sin grupo)` : nombre);
+    const rows = db.prepare("SELECT * FROM users WHERE role = 'student' AND teacher_id = ? ORDER BY name COLLATE NOCASE").all(req.user.id);
+    return res.json({ grupos: estadoSecciones(req.user.id), todas: SECCIONES_MENU, sacados: mio.n, students: rows.map(filaEstudiante) });
 });
 app.get('/api/teacher/secciones', requireTeacher, (req, res) => res.json({ grupos: estadoSecciones(req.user.id), todas: SECCIONES_MENU }));
 app.put('/api/teacher/secciones', requireTeacher, (req, res) => {

@@ -223,7 +223,7 @@ const Profesor = () => {
                 {!mail && <p className="adm-muted">El servidor no tiene correo configurado: entrega tú la contraseña temporal a cada estudiante.</p>}
             </section>
 
-            <SeccionesGrupo version={students.map((x) => `${x.id}:${x.grupo || ''}`).join('|')} onGrupos={setGruposCreados} students={students} onCrear={crearEnGrupo} onVer={verGrupoEnLista} />
+            <SeccionesGrupo version={students.map((x) => `${x.id}:${x.grupo || ''}`).join('|')} onGrupos={setGruposCreados} students={students} onCrear={crearEnGrupo} onVer={verGrupoEnLista} onEstudiantes={setStudents} />
 
             <section className="pro-card cue" ref={listaRef}>
                 <div className="cue-cabeza">

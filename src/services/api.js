@@ -131,7 +131,7 @@ export const api = {
         // Secciones que cada grupo puede construir (null = todas).
         secciones: () => request('/teacher/secciones'),
         crearGrupo: (name) => request('/teacher/grupos', { method: 'POST', body: { name } }),
-        eliminarGrupo: (name) => request('/teacher/grupos/eliminar', { method: 'POST', body: { name } }),
+        eliminarGrupo: (name, sacar = false) => request('/teacher/grupos/eliminar', { method: 'POST', body: { name, sacar } }),
         guardarSecciones: (grupo, secciones) => request('/teacher/secciones', { method: 'PUT', body: { grupo, secciones } }),
     },
 };

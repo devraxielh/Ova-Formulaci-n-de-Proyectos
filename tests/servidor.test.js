@@ -1359,7 +1359,19 @@ test('el profesor crea un grupo vacío, le deja sus secciones y luego asocia est
     assert.equal(asociar.body.hechas, 1);
     assert.deepEqual((await eva.api('/auth/me')).body.user.secciones, ['ideacion']);
 
-    // Con estudiantes no se elimina; al sacarlos, el grupo creado a mano sigue ahí y entonces sí.
+    // Con estudiantes no se elimina sin pedirlo expresamente; con «sacar», quedan sin grupo y nadie se borra.
+    assert.equal((await profe.api('/teacher/grupos/eliminar', 'POST', { name: grupo })).status, 400);
+    const otroGrupo = `Temporal ${sello}`;
+    await profe.api('/teacher/students/bulk', 'POST', { ids: [alta.body.student.id], action: 'group', value: otroGrupo });
+    await profe.api('/teacher/secciones', 'PUT', { grupo: otroGrupo, secciones: ['titulo'] });
+    assert.deepEqual((await eva.api('/auth/me')).body.user.secciones, ['titulo']);
+    const borrado = await profe.api('/teacher/grupos/eliminar', 'POST', { name: otroGrupo, sacar: true });
+    assert.deepEqual([borrado.status, borrado.body.sacados], [200, 1]);
+    assert.equal(borrado.body.students.find((x) => x.id === alta.body.student.id).grupo, '');
+    assert.ok(!borrado.body.grupos.some((g) => g.grupo === otroGrupo));
+    assert.equal((await eva.api('/auth/me')).body.user.secciones, null); // ya no la limita ese grupo
+    assert.equal((await eva.api('/projects')).status, 200); // su cuenta sigue intacta
+    await profe.api('/teacher/students/bulk', 'POST', { ids: [alta.body.student.id], action: 'group', value: grupo });
     assert.equal((await profe.api('/teacher/grupos/eliminar', 'POST', { name: grupo })).status, 400);
     await profe.api('/teacher/students/bulk', 'POST', { ids: [alta.body.student.id], action: 'group', value: '' });
     assert.ok((await profe.api('/teacher/secciones')).body.grupos.some((g) => g.grupo === grupo && g.estudiantes === 0));

@@ -119,3 +119,4 @@
 .sec-filtro { display: flex; align-items: center; gap: 0.45rem; max-width: 24rem; color: #64748b; }
 .sec-filtro input { flex: 1; min-height: 2.4rem; }
 .sec-filtro small { white-space: nowrap; }
+.sec-alumnos-acciones { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
