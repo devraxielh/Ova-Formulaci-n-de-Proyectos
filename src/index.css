@@ -551,3 +551,10 @@ select:not([multiple]) {
 :where(select:not([multiple])):disabled { opacity: 0.55; cursor: not-allowed; }
 /* El pie del ingreso va debajo del contenido, nunca encima (en celular la tarjeta es más alta que la pantalla). */
 .app-acceso > * { flex-shrink: 0; }
+
+/* El administrador está dentro de la cuenta de otra persona */
+.app-prestada { position: fixed; right: 0.9rem; bottom: 0.9rem; z-index: 200; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; justify-content: flex-end; max-width: calc(100vw - 1.8rem); padding: 0.55rem 0.6rem 0.55rem 1rem; border-radius: 999px; background: #1e1b4b; color: #e0e7ff; font-size: 0.88rem; box-shadow: 0 10px 30px rgb(30 27 75 / 0.35); }
+.app-prestada b { color: #fff; }
+.app-prestada button { min-height: 2.25rem; padding: 0.35rem 0.9rem; border: 0; border-radius: 999px; background: #fff; color: #312e81; font: inherit; font-weight: 600; cursor: pointer; }
+.app-prestada button:disabled { opacity: 0.6; cursor: default; }
+@media (max-width: 640px) { .app-prestada { border-radius: 1rem; padding: 0.6rem 0.8rem; } }

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowLeft, ArrowUp, Ban, CheckCircle2, ChevronLeft, ChevronRight, Download, FileText, KeyRound, Mail, Pencil, RefreshCw, Search, UserCheck, ArrowRightLeft, Copy, RotateCcw, Trash2, UserPlus, Users, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Ban, CheckCircle2, ChevronLeft, ChevronRight, Download, FileText, KeyRound, LogIn, Mail, Pencil, RefreshCw, Search, UserCheck, ArrowRightLeft, Copy, RotateCcw, Trash2, UserPlus, Users, X } from 'lucide-react';
 import { api } from '../services/api';
 import { buildDocument } from '../services/projectDoc';
 import { DocumentPaper } from './ProjectDocument';
@@ -364,6 +364,14 @@ const Admin = () => {
             setAcceso({ cuentas: [{ name: user.name, email: user.email, clave: r.clave, emailSent: r.emailSent }], mail: r.emailSent });
         });
     };
+    // Entrar a la cuenta de otra persona: se ve la aplicación como ella la ve. Al terminar, «Volver a mi cuenta».
+    const entrarComo = async (user) => {
+        if (!(await confirmar({ texto: `¿Entrar a la cuenta de ${user.name}?`, detalle: 'Verás la aplicación como esa persona y lo que cambies quedará en sus proyectos. Queda anotado en la bitácora y dura hasta dos horas. Para regresar, usa «Volver a mi cuenta».', aceptar: 'Entrar a su cuenta' }))) return undefined;
+        return accion(async () => {
+            await api.admin.entrarComo(user.id);
+            window.location.reload();
+        });
+    };
     const guardarDatos = (event, user) => {
         event.preventDefault();
         return accion(async () => {
@@ -642,6 +650,7 @@ const Admin = () => {
                     )}
                     {!esAdmin && (
                         <footer className="adm-ficha-acciones">
+                            <button type="button" className="pro-btn pro-btn--ghost adm-sm" disabled={busy || user.status !== 'active'} title={user.status !== 'active' ? 'La cuenta debe estar activa para entrar' : 'Ver la aplicación como esta persona'} onClick={() => entrarComo(user)}><LogIn size={15} /> Entrar a su cuenta</button>
                             <button type="button" className="pro-btn pro-btn--ghost adm-sm" disabled={busy} onClick={() => newAccess(user)}><KeyRound size={15} /> Dar contraseña nueva</button>
                             <StatusActions user={user} onChange={changeStatus} onResend={resend} busy={busy} />
                             <button type="button" className="pro-btn pro-btn--ghost adm-sm adm-danger adm-eliminar" disabled={busy} onClick={() => eliminar(user)}><Trash2 size={15} /> Eliminar cuenta</button>

@@ -108,6 +108,20 @@ function App() {
         const r = boton.getBoundingClientRect();
         setPista({ texto, x: r.right + 10, y: r.top + r.height / 2 });
     };
+    // El administrador está dentro de la cuenta de otra persona: aviso fijo con el botón para regresar a la suya.
+    const [volviendo, setVolviendo] = useState(false);
+    const [errorVolver, setErrorVolver] = useState('');
+    const volverAMiCuenta = async () => {
+        setVolviendo(true);
+        setErrorVolver('');
+        try { await api.volver(); window.location.reload(); } catch (err) { setErrorVolver(err?.message || 'No se pudo volver.'); setVolviendo(false); }
+    };
+    const prestada = user?.comoAdmin ? (
+        <div className="app-prestada" role="status" title="Lo que cambies queda en los proyectos de esta persona">
+            <span>Estás en la cuenta de <b>{user.name}</b>{errorVolver ? `. ${errorVolver}` : ''}</span>
+            <button type="button" onClick={volverAMiCuenta} disabled={volviendo}>{volviendo ? 'Volviendo…' : 'Volver a mi cuenta'}</button>
+        </div>
+    ) : null;
     const isAdmin = user?.role === 'admin';
     const isTeacher = user?.role === 'teacher';
     // Invitado: solo las presentaciones de los módulos. No tiene «Mi proyecto» ni «Referencias».
@@ -295,6 +309,7 @@ function App() {
     if (sinCupo && !isAdmin && !isTeacher && !isGuest && !user.mustChangePassword) {
         return (
             <div className="app-acceso">
+                {prestada}
                 <section className="app-espera" role="status">
                     <Layers size={30} color="#4f46e5" aria-hidden="true" />
                     <h1>Tu cuenta está activa</h1>
@@ -312,6 +327,7 @@ function App() {
 
     return (
         <div className="app-container">
+            {prestada}
             <Avisos />
             {/* Mobile Header */}
             <header className="mobile-header">

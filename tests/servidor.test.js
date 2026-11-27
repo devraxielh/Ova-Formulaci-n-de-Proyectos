@@ -1210,3 +1210,46 @@ test('auditoría: IA solo con sesión, cuota por respuestas, contraseña tempora
         ia.close();
     }
 });
+
+test('el administrador entra a la cuenta de otra persona y vuelve a la suya', async () => {
+    const admin = await entrarAdmin();
+    const ana = await cuenta('suplida');
+    const pendiente = (await admin('/admin/users', 'POST', { name: 'Sin estrenar', email: `sin.estrenar.${Date.now()}@example.test`, role: 'student' })).body.user;
+    const yo = (await admin('/auth/me')).body.user;
+
+    // Solo el administrador puede, y nunca a sí mismo (la aplicación tiene un único administrador).
+    assert.equal((await ana.api(`/admin/users/${yo.id}/entrar`, 'POST')).status, 403);
+    assert.equal((await admin(`/admin/users/${yo.id}/entrar`, 'POST')).status, 400);
+    assert.equal((await admin('/auth/volver', 'POST')).status, 400); // no está en una cuenta ajena
+
+    const antes = (await admin('/admin/users')).body.users.find((u) => u.id === ana.id).lastLoginAt;
+    const entra = await admin(`/admin/users/${ana.id}/entrar`, 'POST');
+    assert.equal(entra.status, 200);
+    const dentro = (await admin('/auth/me')).body.user;
+    assert.deepEqual([dentro.id, dentro.comoAdmin, dentro.role], [ana.id, true, 'researcher']);
+    // Dentro: ya no es administrador, ve lo de esa persona y no puede cambiarle la contraseña.
+    assert.equal((await admin('/admin/users')).status, 403);
+    assert.equal((await admin('/projects', 'POST', { name: 'Hecho por el administrador', data: {} })).status, 201);
+    assert.equal((await admin('/auth/password', 'POST', { current: ana.password, next: clave() })).status, 403);
+    // La sesión de la persona sigue intacta y no lleva la marca.
+    assert.equal((await ana.api('/auth/me')).body.user.comoAdmin, undefined);
+    assert.equal((await ana.api('/projects')).body.projects.length, 1);
+
+    const vuelve = await admin('/auth/volver', 'POST');
+    assert.equal(vuelve.status, 200);
+    assert.equal((await admin('/auth/me')).body.user.id, yo.id);
+    assert.equal((await admin('/auth/volver', 'POST')).status, 400);
+    const fila = (await admin('/admin/users')).body.users.find((u) => u.id === ana.id);
+    assert.equal(fila.lastLoginAt, antes); // no cuenta como ingreso de esa persona
+    const registro = (await admin('/admin/log')).body.log.map((l) => l.action);
+    assert.ok(registro.includes('Entró a una cuenta') && registro.includes('Salió de una cuenta'));
+
+    // Con contraseña temporal sin cambiar: el administrador trabaja igual, y la persona sigue obligada a cambiarla.
+    assert.equal((await admin(`/admin/users/${pendiente.id}/entrar`, 'POST')).status, 200);
+    assert.equal((await admin('/auth/me')).body.user.mustChangePassword, false);
+    assert.equal((await admin('/auth/volver', 'POST')).status, 200);
+    assert.equal((await admin('/admin/users')).body.users.find((u) => u.id === pendiente.id).mustChangePassword, true);
+    // Bloqueada: no se entra.
+    assert.equal((await admin(`/admin/users/${pendiente.id}/status`, 'POST', { status: 'blocked' })).status, 200);
+    assert.equal((await admin(`/admin/users/${pendiente.id}/entrar`, 'POST')).status, 400);
+});

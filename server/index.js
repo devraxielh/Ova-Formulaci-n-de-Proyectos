@@ -104,6 +104,8 @@ const addColumn = (table, column, definition) => {
     if (!exists) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 };
 addColumn('users', 'role', "TEXT NOT NULL DEFAULT 'student'");
+// Sesión abierta por un administrador dentro de la cuenta de otra persona: guarda quién la abrió.
+addColumn('sessions', 'admin_id', 'INTEGER');
 addColumn('users', 'status', "TEXT NOT NULL DEFAULT 'active'"); // pending | active | blocked
 addColumn('users', 'must_change_password', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('users', 'last_login_at', 'TEXT');
@@ -229,12 +231,15 @@ const setSessionCookie = (res, token, maxAgeSeconds) => {
     res.setHeader('Set-Cookie', parts.join('; '));
 };
 
-const createSession = (res, userId) => {
+// `adminId`: la sesión la abre un administrador dentro de la cuenta de otra persona. Dura poco y no cuenta
+// como ingreso de esa persona (no cambia su «último ingreso»).
+const SUPLENCIA_HORAS = 2;
+const createSession = (res, userId, { adminId = null } = {}) => {
     const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = Date.now() + SESSION_DAYS * 86400 * 1000;
-    db.prepare('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)').run(sha256(token), userId, expiresAt);
-    db.prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?").run(userId);
-    setSessionCookie(res, token, SESSION_DAYS * 86400);
+    const segundos = adminId ? SUPLENCIA_HORAS * 3600 : SESSION_DAYS * 86400;
+    db.prepare('INSERT INTO sessions (token_hash, user_id, expires_at, admin_id) VALUES (?, ?, ?, ?)').run(sha256(token), userId, Date.now() + segundos * 1000, adminId);
+    if (!adminId) db.prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?").run(userId);
+    setSessionCookie(res, token, segundos);
 };
 
 // «Entrar como invitado» (sin cuenta propia): todas esas visitas usan esta cuenta compartida, con rol de invitado.
@@ -250,6 +255,7 @@ const publicUser = (user) => ({
     mustChangePassword: Boolean(user.must_change_password),
     projectLimit: user.role === 'admin' ? MAX_PROJECTS : Number(user.project_limit) || 0,
     ...(user.email === INVITADO_COMUN ? { comun: true } : {}), // la cuenta compartida del botón «Entrar como invitado»
+    ...(user.admin_id ? { comoAdmin: true } : {}), // un administrador está dentro de esta cuenta
 });
 
 const ROLES = ['admin', 'teacher', 'student', 'researcher', 'guest'];
@@ -629,10 +635,12 @@ app.use((req, _res, next) => {
     const token = readCookie(req, SESSION_COOKIE);
     if (token) {
         const row = db.prepare(`
-            SELECT users.id, users.email, users.name, users.role, users.status, users.must_change_password, users.project_limit, users.grupo, users.ai_limit, sessions.expires_at
+            SELECT users.id, users.email, users.name, users.role, users.status, users.must_change_password, users.project_limit, users.grupo, users.ai_limit, sessions.expires_at, sessions.admin_id
             FROM sessions JOIN users ON users.id = sessions.user_id
             WHERE sessions.token_hash = ?`).get(sha256(token));
         if (row && row.expires_at > Date.now() && row.status === 'active') {
+            // El administrador que entra por otra persona no conoce su contraseña temporal: trabaja sin ese paso.
+            if (row.admin_id) row.must_change_password = 0;
             req.user = row;
             req.sessionHash = sha256(token);
         }
@@ -781,8 +789,40 @@ app.post('/api/auth/logout', (req, res) => {
 
 app.get('/api/auth/me', (req, res) => res.json({ user: req.user ? publicUser(req.user) : null }));
 
+// El administrador entra a la cuenta de otra persona para ver lo que ella ve y ayudarla. Queda en la bitácora,
+// dura dos horas y no sirve para entrar a otro administrador. Su propia sesión se cierra mientras tanto.
+app.post('/api/admin/users/:id/entrar', requireAdmin, rateLimit({ name: 'entrar-como', limit: 40, windowMs: 10 * 60 * 1000, key: (req) => String(req.user?.id || req.ip) }), (req, res) => {
+    const target = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(req.params.id));
+    if (!target) return res.status(404).json({ error: 'No se encontró el usuario.' });
+    if (target.id === req.user.id) return res.status(400).json({ error: 'Ya estás en tu propia cuenta.' });
+    if (target.role === 'admin') return res.status(403).json({ error: 'No se puede entrar a la cuenta de otro administrador.' });
+    if (target.status !== 'active') return res.status(400).json({ error: target.status === 'blocked' ? 'La cuenta está bloqueada: desbloquéala para entrar.' : 'La cuenta aún no está activa: actívala para entrar.' });
+    bitacora(req, 'Entró a una cuenta', `${target.name} (${target.email})`);
+    db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(req.sessionHash);
+    createSession(res, target.id, { adminId: req.user.id });
+    return res.json({ user: publicUser({ ...target, must_change_password: 0, admin_id: req.user.id }) });
+});
+
+// Vuelve a la cuenta del administrador que abrió la sesión prestada (si sigue siendo administrador activo).
+app.post('/api/auth/volver', requireUser, authLimit, (req, res) => {
+    if (!req.user.admin_id) return res.status(400).json({ error: 'Esta sesión no fue abierta por un administrador.' });
+    const admin = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.admin_id);
+    db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(req.sessionHash);
+    if (!admin || admin.role !== 'admin' || admin.status !== 'active') {
+        setSessionCookie(res, '', 0);
+        return res.status(403).json({ error: 'Tu cuenta de administrador ya no está disponible. Inicia sesión de nuevo.' });
+    }
+    try {
+        db.prepare('INSERT INTO admin_log (created_at, actor_id, actor, action, detail) VALUES (?, ?, ?, ?, ?)')
+            .run(Date.now(), admin.id, String(admin.name).slice(0, 80), 'Salió de una cuenta', `${req.user.name} (${req.user.email})`.slice(0, 400));
+    } catch { /* la bitácora nunca tumba la solicitud */ }
+    createSession(res, admin.id);
+    return res.json({ user: publicUser(admin) });
+});
+
 app.post('/api/auth/password', requireUser, authLimit, (req, res) => {
     if (esInvitadoComun(req.user)) return res.status(400).json({ error: 'La cuenta de invitado es compartida: no tiene contraseña.' });
+    if (req.user.admin_id) return res.status(403).json({ error: 'Estás dentro de la cuenta de otra persona: su contraseña solo la cambia ella.' });
     const current = String(req.body?.current || '');
     const next = String(req.body?.next || '');
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);

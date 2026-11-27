@@ -35,6 +35,8 @@ export const api = {
     login: (payload) => request('/auth/login', { method: 'POST', body: payload }),
     guest: () => request('/auth/guest', { method: 'POST' }),
     logout: () => request('/auth/logout', { method: 'POST' }),
+    // Sale de la cuenta ajena a la que entró el administrador y vuelve a la suya.
+    volver: () => request('/auth/volver', { method: 'POST' }),
     verify: (token) => request('/auth/verify', { method: 'POST', body: { token } }),
     resend: (email) => request('/auth/resend', { method: 'POST', body: { email } }),
     changePassword: (payload) => request('/auth/password', { method: 'POST', body: payload }),
@@ -82,6 +84,8 @@ export const api = {
         setLimit: (id, limit) => request(`/admin/users/${id}/limit`, { method: 'POST', body: { limit } }),
         setStatus: (id, status) => request(`/admin/users/${id}/status`, { method: 'POST', body: { status } }),
         resend: (id) => request(`/admin/users/${id}/resend`, { method: 'POST' }),
+        // Entra a la cuenta de otra persona (queda en la bitácora). Después hay que recargar la página.
+        entrarComo: (id) => request(`/admin/users/${id}/entrar`, { method: 'POST' }),
         // Cuentas: solo el administrador las crea (una a una o por lotes), asigna el rol y renueva el acceso.
         createUser: (payload) => request('/admin/users', { method: 'POST', body: payload }),
         createBatch: (users, opciones = {}) => request('/admin/users/batch', { method: 'POST', body: { users, ...opciones } }),
