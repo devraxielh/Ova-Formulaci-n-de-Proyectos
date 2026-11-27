@@ -258,19 +258,31 @@ const Constructor = ({ intro, onNavigate }) => {
 
             setPunta('Redactando conclusiones y recomendaciones…');
             let conConclusiones = false;
-            try {
-                const conc = await recomendarConclusiones({ data, especificos, resultados: res });
-                const tx = redactarConclusiones(conc, especificos);
-                setField('conclusionesForm', { ...conc, sugeridas: true });
-                setField('conclusiones', tx.conclusiones);
-                setField('recomendaciones', tx.recomendaciones);
-                conConclusiones = Boolean(tx.conclusiones);
-            } catch { /* los resultados quedan; las conclusiones se pueden pedir en su módulo */ }
+            // Es la tercera solicitud seguida a la IA, y el servicio limita cuánto cabe por minuto: si falla,
+            // se espera y se intenta una vez más antes de dejar las conclusiones para su módulo.
+            for (let intento = 0; intento < 2 && !conConclusiones; intento += 1) {
+                try {
+                    if (intento) {
+                        setPunta('La IA está ocupada: reintentando las conclusiones en unos segundos…');
+                        // eslint-disable-next-line no-await-in-loop
+                        await new Promise((ok) => { setTimeout(ok, 20000); });
+                    }
+                    // eslint-disable-next-line no-await-in-loop
+                    const conc = await recomendarConclusiones({ data, especificos, resultados: res });
+                    const tx = redactarConclusiones(conc, especificos);
+                    setField('conclusionesForm', { ...conc, sugeridas: true });
+                    setField('conclusiones', tx.conclusiones);
+                    setField('recomendaciones', tx.recomendaciones);
+                    conConclusiones = Boolean(tx.conclusiones);
+                } catch (err) {
+                    if (err?.code === 'cuota_ia') break; // la cuota del día se agotó: reintentar no sirve
+                }
+            }
             setDatos(null);
             reunir().catch(() => {});
             setPunta('');
             const nFig = nuevos.length - an.tablas.length;
-            avisar(`Listo con ${[an.n ? `${an.n} respuestas` : '', cual.fragmentos ? `${cual.fragmentos} fragmentos de ${cual.n} ${cual.n === 1 ? 'entrevista' : 'entrevistas'}` : ''].filter(Boolean).join(' y ')}: ${an.tablas.length} ${an.tablas.length === 1 ? 'tabla' : 'tablas'}${nFig ? ` y ${nFig} ${nFig === 1 ? 'figura' : 'figuras'}` : ''} en Resultados, resultados y discusión redactados${conConclusiones ? ' y conclusiones escritas' : ''}.${sinMedir.length ? ` Sin datos para ${sinMedir.length === 1 ? `el objetivo ${sinMedir[0]}` : `los objetivos ${sinMedir.join(', ')}`}: ninguna pregunta de la encuesta ${sinMedir.length === 1 ? 'lo mide' : 'los mide'}.` : ''} Revisa cada cifra contra sus tablas.`);
+            avisar(`Listo con ${[an.n ? `${an.n} respuestas` : '', cual.fragmentos ? `${cual.fragmentos} fragmentos de ${cual.n} ${cual.n === 1 ? 'entrevista' : 'entrevistas'}` : ''].filter(Boolean).join(' y ')}: ${an.tablas.length} ${an.tablas.length === 1 ? 'tabla' : 'tablas'}${nFig ? ` y ${nFig} ${nFig === 1 ? 'figura' : 'figuras'}` : ''} en Resultados, resultados y discusión redactados${conConclusiones ? ' y conclusiones escritas.' : '. Las conclusiones no se pudieron redactar ahora: ábrelas en «Conclusiones» para redactarlas.'}${sinMedir.length ? ` Sin datos para ${sinMedir.length === 1 ? `el objetivo ${sinMedir[0]}` : `los objetivos ${sinMedir.join(', ')}`}: ninguna pregunta de la encuesta ${sinMedir.length === 1 ? 'lo mide' : 'los mide'}.` : ''} Revisa cada cifra contra sus tablas.`);
         } catch (err) {
             setPunta('');
             avisar(err?.message && !/JSON/.test(err.message) ? `No se pudo completar: ${err.message}` : 'No se pudo completar la redacción. Las tablas que ya se armaron quedan en Resultados; inténtalo de nuevo.', 'error');

@@ -5,6 +5,7 @@ import { groq } from '../../services/api';
 import { buildDocument, documentText } from '../../services/projectDoc';
 import { partesObjetivos } from '../../services/coherencia';
 import './RevisarIA.css';
+import { nivelDeRevision } from '../../services/revisionNivel';
 
 /*
  * Botón «Revisar con IA» de la barra de las clases: lee lo que el estudiante guardó en la sección abierta
@@ -51,16 +52,17 @@ const pedirRevision = async ({ tab, etiqueta, texto, data }) => {
     const content = r.choices?.[0]?.message?.content || '';
     const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
     const lista = (v) => (Array.isArray(v) ? v : []);
+    const observaciones = lista(json.observaciones).map((o) => ({
+        tipo: TIPOS[o?.tipo] ? o.tipo : 'redaccion',
+        donde: String(o?.donde || '').trim(),
+        problema: String(o?.problema || '').trim(),
+        como: String(o?.como || '').trim(),
+    })).filter((o) => o.problema).slice(0, 8);
     return {
         valoracion: String(json.valoracion || '').trim(),
-        nivel: ['lista', 'casi', 'falta'].includes(json.nivel) ? json.nivel : 'casi',
+        nivel: nivelDeRevision(json.nivel, observaciones),
         fortalezas: lista(json.fortalezas).map((x) => String(x).trim()).filter(Boolean).slice(0, 3),
-        observaciones: lista(json.observaciones).map((o) => ({
-            tipo: TIPOS[o?.tipo] ? o.tipo : 'redaccion',
-            donde: String(o?.donde || '').trim(),
-            problema: String(o?.problema || '').trim(),
-            como: String(o?.como || '').trim(),
-        })).filter((o) => o.problema).slice(0, 8),
+        observaciones,
     };
 };
 
