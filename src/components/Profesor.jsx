@@ -16,7 +16,7 @@ import './Cuentas.css';
  * proyectos y supervisa los que tengan (los abre en solo lectura, con su coherencia).
  */
 
-const SIN_GRUPO = '—';
+const SIN_GRUPO = '__sin_grupo__'; // valor del filtro «Sin grupo» (no choca con un grupo de verdad)
 
 const formatDate = (value) => {
     if (!value) return 'nunca';
@@ -115,6 +115,11 @@ const Profesor = () => {
     // Estudiantes marcados para asociarlos a un grupo de una sola vez.
     const [marcados, setMarcados] = useState([]);
     const [grupoDestino, setGrupoDestino] = useState('');
+    // Si se elimina un grupo, el filtro y el destino de «Asociar» no se quedan apuntando a él (lo recrearían).
+    useEffect(() => {
+        if (grupoDestino && !grupos.includes(grupoDestino)) setGrupoDestino('');
+        if (fGrupo && fGrupo !== SIN_GRUPO && !grupos.includes(fGrupo)) setFGrupo('');
+    }, [grupos, grupoDestino, fGrupo]);
     const alternarMarcado = (id) => setMarcados((m) => (m.includes(id) ? m.filter((x) => x !== id) : [...m, id]));
     const visibles = useMemo(() => {
         const q = query.trim().toLowerCase();
@@ -223,7 +228,7 @@ const Profesor = () => {
                 {!mail && <p className="adm-muted">El servidor no tiene correo configurado: entrega tú la contraseña temporal a cada estudiante.</p>}
             </section>
 
-            <SeccionesGrupo version={students.map((x) => `${x.id}:${x.grupo || ''}`).join('|')} onGrupos={setGruposCreados} students={students} onCrear={crearEnGrupo} onVer={verGrupoEnLista} onEstudiantes={setStudents} />
+            <SeccionesGrupo version={students.map((x) => `${x.id}:${x.grupo || ''}`).join('|')} onGrupos={setGruposCreados} students={students} onCrear={crearEnGrupo} onVer={verGrupoEnLista} onEstudiantes={setStudents} permitir={form.permitir} />
 
             <section className="pro-card cue" ref={listaRef}>
                 <div className="cue-cabeza">

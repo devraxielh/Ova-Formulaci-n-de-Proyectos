@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, Circle, Clipboard, Link2, X } from 'lucide-react';
 import { evaluarCoherencia } from '../services/coherencia';
 import Arreglar, { sePuedeArreglar } from './CoherenciaArreglar';
+import { useProject } from '../context/ProjectContext';
+import { seccionesBloqueadas } from '../data/secciones';
 import './Proyecto.css';
 
 const NOMBRE_TAB = {
@@ -17,6 +19,9 @@ const NOMBRE_TAB = {
  */
 const Coherencia = ({ data, onNavigate, compacto = false, enVentana = false, titulo = 'Coherencia entre secciones' }) => {
     const coherencia = useMemo(() => evaluarCoherencia(data || {}), [data]);
+    // Un estudiante no arregla con IA una sección que su profesor aún no habilita.
+    const { user } = useProject();
+    const bloqueadas = useMemo(() => seccionesBloqueadas(user), [user]);
     const [abierto, setAbierto] = useState({});
     const [copiado, setCopiado] = useState('');
     const [ventana, setVentana] = useState(false);
@@ -88,7 +93,7 @@ const Coherencia = ({ data, onNavigate, compacto = false, enVentana = false, tit
                                         </div>
                                     )}
                                     {/* Solo en la vista del estudiante (con onNavigate): el administrador no cambia proyectos ajenos. */}
-                                    {onNavigate && sePuedeArreglar(check.id) && <Arreglar check={check} data={data} />}
+                                    {onNavigate && sePuedeArreglar(check.id) && !bloqueadas.has(check.tab) && <Arreglar check={check} data={data} />}
                                     {onNavigate && (
                                         <button type="button" className="pro-btn pro-btn--ghost pro-coh-go" onClick={() => { setVentana(false); onNavigate(check.tab); }}>
                                             Ir a {NOMBRE_TAB[check.tab] || 'la sección'} <ArrowRight size={14} aria-hidden="true" />

@@ -426,8 +426,12 @@ try { db.prepare('DELETE FROM usage_daily WHERE day < ?').run(diaDe(Date.now() -
 
 const bitacora = (req, action, detail = '') => {
     try {
+        // Si un administrador está dentro de la cuenta de otra persona, lo que hace queda a su nombre, no al de ella.
+        const admin = req.user?.admin_id ? db.prepare('SELECT id, name FROM users WHERE id = ?').get(req.user.admin_id) : null;
+        const actorId = admin ? admin.id : req.user?.id ?? null;
+        const actor = admin ? `${admin.name} (en la cuenta de ${req.user.name})` : String(req.user?.name || 'Sistema');
         db.prepare('INSERT INTO admin_log (created_at, actor_id, actor, action, detail) VALUES (?, ?, ?, ?, ?)')
-            .run(Date.now(), req.user?.id ?? null, String(req.user?.name || 'Sistema').slice(0, 80), String(action).slice(0, 60), String(detail || '').slice(0, 400));
+            .run(Date.now(), actorId, actor.slice(0, 80), String(action).slice(0, 60), String(detail || '').slice(0, 400));
         db.prepare('DELETE FROM admin_log WHERE id NOT IN (SELECT id FROM admin_log ORDER BY id DESC LIMIT 3000)').run();
     } catch { /* el registro nunca debe tumbar la solicitud */ }
 };
@@ -470,6 +474,13 @@ const limiteValido = (v) => { const n = parseInt(v, 10); return Number.isInteger
 // Profesor de un grupo: sus estudiantes quedan a su cargo; el anterior queda en el historial con sus fechas.
 const ponerProfesorDeGrupo = (grupo, prof, actor) => db.transaction(() => {
     const ahora = Date.now();
+    // Las secciones que el profesor anterior habilitó para el grupo pasan al nuevo (si este no tenía las suyas).
+    // El profesor anterior: el del grupo o, si el grupo no tenía fila propia, el de sus estudiantes.
+    const antes = db.prepare('SELECT teacher_id FROM grupos WHERE name = ?').get(grupo)?.teacher_id
+        || db.prepare("SELECT teacher_id FROM users WHERE grupo = ? AND role = 'student' AND teacher_id IS NOT NULL LIMIT 1").get(grupo)?.teacher_id;
+    if (prof && antes && antes !== prof.id && !db.prepare('SELECT 1 FROM secciones_grupo WHERE teacher_id = ? AND grupo = ?').get(prof.id, grupo)) {
+        db.prepare('UPDATE secciones_grupo SET teacher_id = ? WHERE teacher_id = ? AND grupo = ?').run(prof.id, antes, grupo);
+    }
     db.prepare('INSERT INTO grupos (name, teacher_id) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET teacher_id = excluded.teacher_id').run(grupo, prof ? prof.id : null);
     db.prepare('UPDATE grupo_profesores SET hasta = ? WHERE grupo = ? AND hasta IS NULL').run(ahora, grupo);
     if (prof) db.prepare('INSERT INTO grupo_profesores (grupo, teacher_id, teacher, desde, actor) VALUES (?, ?, ?, ?, ?)').run(grupo, prof.id, prof.name, ahora, String(actor || '').slice(0, 80));
@@ -1464,7 +1475,16 @@ app.post('/api/admin/groups/rename', requireAdmin, (req, res) => {
     const n = db.prepare('SELECT COUNT(*) AS n FROM users WHERE grupo = ?').get(from).n;
     if (!n) return res.status(404).json({ error: 'No hay cuentas en ese grupo.' });
     const unido = to ? db.prepare('SELECT COUNT(*) AS n FROM users WHERE grupo = ?').get(to).n > 0 : false;
+    // Un grupo que un profesor creó y aún no tiene estudiantes también existe: no se pisa al renombrar.
+    if (to && !unido && db.prepare('SELECT 1 FROM grupos WHERE name = ? AND creado = 1').get(to)) return res.status(400).json({ error: `Ya existe el grupo «${to}», creado por un profesor y todavía sin estudiantes. Usa otro nombre o pídele que lo elimine.` });
     db.transaction(() => {
+        // Las secciones habilitadas siguen al grupo: con el nombre nuevo; al unir, mandan las del grupo de destino.
+        if (to && !unido) {
+            db.prepare('DELETE FROM secciones_grupo WHERE grupo = ?').run(to);
+            db.prepare('UPDATE secciones_grupo SET grupo = ? WHERE grupo = ?').run(to, from);
+        } else {
+            db.prepare('DELETE FROM secciones_grupo WHERE grupo = ?').run(from);
+        }
         db.prepare('UPDATE users SET grupo = ? WHERE grupo = ?').run(to, from);
         const propio = db.prepare('SELECT * FROM grupos WHERE name = ?').get(from);
         if (!to) {
@@ -1492,10 +1512,11 @@ app.get('/api/admin/groups', requireAdmin, (_req, res) => {
     const propios = new Map(db.prepare('SELECT g.*, u.name AS teacher FROM grupos g LEFT JOIN users u ON u.id = g.teacher_id').all().map((r) => [r.name, r]));
     const historial = db.prepare('SELECT grupo, teacher, teacher_id, desde, hasta, actor FROM grupo_profesores ORDER BY desde DESC, id DESC').all();
     res.json({
-        groups: [...cuentas.keys()].sort((a, b) => a.localeCompare(b, 'es', { numeric: true })).map((name) => ({
+        groups: [...new Set([...cuentas.keys(), ...[...propios.values()].filter((g) => g.creado).map((g) => g.name)])].sort((a, b) => a.localeCompare(b, 'es', { numeric: true })).map((name) => ({
             name,
-            cuentas: cuentas.get(name).n,
-            estudiantes: cuentas.get(name).est,
+            cuentas: cuentas.get(name)?.n || 0,
+            estudiantes: cuentas.get(name)?.est || 0,
+            creado: Boolean(propios.get(name)?.creado),
             teacherId: propios.get(name)?.teacher_id || null,
             teacherName: propios.get(name)?.teacher || '',
             aiLimit: propios.get(name)?.ai_limit ?? null,
@@ -1508,7 +1529,7 @@ app.get('/api/admin/groups', requireAdmin, (_req, res) => {
 // Asignar (o quitar) el profesor de un grupo: todos sus estudiantes pasan a su cargo.
 app.post('/api/admin/groups/teacher', requireAdmin, (req, res) => {
     const grupo = grupoLimpio(req.body?.grupo);
-    if (!grupo || !db.prepare('SELECT 1 FROM users WHERE grupo = ?').get(grupo)) return res.status(404).json({ error: 'No hay cuentas en ese grupo.' });
+    if (!grupo || !(db.prepare('SELECT 1 FROM users WHERE grupo = ?').get(grupo) || db.prepare('SELECT 1 FROM grupos WHERE name = ? AND creado = 1').get(grupo))) return res.status(404).json({ error: 'No existe ese grupo.' });
     const prof = req.body?.teacherId ? db.prepare("SELECT id, name FROM users WHERE id = ? AND role = 'teacher'").get(Number(req.body.teacherId)) : null;
     if (req.body?.teacherId && !prof) return res.status(400).json({ error: 'El profesor indicado no existe.' });
     const antes = db.prepare('SELECT u.id, u.name FROM grupos g JOIN users u ON u.id = g.teacher_id WHERE g.name = ?').get(grupo);
@@ -1521,7 +1542,7 @@ app.post('/api/admin/groups/teacher', requireAdmin, (req, res) => {
 // Cuota de IA de un grupo (null = la general).
 app.post('/api/admin/groups/ai-limit', requireAdmin, (req, res) => {
     const grupo = grupoLimpio(req.body?.grupo);
-    if (!grupo || !db.prepare('SELECT 1 FROM users WHERE grupo = ?').get(grupo)) return res.status(404).json({ error: 'No hay cuentas en ese grupo.' });
+    if (!grupo || !(db.prepare('SELECT 1 FROM users WHERE grupo = ?').get(grupo) || db.prepare('SELECT 1 FROM grupos WHERE name = ? AND creado = 1').get(grupo))) return res.status(404).json({ error: 'No existe ese grupo.' });
     const quitar = req.body?.limit === null || req.body?.limit === '';
     const limite = quitar ? null : limiteValido(req.body?.limit);
     if (!quitar && limite === null) return res.status(400).json({ error: `La cuota debe estar entre 0 y ${AI_DIARIO_MAX} solicitudes por día.` });
@@ -2041,7 +2062,13 @@ app.post('/api/teacher/grupos', requireTeacher, (req, res) => {
     if (!nombre) return res.status(400).json({ error: 'Escribe el nombre del grupo.' });
     const ajenos = db.prepare("SELECT COUNT(*) AS n FROM users WHERE grupo = ? AND (role != 'student' OR teacher_id IS NULL OR teacher_id != ?)").get(nombre, req.user.id).n;
     if (grupoDeOtroProfesor(nombre, req.user.id) || ajenos > 0) return res.status(400).json({ error: GRUPO_AJENO });
-    db.prepare('INSERT INTO grupos (name, teacher_id, creado) VALUES (?, ?, 1) ON CONFLICT(name) DO UPDATE SET teacher_id = excluded.teacher_id, creado = 1').run(nombre, req.user.id);
+    db.transaction(() => {
+        db.prepare('INSERT INTO grupos (name, teacher_id, creado) VALUES (?, ?, 1) ON CONFLICT(name) DO UPDATE SET teacher_id = excluded.teacher_id, creado = 1').run(nombre, req.user.id);
+        // Queda en el historial de profesores del grupo, como cuando lo asigna el administrador.
+        if (!db.prepare('SELECT 1 FROM grupo_profesores WHERE grupo = ? AND teacher_id = ? AND hasta IS NULL').get(nombre, req.user.id)) {
+            db.prepare('INSERT INTO grupo_profesores (grupo, teacher_id, teacher, desde, actor) VALUES (?, ?, ?, ?, ?)').run(nombre, req.user.id, req.user.name, Date.now(), String(req.user.name).slice(0, 80));
+        }
+    })();
     bitacora(req, 'Creó un grupo', nombre);
     return res.status(201).json({ grupos: estadoSecciones(req.user.id), todas: SECCIONES_MENU });
 });
@@ -2054,7 +2081,11 @@ app.post('/api/teacher/grupos/eliminar', requireTeacher, (req, res) => {
     if (mio.n > 0 && req.body?.sacar !== true) return res.status(400).json({ error: `El grupo tiene ${mio.n} ${mio.n === 1 ? 'estudiante' : 'estudiantes'}: pásalos a otro grupo antes de eliminarlo.` });
     db.transaction(() => {
         db.prepare("UPDATE users SET grupo = '' WHERE role = 'student' AND teacher_id = ? AND grupo = ?").run(req.user.id, nombre);
-        db.prepare('DELETE FROM grupos WHERE name = ? AND teacher_id = ?').run(nombre, req.user.id);
+        // Si en el grupo quedan otras cuentas (de otro profesor o investigadores), se conserva su fila y su cuota de IA:
+        // solo deja de estar a cargo de este profesor.
+        if (db.prepare('SELECT 1 FROM users WHERE grupo = ?').get(nombre)) db.prepare('UPDATE grupos SET teacher_id = NULL, creado = 0 WHERE name = ? AND teacher_id = ?').run(nombre, req.user.id);
+        else db.prepare('DELETE FROM grupos WHERE name = ? AND teacher_id = ?').run(nombre, req.user.id);
+        db.prepare('UPDATE grupo_profesores SET hasta = ? WHERE grupo = ? AND teacher_id = ? AND hasta IS NULL').run(Date.now(), nombre, req.user.id);
         db.prepare('DELETE FROM secciones_grupo WHERE teacher_id = ? AND grupo = ?').run(req.user.id, nombre);
     })();
     limpiarGruposVacios();
@@ -2252,7 +2283,7 @@ app.post('/api/admin/backups', requireAdmin, async (_req, res) => {
 // Restaurar una copia: deja usuarios, proyectos, versiones, figuras y encuestas como estaban ese día.
 // Exige escribir RESTAURAR y la contraseña del administrador; antes guarda una copia del estado actual.
 // No se reinicia el servidor: los datos se cambian dentro de una sola transacción (si algo falla, no cambia nada).
-const TABLAS_RESTAURAR = ['users', 'projects', 'project_members', 'project_versions', 'project_files', 'surveys', 'survey_responses', 'deleted_users', 'grupos', 'grupo_profesores'];
+const TABLAS_RESTAURAR = ['users', 'projects', 'project_members', 'project_versions', 'project_files', 'surveys', 'survey_responses', 'deleted_users', 'grupos', 'grupo_profesores', 'secciones_grupo'];
 let restaurando = false;
 app.post('/api/admin/backups/:name/restore', requireAdmin, rateLimit({ name: 'restaurar', limit: 6, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const found = [...listBackups(), ...listSafety()].find((b) => b.name === req.params.name);

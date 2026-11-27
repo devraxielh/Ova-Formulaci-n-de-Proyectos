@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useContext } from 'react';
+import { SoloPresentacion } from '../context/SoloPresentacion';
 import {
     AlertTriangle, ArrowLeft, ArrowRight, BookOpen, CheckCircle2, Clipboard, Clock, Compass, Cpu, Database,
     MapPin, Maximize2, Minimize2, Pause, Play, RotateCcw, Search, Users, Wallet, Wrench, XCircle,
@@ -108,15 +109,19 @@ const buildFicha = (wb) => [
 
 /* ---------- Piezas reutilizables ---------- */
 
-const Campo = ({ id, label, value, onChange, placeholder, hint, autofill, multiline = false, rows = 3 }) => (
-    <div className="input-group">
+// En una sección que el profesor aún no habilita, los campos de las diapositivas se ven pero no se editan.
+const Campo = ({ id, label, value, onChange, placeholder, hint, autofill, multiline = false, rows = 3 }) => {
+    const soloVer = Boolean(useContext(SoloPresentacion));
+    return (
+    <fieldset disabled={soloVer} className="input-group" style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
         <label htmlFor={id}>{label}</label>
         {multiline
             ? <textarea id={id} className="textarea-field" rows={rows} value={value} onChange={onChange} placeholder={placeholder} data-autofill={autofill} aria-describedby={hint ? `${id}-ayuda` : undefined} />
             : <input id={id} type="text" className="input-field" value={value} onChange={onChange} placeholder={placeholder} data-autofill={autofill} aria-describedby={hint ? `${id}-ayuda` : undefined} />}
         {hint && <small className="ide-field-hint" id={`${id}-ayuda`}>{hint}</small>}
-    </div>
-);
+    </fieldset>
+    );
+};
 
 /* ---------- Contenido de los ejercicios ---------- */
 

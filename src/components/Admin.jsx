@@ -397,14 +397,16 @@ const Admin = () => {
                 for (const fig of figuras || []) {
                     const destino = elementos.find((e) => e.id === fig.id);
                     if (!destino) continue;
-                    const canvas = dibujarBarras(fig.variable);
-                    // eslint-disable-next-line no-await-in-loop
-                    const { file } = await api.uploadFile(nuevo.id, { mime: 'image/png', data: canvas.toDataURL('image/png').split(',')[1] });
-                    Object.assign(destino, { fileId: file.id, w: canvas.width, h: canvas.height });
-                    conFiguras += 1;
+                    try {
+                        const canvas = dibujarBarras(fig.variable);
+                        // eslint-disable-next-line no-await-in-loop
+                        const { file } = await api.uploadFile(nuevo.id, { mime: 'image/png', data: canvas.toDataURL('image/png').split(',')[1] });
+                        Object.assign(destino, { fileId: file.id, w: canvas.width, h: canvas.height });
+                        conFiguras += 1;
+                    } catch { /* esa figura no: siguen las demás */ }
                 }
                 if (conFiguras) await api.updateProject(nuevo.id, { patch: { elementos }, force: true });
-            } catch { /* sin figuras: el proyecto queda con sus tablas y se pueden generar desde Resultados */ }
+            } catch { conFiguras = 0; /* sin figuras: el proyecto queda con sus tablas y se pueden generar desde Resultados */ }
             setProjects(null);
             load();
             refreshProjects().catch(() => { /* la lista de «Mi proyecto» se actualiza al recargar */ });

@@ -26,12 +26,13 @@ const evaluarSeccion = async (id, diag) => {
     for (let intento = 0; intento < 2; intento += 1) {
         try {
             // eslint-disable-next-line no-await-in-loop
-            const r = await api.chat({ messages: mensajes, temperature: 0.2, max_tokens: 1600, response_format: { type: 'json_object' } });
+            const r = await api.chat({ messages: mensajes, temperature: 0.2, max_tokens: 1300, response_format: { type: 'json_object' } });
             return leerEvaluacion(id, r?.choices?.[0]?.message?.content || '');
         } catch (err) {
             if (intento === 1 || err?.code === 'cuota_ia' || err?.status === 401 || err?.status === 403) throw err;
+            // El servicio de IA limita el texto por minuto: se da tiempo a que se libere antes del segundo intento.
             // eslint-disable-next-line no-await-in-loop
-            await esperar(4000);
+            await esperar(err?.status === 429 || err?.status === 504 ? 30000 : 6000);
         }
     }
     return null;
@@ -47,7 +48,8 @@ const EvaluarProyecto = () => {
     const [enCurso, setEnCurso] = useState('');
     const [arrastrando, setArrastrando] = useState(false);
     const entrada = useRef(null);
-    const cancelar = useRef(false);
+    // Cada archivo cargado abre una «tanda»: lo que responda la IA para un archivo anterior se descarta.
+    const tanda = useRef(0);
 
     const diag = useMemo(() => (renglones ? diagnosticar(renglones, { titulo: tituloManual }) : null), [renglones, tituloManual]);
     const evaluables = useMemo(() => (diag ? Object.keys(CRITERIOS).filter((id) => palabras(textoParaIA(diag.secciones, id)) >= 20) : []), [diag]);
@@ -59,7 +61,6 @@ const EvaluarProyecto = () => {
         const tipo = /\.pdf$/i.test(nombre) || file.type === 'application/pdf' ? 'pdf' : /\.docx$/i.test(nombre) ? 'docx' : '';
         if (!tipo) { setError(/\.doc$/i.test(nombre) ? 'Ese es un Word antiguo (.doc). Ábrelo en Word y guárdalo como .docx, o expórtalo a PDF.' : 'Sube un archivo de Word (.docx) o un PDF.'); return; }
         if (file.size > 25 * 1024 * 1024) { setError('El archivo pesa más de 25 MB. Quítale imágenes pesadas o expórtalo de nuevo.'); return; }
-        cancelar.current = true;
         setLeyendo(true);
         try {
             const buffer = await file.arrayBuffer();
@@ -73,6 +74,7 @@ const EvaluarProyecto = () => {
             } else {
                 lineas = await leerDocx(buffer);
             }
+            tanda.current += 1;
             setArchivo({ nombre, tipo, paginas });
             setRenglones(lineas);
             setTituloManual('');
@@ -86,12 +88,15 @@ const EvaluarProyecto = () => {
     };
 
     const evaluarUna = async (id) => {
+        const mia = tanda.current;
         setEvaluaciones((prev) => ({ ...prev, [id]: { estado: 'cargando' } }));
         try {
             const resultado = await evaluarSeccion(id, diag);
+            if (mia !== tanda.current) return false;
             setEvaluaciones((prev) => ({ ...prev, [id]: { estado: 'listo', resultado } }));
             return true;
         } catch (err) {
+            if (mia !== tanda.current) return false;
             const mensaje = err?.code === 'cuota_ia' ? err.message : err?.message?.includes('JSON') ? 'La IA respondió en un formato inesperado. Inténtalo de nuevo.' : (err?.message || 'No se pudo evaluar esta sección.');
             setEvaluaciones((prev) => ({ ...prev, [id]: { estado: 'error', error: mensaje } }));
             return err?.code !== 'cuota_ia';
@@ -99,16 +104,19 @@ const EvaluarProyecto = () => {
     };
     // Una sección tras otra: el servicio de IA limita cuánto texto acepta por minuto.
     const evaluarTodas = async () => {
-        cancelar.current = false;
+        const mia = tanda.current;
         const pendientes = evaluables.filter((id) => evaluaciones[id]?.estado !== 'listo');
-        for (const id of pendientes) {
-            if (cancelar.current) break;
+        for (const [k, id] of pendientes.entries()) {
+            if (mia !== tanda.current) return;
             setEnCurso(id);
             // eslint-disable-next-line no-await-in-loop
             const seguir = await evaluarUna(id);
-            if (!seguir) break;
+            if (!seguir || mia !== tanda.current) break;
+            // Una pausa breve entre secciones para no chocar con el límite por minuto del servicio de IA.
+            // eslint-disable-next-line no-await-in-loop
+            if (k < pendientes.length - 1) await esperar(8000);
         }
-        setEnCurso('');
+        if (mia === tanda.current) setEnCurso('');
     };
 
     const listas = evaluables.filter((id) => evaluaciones[id]?.estado === 'listo');

@@ -71,3 +71,18 @@ test('evaluación con IA: mensajes con los criterios y lectura de la respuesta',
     assert.equal(r.nivel, 'falta');
     assert.deepEqual(r.sugerencias, ['Agregar el método.']);
 });
+
+test('documentos reales: pregunta como título, celdas de tablas, renglones partidos y referencias en otros estilos', () => {
+    assert.equal(ev.seccionDeTitulo('2.3 Pregunta de investigación'), 'pregunta');
+    assert.equal(ev.seccionDeTitulo('metodología.'), ''); // renglón partido de un párrafo en un PDF
+    // Una tabla (cronograma) con celdas «Marco teórico» o «Resultados» no abre secciones.
+    const { secciones } = ev.separarSecciones([{ texto: 'Planteamiento del problema', titulo: true }, { texto: 'El problema es grave.' }, { texto: 'Actividad · Marco teórico · Resultados · Conclusiones', tabla: true }, { texto: 'Sigue el planteamiento.' }]);
+    assert.deepEqual(Object.keys(secciones), ['planteamiento']);
+    assert.equal(secciones.planteamiento.renglones.length, 3);
+    // Objetivos escritos en el mismo renglón del rótulo; un párrafo de cierre no es otro objetivo.
+    assert.deepEqual(ev.objetivosDe('Objetivo específico 1: Identificar las causas de la deserción.\nObjetivo específico 2: Describir el perfil de quienes desertan.').especificos, ['Identificar las causas de la deserción.', 'Describir el perfil de quienes desertan.']);
+    assert.deepEqual(ev.objetivosDe('Objetivos específicos\n1. Identificar las causas de la deserción.\nCon esto se busca aportar a la universidad.').especificos, ['Identificar las causas de la deserción.']);
+    // Referencias ICONTEC y entradas sin año no se juntan con la siguiente.
+    assert.equal(ev.entradasReferencias('PÉREZ, Juan. Metodología. Bogotá: Norma, 2019.\nGÓMEZ, Ana. Estadística básica. Medellín: UdeA, 2020.').length, 2);
+    assert.equal(ev.entradasReferencias('Ministerio de Salud. Portal de datos. https://www.minsalud.gov.co\nPérez, J. (2020). Título. Editorial.').length, 2);
+});

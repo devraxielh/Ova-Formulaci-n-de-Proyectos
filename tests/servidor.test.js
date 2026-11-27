@@ -1426,3 +1426,34 @@ test('proyecto de ejemplo de Ingeniería Industrial: completo, coherente y con t
     const an = analizarPorObjetivo({ encuestas: [{ titulo: r.definition.titulo, definition: r.definition, responses: r.responses, meta: metaDePreguntas(r.definition, 'cuest01', d.instrumentosGen, d.operacionalizacion) }], especificos: d.objetivosForm.especificos, plan: d.metodologiaForm.analisis });
     assert.deepEqual(d.elementos.filter((e) => e.tipo === 'tabla').map((e) => [e.titulo, e.rows]), an.tablas.map((x) => [x.titulo, x.rows]));
 });
+
+test('los grupos del administrador arrastran las secciones habilitadas y respetan los grupos creados por profesores', async () => {
+    const admin = await entrarAdmin();
+    const profe = await cuenta('profe-renombre', 'teacher');
+    const otro = await cuenta('profe-dueno', 'teacher');
+    const sello = Date.now();
+    const g1 = `Curso ${sello}`;
+    const alta = await profe.api('/teacher/students', 'POST', { name: 'Rita Nombre', email: `rita.${sello}@example.test`, grupo: g1, permitir: true });
+    const rita = await estrenar(`rita.${sello}@example.test`, alta.body.clave);
+    await profe.api('/teacher/secciones', 'PUT', { grupo: g1, secciones: ['ideacion'] });
+    // Renombrar el grupo no le quita la restricción a sus estudiantes.
+    const g2 = `Curso nuevo ${sello}`;
+    assert.equal((await admin('/admin/groups/rename', 'POST', { from: g1, to: g2 })).status, 200);
+    assert.deepEqual((await rita.api('/auth/me')).body.user.secciones, ['ideacion']);
+    // Un grupo creado por otro profesor, aún vacío, no se pisa al renombrar, y el administrador lo ve.
+    const vacio = `Vacío ${sello}`;
+    assert.equal((await otro.api('/teacher/grupos', 'POST', { name: vacio })).status, 201);
+    assert.equal((await admin('/admin/groups/rename', 'POST', { from: g2, to: vacio })).status, 400);
+    const lista = (await admin('/admin/groups')).body.groups;
+    assert.deepEqual((({ cuentas, creado }) => [cuentas, creado])(lista.find((g) => g.name === vacio)), [0, true]);
+    assert.equal(lista.find((g) => g.name === vacio).historial.length, 1); // quedó en el historial de profesores
+    // Al pasar el grupo a otro profesor, la restricción lo acompaña.
+    assert.equal((await admin('/admin/groups/teacher', 'POST', { grupo: g2, teacherId: otro.id })).status, 200);
+    assert.deepEqual((await rita.api('/auth/me')).body.user.secciones, ['ideacion']);
+    // Lo que hace el administrador dentro de una cuenta queda a su nombre en la bitácora.
+    await admin(`/admin/users/${otro.id}/entrar`, 'POST');
+    await admin('/teacher/grupos/eliminar', 'POST', { name: vacio });
+    await admin('/auth/volver', 'POST');
+    const fila = (await admin('/admin/log')).body.log.find((l) => l.action === 'Eliminó un grupo' && l.detail.includes(vacio));
+    assert.match(fila.actor, /en la cuenta de profe-dueno/);
+});

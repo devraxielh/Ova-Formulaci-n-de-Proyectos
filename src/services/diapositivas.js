@@ -157,7 +157,8 @@ export const presentacionPptx = async (slides, imagenes = {}, tema = temaDe(), l
         : { x: 0.9, w: 11.7, y: 1.6, h: 5.2, tituloY: 0.4, tituloW: 11.9, figW: 11.4, figH: 4.7, notaY: 6.4, tablaW: 11.5, listaW: 11.7, listaH: 5.2 };
     const rotuloColor = T.rotulo || T.acento;
     const textoColor = T.texto || T.tinta;
-    const titular = (slide, texto) => slide.addText(texto, { x: 0.75, y: G.tituloY, w: G.tituloW, h: 1.0, fontSize: texto.length > 70 ? 24 : 30, bold: true, color: T.tinta, fontFace: 'Calibri', valign: 'middle', fit: 'shrink' });
+    // Títulos largos (p. ej. «Figura 4. Distribución porcentual: …») bajan de tamaño y se recortan para no tapar el contenido.
+    const titular = (slide, crudo) => { const texto = crudo.length > 150 ? `${crudo.slice(0, 147).replace(/\s+\S*$/, '')}…` : crudo; return slide.addText(texto, { x: 0.75, y: G.tituloY, w: G.tituloW, h: 1.0, fontSize: texto.length > 110 ? 18 : texto.length > 70 ? 22 : 30, bold: true, color: T.tinta, fontFace: 'Calibri', valign: 'middle', fit: 'shrink' }); };
 
     slides.forEach((s) => {
         if (s.tipo === 'portada') {
@@ -192,24 +193,35 @@ export const presentacionPptx = async (slides, imagenes = {}, tema = temaDe(), l
             const n = s.bloques.length;
             const cols = n <= 3 ? n : 3;
             const filas = Math.ceil(n / cols);
-            const sep = filas > 1 ? 0.25 : 0.3; const pad = 0.25; const cabeza = filas > 1 ? 0.72 : 0.8;
+            const sep = filas > 1 ? 0.25 : 0.3; const pad = 0.25;
+            const ptRotulo = filas > 1 ? 15 : 20;
             const w = (G.w - sep * (cols - 1)) / cols;
             const tope = (G.h - sep * (filas - 1)) / filas;
             const largoMax = Math.max(...s.bloques.map((b) => b.texto.length));
             // Primero crece la caja: mide lo que pide el texto más largo, hasta el alto disponible. Solo si ni así
             // cabe, baja la letra. Rótulo y texto van dentro de la misma caja, con «ajustar la forma al texto», para
             // que PowerPoint la agrande sola si alguien alarga el texto.
-            const pt = letraQueCabe(s.bloques.map((b) => b.texto), w - pad * 2, tope - cabeza - 0.12, filas > 1 ? 14 : largoMax > 260 ? 16 : 18, 10);
-            const h = Math.min(tope, Math.max(1.5, cabeza + Math.max(...s.bloques.map((b) => altoTexto(b.texto, w - pad * 2, pt))) + 0.12));
+            // Alto del rótulo: el más largo puede ocupar dos renglones («Instrumentos de recolección de información»).
+            const cabeza = 0.3 + Math.max(...s.bloques.map((b) => altoTexto(`${s.numerados ? '1   ' : ''}${b.rotulo}`, w - pad * 2, ptRotulo) - (ptRotulo * 0.61) / 72));
+            const disponible = tope - cabeza - 0.12;
+            const pt = letraQueCabe(s.bloques.map((b) => b.texto), w - pad * 2, disponible, filas > 1 ? 14 : largoMax > 260 ? 16 : 18, 10);
+            // Si ni con la letra mínima cabe, el texto se recorta (con «…») en vez de salirse de la caja.
+            const cabe = (texto) => {
+                if (altoTexto(texto, w - pad * 2, pt) <= disponible) return texto;
+                let corto = texto;
+                while (corto.length > 40 && altoTexto(`${corto}…`, w - pad * 2, pt) > disponible) corto = corto.slice(0, Math.floor(corto.length * 0.92)).replace(/\s+\S*$/, '');
+                return `${corto.replace(/[,;:.\s]+$/, '')}…`;
+            };
+            const textos = s.bloques.map((b) => cabe(b.texto));
+            const h = Math.min(tope, Math.max(1.5, cabeza + Math.max(...textos.map((x) => altoTexto(x, w - pad * 2, pt))) + 0.12));
             const total = h * filas + sep * (filas - 1);
             const y0 = G.y + (G.h - total) * 0.4;
-            const ptRotulo = filas > 1 ? 15 : 20;
             s.bloques.forEach((b, i) => {
                 const x = G.x + (i % cols) * (w + sep);
                 const y = y0 + Math.floor(i / cols) * (h + sep);
                 slide.addText([
                     { text: `${s.numerados ? `${i + 1}   ` : ''}${b.rotulo}`, options: { fontSize: ptRotulo, bold: true, color: rotuloColor, breakLine: true, paraSpaceAfter: 8 } },
-                    { text: b.texto, options: { fontSize: pt, color: textoColor } },
+                    { text: textos[i], options: { fontSize: pt, color: textoColor } },
                 ], { shape: pptx.ShapeType.roundRect, x, y, w, h, fill: { color: T.tarjeta }, line: { color: T.borde, width: 1 }, rectRadius: 0.1, margin: pad * 72, fontFace: 'Calibri', align: 'left', valign: 'top', fit: 'resize' });
             });
         } else if (s.tipo === 'referencias') {

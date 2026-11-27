@@ -206,7 +206,7 @@ const MiProyecto = ({ onNavigate }) => {
         try {
             const [{ docxBlob }, imagenes, logo] = await Promise.all([import('../services/docx'), cargarImagenes(), cargarLogo(ins)]);
             descargar(await docxBlob(project.name, author, sections, { ...extra, imagenes, logo }), 'docx');
-            setNotice(`Word descargado${ins ? (logo ? ` con el logo de ${ins.corto} en la portada` : ' (no se pudo cargar el logo: salió sin él)') : ''}. Al abrirlo, Word puede preguntar si actualiza los campos: responde «Sí» para que la tabla de contenido muestre los números de página.`);
+            setNotice(`Word descargado${ins ? (logo ? ` con el logo de ${ins.corto} en la portada` : ' (no se pudo cargar el logo: salió sin él)') : ''}. La tabla de contenido ya trae los números de página.`);
         } catch {
             descargar(new Blob(['\ufeff', documentHtml(project.name, author, sections)], { type: 'application/msword' }), 'doc');
             setNotice('No se pudo generar el .docx; se descargó la versión .doc.');

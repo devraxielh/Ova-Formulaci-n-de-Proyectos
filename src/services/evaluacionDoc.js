@@ -26,7 +26,14 @@ export const leerDocx = async (buffer) => {
     const xml = await archivo.async('string');
     const cuerpo = xml.slice(xml.indexOf('<w:body'));
     const parrafos = [];
-    for (const m of cuerpo.matchAll(/<w:p[ >][\s\S]*?<\/w:p>/g)) {
+    // Tablas y párrafos en orden. Una tabla (cronograma, presupuesto…) entra como un solo renglón de texto que nunca
+    // abre sección: sus celdas («Marco teórico», «Resultados») no son títulos.
+    for (const m of cuerpo.matchAll(/<w:tbl>[\s\S]*?<\/w:tbl>|<w:p[ >][\s\S]*?<\/w:p>/g)) {
+        if (m[0].startsWith('<w:tbl>')) {
+            const celdas = [...m[0].matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)].map((x) => entidades(x[1]).trim()).filter(Boolean);
+            if (celdas.length) parrafos.push({ texto: celdas.join(' · '), estilo: '', titulo: false, indice: false, tabla: true });
+            continue;
+        }
         const p = m[0];
         const estilo = (p.match(/<w:pStyle w:val="([^"]+)"/) || [])[1] || '';
         // Texto de las corridas, con tabulaciones y saltos de línea como espacios (en el índice separan el número de página).
@@ -59,7 +66,7 @@ export const SECCIONES = [
     { id: 'resumen', label: 'Resumen', patron: /^(resumen|abstract)( ejecutivo)?$/ },
     { id: 'introduccion', label: 'Introducción', patron: /^introduccion$/ },
     { id: 'planteamiento', label: 'Planteamiento del problema', patron: /^((planteamiento|descripcion|definicion|identificacion) (del|de la) problem(a|atica)( de investigacion)?|problema de investigacion|situacion problema|el problema)$/ },
-    { id: 'pregunta', label: 'Pregunta de investigación', patron: /^((formulacion|pregunta)( del| de la)? (problema|pregunta|investigacion)( de investigacion)?|formulacion o pregunta de investigacion|pregunta problema)$/ },
+    { id: 'pregunta', label: 'Pregunta de investigación', patron: /^((formulacion|pregunta)( del| de la| de)? (problema|pregunta|investigacion)( de investigacion)?|formulacion o pregunta de investigacion|pregunta problema)$/ },
     { id: 'objetivos', label: 'Objetivos', patron: /^objetivos?( de (la )?investigacion| del (proyecto|estudio)| general(es)?| especificos?)?$/ },
     { id: 'justificacion', label: 'Justificación', patron: /^justificacion( del (proyecto|estudio)| de la investigacion)?$/ },
     { id: 'alcances', label: 'Alcances y limitaciones', patron: /^(alcances?|delimitacion|limitaciones)( y (limitaciones|delimitacion|alcances?))?( del (proyecto|estudio)| de la investigacion)?$/ },
@@ -89,6 +96,9 @@ export const seccionDeTitulo = (texto, { estiloTitulo = false } = {}) => {
     const limpio = sinNumero(crudo).replace(/[:.]$/, '');
     if (!limpio || limpio.length > 75 || palabras(limpio) > 9) return '';
     if (!estiloTitulo && /[;,]$/.test(crudo)) return '';
+    // Un renglón partido del cuerpo («metodología.», «resultados») no es título: los títulos empiezan en mayúscula
+    // y, si terminan en punto, llevan número delante.
+    if (!estiloTitulo && (/^\p{Ll}/u.test(limpio) || (/\.$/.test(crudo) && limpio === crudo.replace(/\.$/, '')))) return '';
     const p = plano(limpio);
     const ignorada = IGNORAR.find((x) => x.patron.test(p));
     if (ignorada) return ignorada.id;
@@ -108,12 +118,12 @@ export const separarSecciones = (renglones) => {
         const texto = typeof r === 'string' ? r : r.texto;
         if (!t(texto) || r?.indice) return;
         if (/^[\divxlc]{1,4}$/i.test(t(texto))) return; // número de página suelto
-        const id = seccionDeTitulo(texto, { estiloTitulo: Boolean(r?.titulo) });
+        const id = r?.tabla ? '' : seccionDeTitulo(texto, { estiloTitulo: Boolean(r?.titulo) });
         if (id) {
             actual = id;
             if (SECCIONES.some((s) => s.id === id)) {
                 const yaEstaba = Boolean(secciones[id]);
-                secciones[id] = secciones[id] || { label: SECCIONES.find((s) => s.id === id).label, renglones: [], titulos: [] };
+                secciones[id] = secciones[id] || { label: SECCIONES.find((s) => s.id === id).label, renglones: [], titulos: [], porParrafo: typeof r !== 'string' };
                 secciones[id].titulos.push(t(texto));
                 // Un subtítulo de la misma sección («Objetivo general», «Antecedentes») se conserva en el texto:
                 // marca dónde empieza cada parte.
@@ -170,7 +180,14 @@ export const objetivosDe = (texto) => {
     lineas.forEach((l) => {
         const p = plano(sinNumero(l));
         if (/^objetivo general/.test(p)) { modo = 'general'; const resto = l.replace(/^.*?objetivo general\s*[:.\-–]?\s*/i, ''); if (palabras(resto) > 3) general = resto; return; }
-        if (/^objetivos? especificos?/.test(p)) { modo = 'especificos'; return; }
+        if (/^objetivos? especificos?/.test(p)) {
+            modo = 'especificos';
+            // «Objetivo específico 1: Identificar…» o «Objetivos específicos: identificar…; describir…».
+            const resto = l.replace(/^.*?objetivos? espec[ií]ficos?\s*\d*\s*[:.\-–]?\s*/i, '');
+            resto.split(/;\s*/).map(sinVineta).filter((x) => palabras(x) > 3).forEach((x) => especificos.push(x.charAt(0).toUpperCase() + x.slice(1)));
+            return;
+        }
+        if (modo === 'fin') return;
         const limpia = sinVineta(l);
         if (modo === 'general') {
             if (!general) general = limpia;
@@ -181,7 +198,8 @@ export const objetivosDe = (texto) => {
         if (modo === 'especificos') {
             const nuevo = /^([-•*·▪◦]|\d{1,2}[.)]|[a-h][.)])\s*/i.test(l) || VERBO.test(plano(limpia));
             if (nuevo || !especificos.length) especificos.push(limpia);
-            else especificos[especificos.length - 1] = `${especificos.at(-1)} ${limpia}`;
+            else if (!/[.]$/.test(especificos.at(-1))) especificos[especificos.length - 1] = `${especificos.at(-1)} ${limpia}`;
+            else modo = 'fin'; // un párrafo de cierre después de la lista no es otro objetivo
             return;
         }
         // Sin rótulos: el primer verbo en infinitivo es el general y los siguientes, los específicos;
@@ -196,16 +214,18 @@ export const objetivosDe = (texto) => {
 /* ---------- Referencias y citas ---------- */
 
 // Entradas de la lista de referencias (en un PDF cada entrada puede ocupar varios renglones).
-export const entradasReferencias = (texto) => {
+export const entradasReferencias = (texto, { porParrafo = false } = {}) => {
     const entradas = [];
+    if (porParrafo) return t(texto).split('\n').map(t).filter((l) => palabras(l) >= 3);
     t(texto).split('\n').map(t).filter(Boolean).forEach((l) => {
         // Un apellido puede empezar con partícula en minúscula: «da Costa, B. R.», «van Dijk, T.».
         const l2 = l.replace(/^((da|das|de|del|di|do|dos|du|la|le|van|von|der|den)\s)+/, '');
         // «Apellido, I.» abre una entrada solo si la anterior ya tiene su año: así una lista larga de autores
         // partida en varios renglones sigue siendo una sola entrada.
         const anterior = entradas.at(-1) || '';
-        const completa = !anterior || /\(\s*((19|20)\d{2}[a-z]?|s\.\s?f\.)/.test(anterior) || /^(Ley|Decreto|Resoluci[oó]n|Acuerdo|Constituci[oó]n)\s/i.test(anterior);
-        const autor = /^[\p{Lu}][\p{L}'’-]+(\s[\p{L}'’-]+){0,3},\s*[\p{Lu}]\./u.test(l2) || /^[\p{Lu}][^()]{0,160}\(\s*((19|20)\d{2}[a-z]?|s\.\s?f\.)\)/u.test(l2);
+        const completa = !anterior || /\(\s*((19|20)\d{2}[a-z]?|s\.\s?f\.)/.test(anterior) || /^(Ley|Decreto|Resoluci[oó]n|Acuerdo|Constituci[oó]n)\s/i.test(anterior) || /([.)]|https?:\/\/\S+)$/.test(anterior);
+        // APA («Pérez, J.»), ICONTEC («PÉREZ, Juan.») o una institución con su año («Ministerio de Salud. (2020)»).
+        const autor = /^[\p{Lu}][\p{L}'’-]+(\s[\p{L}'’-]+){0,3},\s*[\p{Lu}]\./u.test(l2) || /^[\p{Lu}][^()]{0,160}\(\s*((19|20)\d{2}[a-z]?|s\.\s?f\.)\)/u.test(l2) || /^\p{Lu}{2,}[\p{Lu} '’-]*,\s*\p{Lu}/u.test(l2);
         const empieza = (autor && completa) || /^(Ley|Decreto|Resoluci[oó]n|Acuerdo|Constituci[oó]n)\s\S+\sde\s(19|20)\d{2}/i.test(l);
         if (empieza || !entradas.length) entradas.push(l); else entradas[entradas.length - 1] = `${entradas.at(-1)} ${l}`;
     });
@@ -223,7 +243,7 @@ export const revisarCitasDocumento = (secciones) => {
     const textoCuerpo = Object.entries(secciones).filter(([id]) => id !== 'referencias').map(([, s]) => textoDe(s)).join('\n');
     const citas = new Map();
     citasEnTexto(textoCuerpo.replace(/\n/g, ' ')).forEach((c) => { const x = citas.get(c.clave) || { ...c, veces: 0 }; x.veces += 1; citas.set(c.clave, x); });
-    const entradas = entradasReferencias(textoDe(secciones.referencias));
+    const entradas = entradasReferencias(textoDe(secciones.referencias), { porParrafo: Boolean(secciones.referencias?.porParrafo) });
     const refs = entradas.map((e) => ({ entrada: e, ref: refDeEntrada(e) }));
     const claves = new Set(refs.filter((r) => r.ref).map((r) => claveRef(r.ref)));
     const citadas = new Set(citas.keys());
@@ -288,7 +308,7 @@ export const mensajesEvaluacion = ({ id, texto, titulo, pregunta, general, espec
     const contexto = [titulo && `TÍTULO: ${titulo}`, pregunta && `PREGUNTA: ${pregunta}`, general && `OBJETIVO GENERAL: ${general}`, especificos?.length && `OBJETIVOS ESPECÍFICOS:\n${especificos.map((o, i) => `${i + 1}. ${o}`).join('\n')}`].filter(Boolean).join('\n');
     return [
         { role: 'system', content: 'Eres un evaluador metodológico de proyectos de investigación universitarios. Revisas con rigor y respeto un documento escrito por otra persona, fuera de cualquier plataforma. Solo juzgas lo que está en el texto: si algo no aparece, lo marcas como ausente; nunca inventas datos, autores ni cifras. Respondes solo JSON válido en español.' },
-        { role: 'user', content: `Evalúa la sección «${etiqueta}» de este proyecto.\n\nCONTEXTO DEL PROYECTO\n${contexto || '(no se pudieron leer el título ni los objetivos)'}\n\nTEXTO DE LA SECCIÓN\n${t(texto).slice(0, 7000)}\n\nCRITERIOS\n${criterios.map(([cid, desc]) => `- ${cid}: ${desc}`).join('\n')}\n\nPara cada criterio decide: "cumple" (está y está bien), "parcial" (está pero incompleto o débil) o "no" (no aparece). Da como evidencia una cita textual breve (máx. 15 palabras) cuando exista. Responde exactamente con este JSON:\n{"valoracion": "una o dos frases con el estado general de la sección", "criterios": [{"id": "id del criterio", "estado": "cumple | parcial | no", "evidencia": "cita breve o vacío", "comentario": "qué falta o cómo mejorarlo, en una frase; vacío si cumple sin reparos"}], "sugerencias": ["máximo 3 mejoras concretas, de la más a la menos importante"]}` },
+        { role: 'user', content: `Evalúa la sección «${etiqueta}» de este proyecto.\n\nCONTEXTO DEL PROYECTO\n${contexto || '(no se pudieron leer el título ni los objetivos)'}\n\nTEXTO DE LA SECCIÓN\n${t(texto).slice(0, 6000)}\n\nCRITERIOS\n${criterios.map(([cid, desc]) => `- ${cid}: ${desc}`).join('\n')}\n\nPara cada criterio decide: "cumple" (está y está bien), "parcial" (está pero incompleto o débil) o "no" (no aparece). Da como evidencia una cita textual breve (máx. 15 palabras, sin comillas dobles) cuando exista. Responde exactamente con este JSON:\n{"valoracion": "una o dos frases con el estado general de la sección", "criterios": [{"id": "id del criterio", "estado": "cumple | parcial | no", "evidencia": "cita breve o vacío", "comentario": "qué falta o cómo mejorarlo, en una frase; vacío si cumple sin reparos"}], "sugerencias": ["máximo 3 mejoras concretas, de la más a la menos importante"]}` },
     ];
 };
 

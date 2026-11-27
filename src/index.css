@@ -584,3 +584,11 @@ select:not([multiple]) {
 .app-bloqueada svg { color: #64748b; }
 .app-bloqueada h2 { margin: 0; font-size: 1.25rem; color: #0f172a; }
 .app-bloqueada p { margin: 0; line-height: 1.6; }
+
+/* El texto de cada opción del menú ocupa un solo renglón (con «…» si no cabe), para que no se monte sobre la
+   siguiente cuando el menú se ajusta al alto de la ventana. Con el menú recogido, el candado se ve sobre el ícono. */
+@media (min-width: 769px) {
+  .sidebar nav .nav-button > span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sidebar--collapsed .nav-button--locked { position: relative; }
+  .sidebar--collapsed .nav-button--locked::after { content: '🔒'; position: absolute; right: 0.1rem; bottom: 0; font-size: 0.6rem; line-height: 1; }
+}

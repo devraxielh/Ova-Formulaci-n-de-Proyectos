@@ -9,7 +9,7 @@ import { Credenciales } from './Cuentas';
 // Sin lista guardada, el grupo tiene todas habilitadas. Un grupo puede crearse antes de tener estudiantes.
 const TODAS = SECCIONES_MENU.map((s) => s.id);
 
-const SeccionesGrupo = ({ version = 0, onGrupos, students = [], onCrear, onVer, onEstudiantes }) => {
+const SeccionesGrupo = ({ version = 0, onGrupos, students = [], onCrear, onVer, onEstudiantes, permitir }) => {
     const [grupos, setGrupos] = useState(null);
     const [grupo, setGrupo] = useState('');
     const [marcadas, setMarcadas] = useState(TODAS);
@@ -59,11 +59,15 @@ const SeccionesGrupo = ({ version = 0, onGrupos, students = [], onCrear, onVer, 
 
     // Al cambiar de grupo (o al recargar) se muestra lo que ese grupo tiene guardado.
     const actual = (grupos || []).find((g) => g.grupo === grupo) || (grupos || [])[0];
+    // Solo cuando cambia el grupo elegido o lo guardado de ese grupo: recargar la lista (al crear o mover
+    // estudiantes) no borra lo que el profesor marcó y aún no guarda.
+    const guardadoClave = actual ? `${actual.grupo}|${(actual.secciones || TODAS).join(',')}` : '';
     useEffect(() => {
         if (!actual) return;
         if (actual.grupo !== grupo) setGrupo(actual.grupo);
         setMarcadas(actual.secciones || TODAS);
-    }, [actual, grupo]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [guardadoClave]);
     useEffect(() => { setFiltro(''); }, [grupo]);
 
     if (!grupos) return null;
@@ -124,7 +128,7 @@ const SeccionesGrupo = ({ version = 0, onGrupos, students = [], onCrear, onVer, 
                     // Cada pestaña muestra a sus estudiantes: hasta cuatro nombres y cuántos más hay.
                     const suyos = students.filter((x) => (x.grupo || '') === g.grupo);
                     return (
-                        <button key={g.grupo || '—'} type="button" role="tab" className="sec-chip" aria-selected={g.grupo === actual.grupo} onClick={() => setGrupo(g.grupo)}>
+                        <button key={g.grupo || '__sin_grupo__'} type="button" role="tab" className="sec-chip" aria-selected={g.grupo === actual.grupo} onClick={() => setGrupo(g.grupo)}>
                             <b>{g.grupo || 'Sin grupo'}</b>
                             <small>{g.estudiantes} {g.estudiantes === 1 ? 'estudiante' : 'estudiantes'} · {g.secciones ? `${g.secciones.length} de ${TODAS.length} secciones` : 'todas las secciones'}</small>
                             {suyos.length > 0
@@ -167,6 +171,7 @@ const SeccionesGrupo = ({ version = 0, onGrupos, students = [], onCrear, onVer, 
                         <label><span>Nombre completo</span><input className="input-field" required maxLength={120} value={alumno.name} onChange={(e) => setAlumno({ ...alumno, name: e.target.value })} placeholder="Ej.: Ana Pérez Gómez" /></label>
                         <label><span>Correo (será su usuario)</span><input className="input-field" type="email" required maxLength={160} value={alumno.email} onChange={(e) => setAlumno({ ...alumno, email: e.target.value })} placeholder="ana@correo.edu.co" /></label>
                         <button type="submit" className="pro-btn pro-btn--primary" disabled={creandoAlumno || !alumno.name.trim() || !alumno.email.trim()}><UserPlus size={15} /> {creandoAlumno ? 'Creando…' : actual.grupo ? 'Crear en este grupo' : 'Crear sin grupo'}</button>
+                        {permitir !== undefined && <small className="adm-muted sec-permiso">{permitir ? 'Podrá crear su proyecto desde ya.' : 'Sin permiso para crear su proyecto (lo marcas en «Crear estudiantes»).'}</small>}
                     </form>
                 )}
                 {credenciales && <Credenciales cuentas={credenciales.cuentas} mail={credenciales.mail} onCerrar={() => setCredenciales(null)} />}
