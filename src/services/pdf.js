@@ -114,13 +114,13 @@ export const definicionPdf = (name, author, sections, extra = {}) => {
 
     // Logo de la institución (si se eligió): va arriba en la portada y ocupa el lugar de varios renglones en blanco.
     const lg = extra.logo?.dataUrl ? extra.logo : null;
-    const logo = lg ? [{ image: lg.dataUrl, width: lg.width * 0.75, height: lg.height * 0.75, alignment: 'center', margin: [0, 0, 0, 6] }] : [];
+    const logo = () => lg ? [{ image: lg.dataUrl, width: lg.width * 0.75, height: lg.height * 0.75, alignment: 'center', margin: [0, 0, 0, 6] }] : [];
     const portada = [
-        ...(lg ? [...vacios(1), ...logo, ...vacios(1)] : vacios(4)), centrado(titulo, { bold: true }), ...vacios(lg ? 4 : 5), centrado('Presentado por:'), ...autores.map((a) => centrado(a)), ...vacios(6), centrado(lugarFecha),
+        ...(lg ? [...vacios(1), ...logo(), ...vacios(1)] : vacios(4)), centrado(titulo, { bold: true }), ...vacios(lg ? 4 : 5), centrado('Presentado por:'), ...autores.map((a) => centrado(a)), ...vacios(6), centrado(lugarFecha),
         { text: ' ', pageBreak: 'before' },
-        ...vacios(3), centrado(titulo, { bold: true }), ...vacios(3), centrado('Presentado por:'), ...autores.map((a) => centrado(a)),
+        ...(lg ? [...vacios(1), ...logo(), ...vacios(1)] : vacios(3)), centrado(titulo, { bold: true }), ...vacios(lg ? 2 : 3), centrado('Presentado por:'), ...autores.map((a) => centrado(a)),
         ...(director ? [...vacios(2), centrado('Bajo la dirección de:'), ...director.split('\n').map((d) => centrado(d.trim()))] : []),
-        ...vacios(director ? 4 : 6), centrado(lugarFecha),
+        ...vacios(lg ? (director ? 3 : 4) : director ? 4 : 6), centrado(lugarFecha),
     ];
     const pagina = (t, texto) => (String(texto || '').trim() ? [centrado(t, { bold: true, pageBreak: 'before' }), ...String(texto).trim().split(/\n+/).map((x) => centrado(x.trim()))] : []);
 

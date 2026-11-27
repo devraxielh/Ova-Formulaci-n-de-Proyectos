@@ -186,9 +186,12 @@ export const crearDocx = (name, author, sections, extra = {}) => {
     const autores = String(author || '').split(/\n|;/).map((a) => a.trim()).filter(Boolean);
 
     // Portada (con el logo de la institución, si se eligió una) y portada interna.
-    const logo = extra.logo?.data && extra.logo.width > 0
+    // Va en las dos hojas de portada: cada una lleva su propio párrafo con la imagen.
+    const hacerLogo = () => (extra.logo?.data && extra.logo.width > 0
         ? new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 240, line: 240 }, children: [new ImageRun({ type: extra.logo.type === 'png' ? 'png' : 'jpg', data: extra.logo.data, transformation: { width: extra.logo.width, height: extra.logo.height } })] })
-        : null;
+        : null);
+    const logo = hacerLogo();
+    const logo2 = hacerLogo();
     const portada = [
         ...(logo ? [...vacios(1), logo, ...vacios(1)] : vacios(4)),
         centrado(titulo, { bold: true }),
@@ -198,13 +201,13 @@ export const crearDocx = (name, author, sections, extra = {}) => {
         ...vacios(logo ? 4 : 6),
         centrado(lugarFecha),
         salto(),
-        ...vacios(4),
+        ...(logo2 ? [...vacios(1), logo2, ...vacios(1)] : vacios(4)),
         centrado(titulo, { bold: true }),
-        ...vacios(3),
+        ...vacios(logo2 ? 2 : 3),
         centrado('Presentado por:'),
         ...autores.map((a) => centrado(a)),
         ...(director ? [...vacios(2), centrado('Bajo la dirección de:'), ...director.split('\n').map((d) => centrado(d.trim()))] : []),
-        ...vacios(director ? 4 : 6),
+        ...vacios(logo2 ? (director ? 3 : 4) : director ? 4 : 6),
         centrado(lugarFecha),
         salto(),
     ];
